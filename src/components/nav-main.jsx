@@ -16,8 +16,8 @@ export function NavMain({ items }) {
         <SidebarMenu>
           <SidebarMenuItem>
             <Button
-              variant="default"
-              className="w-full justify-start bg-primary text-primary-foreground hover:bg-primary/90"
+              variant="outline"
+              className="w-full justify-start"
             >
               <IconCirclePlusFilled className="mr-2 h-5 w-5" />
               Nueva venta

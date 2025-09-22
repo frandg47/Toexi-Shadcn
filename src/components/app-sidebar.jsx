@@ -9,6 +9,9 @@ import {
   IconHelp,
   IconDatabase,
   IconReport,
+  IconBrandProducthunt,
+  IconUserCircle,
+  IconUsersGroup
 } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 
@@ -34,11 +37,11 @@ const navData = {
   },
   navMain: [
     { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
-    { title: "Productos", url: "/dashboard/products", icon: IconPhone },
+    { title: "Productos", url: "/dashboard/products", icon: IconReport },
     { title: "Categorías", url: "/dashboard/categories", icon: IconCategory2 },
     { title: "Pedidos", url: "/dashboard/orders", icon: IconShoppingCart },
     { title: "Clientes", url: "/dashboard/clients", icon: IconUsers },
-    { title: "Usuarios", url: "/dashboard/users", icon: IconUsers },
+    { title: "Equipo", url: "/dashboard/users", icon: IconUsersGroup },
   ],
   navSecondary: [
     { title: "Configuración", url: "/dashboard/settings", icon: IconSettings },
@@ -53,9 +56,7 @@ export default function AppSidebar(props) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link to="/dashboard" className="text-base font-semibold">
-                Tienda Celulares
-              </Link>
+              <span className="text-xl font-bold">Toexi Tech</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

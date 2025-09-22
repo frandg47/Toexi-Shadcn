@@ -201,7 +201,7 @@ export default function CategoriesAndBrandsCRUDWithSelection() {
             onChange={(e) => setNewCategory(e.target.value)}
             className="flex-1"
           />
-          <Button variant="outline" onClick={handleAddCategory} disabled={addingCategory}>
+          <Button className="bg-neutral-900 hover:bg-neutral-800 text-white" onClick={handleAddCategory} disabled={addingCategory}>
             {addingCategory && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
             Agregar Categoría
           </Button>
@@ -290,7 +290,7 @@ export default function CategoriesAndBrandsCRUDWithSelection() {
             onChange={(e) => setNewBrand(e.target.value)}
             className="flex-1"
           />
-          <Button variant="outline" onClick={handleAddBrand} disabled={addingBrand}>
+          <Button className="bg-neutral-900 hover:bg-neutral-800 text-white" onClick={handleAddBrand} disabled={addingBrand}>
             {addingBrand && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
             Agregar Marca
           </Button>
