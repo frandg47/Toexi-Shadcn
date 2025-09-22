@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import DashboardLayout from "./components/layout/DashboardLayout";
+import { Toaster } from "@/components/ui/sonner";
 
 import Dashboard from "./pages/Dashboard";
 import Products from "./pages/Products";
@@ -11,6 +12,7 @@ import Orders from "./pages/Orders";
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-center" />
       <Routes>
         <Route path="/dashboard" element={<DashboardLayout />}>
           {/* 👇 Ruta index: cuando entres a /dashboard muestra Dashboard */}
