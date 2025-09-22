@@ -1,19 +1,19 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { Input, Select, Button } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
-export default function AddBrand({ categories, onBrandAdded }) {
+export default function AddBrand({ onBrandAdded }) {
   const [name, setName] = useState("");
-  const [categoryId, setCategoryId] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleAdd = async () => {
-    if (!name || !categoryId) return;
+    if (!name) return;
 
     setLoading(true);
     const { data, error } = await supabase
       .from("brands")
-      .insert([{ name, category_id: parseInt(categoryId) }])
+      .insert([{ name: name.toUpperCase() }])
       .select();
 
     setLoading(false);
@@ -21,7 +21,6 @@ export default function AddBrand({ categories, onBrandAdded }) {
       console.error("Error adding brand:", error);
     } else {
       setName("");
-      setCategoryId("");
       if (onBrandAdded) onBrandAdded(data[0]);
     }
   };
@@ -29,24 +28,12 @@ export default function AddBrand({ categories, onBrandAdded }) {
   return (
     <div className="flex items-center gap-2 mb-4">
       <Input
-        placeholder="New brand"
+        placeholder="Nueva marca"
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
-      <select
-        value={categoryId}
-        onChange={(e) => setCategoryId(e.target.value)}
-        className="border rounded px-2 py-1"
-      >
-        <option value="">Select category</option>
-        {categories.map((cat) => (
-          <option key={cat.id} value={cat.id}>
-            {cat.name}
-          </option>
-        ))}
-      </select>
       <Button onClick={handleAdd} disabled={loading}>
-        {loading ? "Adding..." : "Add"}
+        {loading ? "Agregando..." : "Agregar"}
       </Button>
     </div>
   );

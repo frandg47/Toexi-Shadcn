@@ -8,88 +8,281 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import AddCategory from "./AddCategory";
-import AddBrand from "./AddBrand";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
-export default function CatalogTable() {
-  const [brands, setBrands] = useState([]);
+export default function CategoriesAndBrandsCRUDWithSelection() {
   const [categories, setCategories] = useState([]);
+  const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [newCategory, setNewCategory] = useState("");
+  const [newBrand, setNewBrand] = useState("");
+
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedBrands, setSelectedBrands] = useState([]);
+
+  // Fetch data
+  const fetchData = async () => {
+    setLoading(true);
+    const { data: categoriesData, error: categoriesError } = await supabase
+      .from("categories")
+      .select("*");
+    const { data: brandsData, error: brandsError } = await supabase
+      .from("brands")
+      .select("*");
+
+    if (!categoriesError) setCategories(categoriesData);
+    if (!brandsError) setBrands(brandsData);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-
-      // Traer categorías
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from("categories")
-        .select("*");
-
-      // Traer marcas
-      const { data: brandsData, error: brandsError } = await supabase
-        .from("brands")
-        .select("*");
-
-      if (categoriesError)
-        console.error("Error fetching categories:", categoriesError);
-      else setCategories(categoriesData);
-
-      if (brandsError) console.error("Error fetching brands:", brandsError);
-      else setBrands(brandsData);
-
-      setLoading(false);
-    };
-
     fetchData();
   }, []);
+
+  // --- CRUD HANDLERS ---
+  const handleAddCategory = async () => {
+    if (!newCategory) return;
+    const { data, error } = await supabase
+      .from("categories")
+      .insert([{ name: newCategory }])
+      .select();
+    if (!error) {
+      setCategories([...categories, data[0]]);
+      setNewCategory("");
+    }
+  };
+
+  const handleEditCategory = async (id, name) => {
+    const { data, error } = await supabase
+      .from("categories")
+      .update({ name })
+      .eq("id", id)
+      .select();
+    if (!error)
+      setCategories(categories.map((c) => (c.id === id ? data[0] : c)));
+  };
+
+  const handleDeleteCategory = async (id) => {
+    const { error } = await supabase.from("categories").delete().eq("id", id);
+    if (!error) {
+      setCategories(categories.filter((c) => c.id !== id));
+      setSelectedCategories(selectedCategories.filter((x) => x !== id));
+    }
+  };
+
+  const handleDeleteSelectedCategories = async () => {
+    if (selectedCategories.length === 0) return;
+    const { error } = await supabase
+      .from("categories")
+      .delete()
+      .in("id", selectedCategories);
+    if (!error) {
+      setCategories(
+        categories.filter((c) => !selectedCategories.includes(c.id))
+      );
+      setSelectedCategories([]);
+    }
+  };
+
+  const handleAddBrand = async () => {
+    if (!newBrand) return;
+    const { data, error } = await supabase
+      .from("brands")
+      .insert([{ name: newBrand }])
+      .select();
+    if (!error) {
+      setBrands([...brands, data[0]]);
+      setNewBrand("");
+    }
+  };
+
+  const handleEditBrand = async (id, name) => {
+    const { data, error } = await supabase
+      .from("brands")
+      .update({ name })
+      .eq("id", id)
+      .select();
+    if (!error) setBrands(brands.map((b) => (b.id === id ? data[0] : b)));
+  };
+
+  const handleDeleteBrand = async (id) => {
+    const { error } = await supabase.from("brands").delete().eq("id", id);
+    if (!error) {
+      setBrands(brands.filter((b) => b.id !== id));
+      setSelectedBrands(selectedBrands.filter((x) => x !== id));
+    }
+  };
+
+  const handleDeleteSelectedBrands = async () => {
+    if (selectedBrands.length === 0) return;
+    const { error } = await supabase
+      .from("brands")
+      .delete()
+      .in("id", selectedBrands);
+    if (!error) {
+      setBrands(brands.filter((b) => !selectedBrands.includes(b.id)));
+      setSelectedBrands([]);
+    }
+  };
+
+  // --- CHECKBOX HANDLERS ---
+  const toggleCategory = (id) =>
+    setSelectedCategories((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+
+  const toggleBrand = (id) =>
+    setSelectedBrands((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
 
   if (loading) return <div>Loading...</div>;
 
   return (
-    <div className="space-y-8">
-      {/* Tabla de categorías */}
+    <div className="space-y-10">
+      {/* --- TABLA CATEGORÍAS --- */}
       <div>
-        <AddCategory
-          onCategoryAdded={(newCat) => setCategories([...categories, newCat])}
-        />
-        <h2 className="text-xl font-semibold mb-2">Categorias</h2>
+        <h2 className="text-xl font-semibold mb-2">Categorías</h2>
+        <div className="flex items-center gap-2 mb-4">
+          <Input
+            placeholder="Nueva categoría"
+            value={newCategory}
+            onChange={(e) => setNewCategory(e.target.value)}
+            className="flex-1"
+          />
+          <Button variant="outline" onClick={handleAddCategory}>
+            Agregar Categoría
+          </Button>
+          {selectedCategories.length > 0 && (
+            <Button
+              variant="destructive"
+              onClick={handleDeleteSelectedCategories}
+            >
+              Eliminar Seleccionadas ({selectedCategories.length})
+            </Button>
+          )}
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead></TableHead>
               <TableHead>ID</TableHead>
               <TableHead>Nombre</TableHead>
+              <TableHead>Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {categories.map((category) => (
-              <TableRow key={category.id}>
-                <TableCell>{category.id}</TableCell>
-                <TableCell>{category.name}</TableCell>
+            {categories.map((cat) => (
+              <TableRow
+                key={cat.id}
+                className={selectedCategories.includes(cat.id) ? "bg-gray-100" : ""}
+              >
+                <TableCell>
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(cat.id)}
+                    onChange={() => toggleCategory(cat.id)}
+                  />
+                </TableCell>
+                <TableCell>{cat.id}</TableCell>
+                <TableCell>
+                  <Input
+                    value={cat.name}
+                    onChange={(e) =>
+                      setCategories(
+                        categories.map((c) =>
+                          c.id === cat.id ? { ...c, name: e.target.value } : c
+                        )
+                      )
+                    }
+                  />
+                </TableCell>
+                <TableCell className="flex gap-2">
+                  <Button size="sm" onClick={() => handleEditCategory(cat.id, cat.name)}>
+                    Editar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDeleteCategory(cat.id)}
+                  >
+                    Eliminar
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
 
-      {/* Tabla de marcas */}
+      {/* --- TABLA MARCAS --- */}
       <div>
-        <AddBrand
-          categories={categories}
-          onBrandAdded={(newBrand) => setBrands([...brands, newBrand])}
-        />
         <h2 className="text-xl font-semibold mb-2">Marcas</h2>
+        <div className="flex items-center gap-2 mb-4">
+          <Input
+            placeholder="Nueva marca"
+            value={newBrand}
+            onChange={(e) => setNewBrand(e.target.value)}
+            className="flex-1"
+          />
+          <Button variant="outline" onClick={handleAddBrand}>
+            Agregar Marca
+          </Button>
+          {selectedBrands.length > 0 && (
+            <Button variant="destructive" onClick={handleDeleteSelectedBrands}>
+              Eliminar Seleccionadas ({selectedBrands.length})
+            </Button>
+          )}
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead></TableHead>
               <TableHead>ID</TableHead>
               <TableHead>Nombre</TableHead>
+              <TableHead>Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {brands.map((brand) => (
-              <TableRow key={brand.id}>
+              <TableRow
+                key={brand.id}
+                className={selectedBrands.includes(brand.id) ? "bg-gray-100" : ""}
+              >
+                <TableCell>
+                  <input
+                    type="checkbox"
+                    checked={selectedBrands.includes(brand.id)}
+                    onChange={() => toggleBrand(brand.id)}
+                  />
+                </TableCell>
                 <TableCell>{brand.id}</TableCell>
-                <TableCell>{brand.name}</TableCell>
+                <TableCell>
+                  <Input
+                    value={brand.name}
+                    onChange={(e) =>
+                      setBrands(
+                        brands.map((b) =>
+                          b.id === brand.id ? { ...b, name: e.target.value } : b
+                        )
+                      )
+                    }
+                  />
+                </TableCell>
+                <TableCell className="flex gap-2">
+                  <Button size="sm" onClick={() => handleEditBrand(brand.id, brand.name)}>
+                    Editar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDeleteBrand(brand.id)}
+                  >
+                    Eliminar
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
