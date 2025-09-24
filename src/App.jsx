@@ -7,13 +7,16 @@ import Products from "./pages/Products";
 import Categories from "./pages/Categories";
 import Clients from "./pages/Clients";
 import Users from "./pages/Users";
+import LoginPage from "./pages/LoginPage";
 import Orders from "./pages/Orders";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Toaster position="top-center" />
+
       <Routes>
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/dashboard" element={<DashboardLayout />}>
           {/* 👇 Ruta index: cuando entres a /dashboard muestra Dashboard */}
           <Route index element={<Dashboard />} />
