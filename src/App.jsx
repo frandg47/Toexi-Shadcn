@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 import Dashboard from "./pages/Dashboard";
 import Products from "./pages/Products";
-import Categories from "./pages/Categories";
+import CatalogPage from "./pages/CatalogPage";
 import Clients from "./pages/Clients";
 import Users from "./pages/Users";
 import LoginPage from "./pages/LoginPage";
@@ -21,7 +21,7 @@ export default function App() {
           {/* 👇 Ruta index: cuando entres a /dashboard muestra Dashboard */}
           <Route index element={<Dashboard />} />
           <Route path="products" element={<Products />} />
-          <Route path="categories" element={<Categories />} />
+          <Route path="catalog" element={<CatalogPage />} />
           <Route path="clients" element={<Clients />} />
           <Route path="users" element={<Users />} />
           <Route path="orders" element={<Orders />} />

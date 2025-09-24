@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2Icon } from "lucide-react";
+import { Icon, Loader2Icon } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import {
   Table,
@@ -10,364 +10,310 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import DialogCatalog from "../components/DialogCatalog";
+import { IconBallpen, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 
-export default function CategoriesAndBrandsCRUDWithSelection() {
+export default function CatalogTable() {
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [newCategory, setNewCategory] = useState("");
-  const [newBrand, setNewBrand] = useState("");
-
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedBrands, setSelectedBrands] = useState([]);
 
-  // loading states por operación
-  const [addingCategory, setAddingCategory] = useState(false);
-  const [addingBrand, setAddingBrand] = useState(false);
-  const [editingCategoryId, setEditingCategoryId] = useState(null);
-  const [editingBrandId, setEditingBrandId] = useState(null);
+  // Estados para modales
+  const [categoryModal, setCategoryModal] = useState({
+    open: false,
+    editId: null,
+    initial: "",
+  });
+  const [brandModal, setBrandModal] = useState({
+    open: false,
+    editId: null,
+    initial: "",
+  });
+
+  // Estados de operaciones
   const [deletingIds, setDeletingIds] = useState(new Set());
-  const [bulkDeletingCategories, setBulkDeletingCategories] = useState(false);
-  const [bulkDeletingBrands, setBulkDeletingBrands] = useState(false);
-
-  // Fetch data
-  const fetchData = async () => {
-    setLoading(true);
-    const { data: categoriesData, error: categoriesError } = await supabase
-      .from("categories")
-      .select("*");
-    const { data: brandsData, error: brandsError } = await supabase
-      .from("brands")
-      .select("*");
-
-    if (!categoriesError) setCategories(categoriesData);
-    else toast.error("Error al cargar categorías");
-    if (!brandsError) setBrands(brandsData);
-    else toast.error("Error al cargar marcas");
-
-    setLoading(false);
-  };
+  const [bulkDeleting, setBulkDeleting] = useState({
+    cat: false,
+    brand: false,
+  });
 
   useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      const [{ data: cat }, { data: br }] = await Promise.all([
+        supabase.from("categories").select("*"),
+        supabase.from("brands").select("*"),
+      ]);
+      if (cat) setCategories(cat);
+      else toast.error("Error al cargar categorías");
+      if (br) setBrands(br);
+      else toast.error("Error al cargar marcas");
+      setLoading(false);
+    };
     fetchData();
   }, []);
 
-  // --- CRUD HANDLERS ---
-  const handleAddCategory = async () => {
-    if (!newCategory) return;
-    setAddingCategory(true);
-    const { data, error } = await supabase
-      .from("categories")
-      .insert([{ name: newCategory }])
-      .select();
-    setAddingCategory(false);
-    if (!error) {
-      setCategories([...categories, data[0]]);
-      setNewCategory("");
-      toast.success("Categoría agregada");
-    } else toast.error("Error al agregar categoría");
-  };
-
-  const handleEditCategory = async (id, name) => {
-    setEditingCategoryId(id);
-    const { data, error } = await supabase
-      .from("categories")
-      .update({ name })
-      .eq("id", id)
-      .select();
-    setEditingCategoryId(null);
-    if (!error) {
+  /* ---------- CRUD ---------- */
+  const saveCategory = async (name, id = null) => {
+    if (!name) return;
+    if (id) {
+      // Editar
+      const { data, error } = await supabase
+        .from("categories")
+        .update({ name })
+        .eq("id", id)
+        .select();
+      if (error) return toast.error("Error al editar categoría");
       setCategories(categories.map((c) => (c.id === id ? data[0] : c)));
       toast.success("Categoría actualizada");
-    } else toast.error("Error al editar categoría");
+    } else {
+      // Crear
+      const { data, error } = await supabase
+        .from("categories")
+        .insert([{ name }])
+        .select();
+      if (error) return toast.error("Error al agregar categoría");
+      setCategories([...categories, data[0]]);
+      toast.success("Categoría agregada");
+    }
   };
 
-  const handleDeleteCategory = async (id) => {
-    setDeletingIds((prev) => new Set(prev).add(id));
-    const { error } = await supabase.from("categories").delete().eq("id", id);
-    setDeletingIds((prev) => {
-      const copy = new Set(prev);
-      copy.delete(id);
-      return copy;
-    });
-    if (!error) {
-      setCategories(categories.filter((c) => c.id !== id));
-      setSelectedCategories(selectedCategories.filter((x) => x !== id));
-      toast.success("Categoría eliminada");
-    } else toast.error("Error al eliminar categoría");
-  };
-
-  const handleDeleteSelectedCategories = async () => {
-    if (selectedCategories.length === 0) return;
-    setBulkDeletingCategories(true);
-    const { error } = await supabase
-      .from("categories")
-      .delete()
-      .in("id", selectedCategories);
-    setBulkDeletingCategories(false);
-    if (!error) {
-      setCategories(
-        categories.filter((c) => !selectedCategories.includes(c.id))
-      );
-      setSelectedCategories([]);
-      toast.success("Categorías eliminadas");
-    } else toast.error("Error al eliminar categorías seleccionadas");
-  };
-
-  const handleAddBrand = async () => {
-    if (!newBrand) return;
-    setAddingBrand(true);
-    const { data, error } = await supabase
-      .from("brands")
-      .insert([{ name: newBrand }])
-      .select();
-    setAddingBrand(false);
-    if (!error) {
-      setBrands([...brands, data[0]]);
-      setNewBrand("");
-      toast.success("Marca agregada");
-    } else toast.error("Error al agregar marca");
-  };
-
-  const handleEditBrand = async (id, name) => {
-    setEditingBrandId(id);
-    const { data, error } = await supabase
-      .from("brands")
-      .update({ name })
-      .eq("id", id)
-      .select();
-    setEditingBrandId(null);
-    if (!error) {
+  const saveBrand = async (name, id = null) => {
+    if (!name) return;
+    if (id) {
+      const { data, error } = await supabase
+        .from("brands")
+        .update({ name })
+        .eq("id", id)
+        .select();
+      if (error) return toast.error("Error al editar marca");
       setBrands(brands.map((b) => (b.id === id ? data[0] : b)));
       toast.success("Marca actualizada");
-    } else toast.error("Error al editar marca");
+    } else {
+      const { data, error } = await supabase
+        .from("brands")
+        .insert([{ name }])
+        .select();
+      if (error) return toast.error("Error al agregar marca");
+      setBrands([...brands, data[0]]);
+      toast.success("Marca agregada");
+    }
   };
 
-  const handleDeleteBrand = async (id) => {
-    setDeletingIds((prev) => new Set(prev).add(id));
-    const { error } = await supabase.from("brands").delete().eq("id", id);
-    setDeletingIds((prev) => {
-      const copy = new Set(prev);
+  const deleteCategory = async (id) => {
+    setDeletingIds((p) => new Set(p).add(id));
+    const { error } = await supabase.from("categories").delete().eq("id", id);
+    setDeletingIds((p) => {
+      const copy = new Set(p);
       copy.delete(id);
       return copy;
     });
-    if (!error) {
-      setBrands(brands.filter((b) => b.id !== id));
-      setSelectedBrands(selectedBrands.filter((x) => x !== id));
-      toast.success("Marca eliminada");
-    } else toast.error("Error al eliminar marca");
+    if (error) return toast.error("Error al eliminar categoría");
+    setCategories(categories.filter((c) => c.id !== id));
+    setSelectedCategories((sel) => sel.filter((x) => x !== id));
+    toast.success("Categoría eliminada");
   };
 
-  const handleDeleteSelectedBrands = async () => {
-    if (selectedBrands.length === 0) return;
-    setBulkDeletingBrands(true);
+  const deleteBrand = async (id) => {
+    setDeletingIds((p) => new Set(p).add(id));
+    const { error } = await supabase.from("brands").delete().eq("id", id);
+    setDeletingIds((p) => {
+      const copy = new Set(p);
+      copy.delete(id);
+      return copy;
+    });
+    if (error) return toast.error("Error al eliminar marca");
+    setBrands(brands.filter((b) => b.id !== id));
+    setSelectedBrands((sel) => sel.filter((x) => x !== id));
+    toast.success("Marca eliminada");
+  };
+
+  const deleteSelected = async (type) => {
+    const selected = type === "cat" ? selectedCategories : selectedBrands;
+    if (!selected.length) return;
+    setBulkDeleting((p) => ({ ...p, [type]: true }));
     const { error } = await supabase
-      .from("brands")
+      .from(type === "cat" ? "categories" : "brands")
       .delete()
-      .in("id", selectedBrands);
-    setBulkDeletingBrands(false);
-    if (!error) {
-      setBrands(brands.filter((b) => !selectedBrands.includes(b.id)));
+      .in("id", selected);
+    setBulkDeleting((p) => ({ ...p, [type]: false }));
+    if (error) return toast.error("Error al eliminar seleccionados");
+    if (type === "cat") {
+      setCategories(categories.filter((c) => !selected.includes(c.id)));
+      setSelectedCategories([]);
+    } else {
+      setBrands(brands.filter((b) => !selected.includes(b.id)));
       setSelectedBrands([]);
-      toast.success("Marcas eliminadas");
-    } else toast.error("Error al eliminar marcas seleccionadas");
+    }
+    toast.success("Eliminados correctamente");
   };
 
-  // --- CHECKBOX HANDLERS ---
-  const toggleCategory = (id) =>
-    setSelectedCategories((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+  /* ---------- Helpers ---------- */
+  const toggle = (id, type) => {
+    if (type === "cat") {
+      setSelectedCategories((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      );
+    } else {
+      setSelectedBrands((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      );
+    }
+  };
 
-  const toggleBrand = (id) =>
-    setSelectedBrands((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div>Cargando...</div>;
 
   return (
     <div className="space-y-10">
-      {/* --- TABLA CATEGORÍAS --- */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Categorías</h2>
-        <div className="flex items-center gap-2 mb-4">
-          <Input
-            placeholder="Nueva categoría"
-            value={newCategory}
-            onChange={(e) => setNewCategory(e.target.value)}
-            className="flex-1"
-          />
-          <Button className="bg-neutral-900 hover:bg-neutral-800 text-white" onClick={handleAddCategory} disabled={addingCategory}>
-            {addingCategory && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
-            Agregar Categoría
-          </Button>
-          {selectedCategories.length > 0 && (
-            <Button
-              variant="destructive"
-              onClick={handleDeleteSelectedCategories}
-              disabled={bulkDeletingCategories}
-            >
-              {bulkDeletingCategories && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
-              Eliminar Seleccionadas ({selectedCategories.length})
-            </Button>
-          )}
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead></TableHead>
-              <TableHead>ID</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {categories.map((cat) => (
-              <TableRow
-                key={cat.id}
-                className={selectedCategories.includes(cat.id) ? "bg-gray-100" : ""}
-              >
-                <TableCell>
-                  <input
-                    type="checkbox"
-                    checked={selectedCategories.includes(cat.id)}
-                    onChange={() => toggleCategory(cat.id)}
-                  />
-                </TableCell>
-                <TableCell>{cat.id}</TableCell>
-                <TableCell>
-                  <Input
-                    value={cat.name}
-                    onChange={(e) =>
-                      setCategories(
-                        categories.map((c) =>
-                          c.id === cat.id ? { ...c, name: e.target.value } : c
-                        )
-                      )
-                    }
-                  />
-                </TableCell>
-                <TableCell className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => handleEditCategory(cat.id, cat.name)}
-                    disabled={editingCategoryId === cat.id}
-                  >
-                    {editingCategoryId === cat.id && (
-                      <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Editar
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDeleteCategory(cat.id)}
-                    disabled={deletingIds.has(cat.id)}
-                  >
-                    {deletingIds.has(cat.id) && (
-                      <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Eliminar
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      {/* ===== CATEGORÍAS ===== */}
+      <Section
+        title="Categorías"
+        items={categories}
+        selected={selectedCategories}
+        toggle={(id) => toggle(id, "cat")}
+        onAdd={() =>
+          setCategoryModal({ open: true, editId: null, initial: "" })
+        }
+        onEdit={(item) =>
+          setCategoryModal({ open: true, editId: item.id, initial: item.name })
+        }
+        onDelete={deleteCategory}
+        onDeleteSelected={() => deleteSelected("cat")}
+        deletingIds={deletingIds}
+        bulkDeleting={bulkDeleting.cat}
+      />
 
-      {/* --- TABLA MARCAS --- */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Marcas</h2>
-        <div className="flex items-center gap-2 mb-4">
-          <Input
-            placeholder="Nueva marca"
-            value={newBrand}
-            onChange={(e) => setNewBrand(e.target.value)}
-            className="flex-1"
-          />
-          <Button className="bg-neutral-900 hover:bg-neutral-800 text-white" onClick={handleAddBrand} disabled={addingBrand}>
-            {addingBrand && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
-            Agregar Marca
+      {/* ===== MARCAS ===== */}
+      <Section
+        title="Marcas"
+        items={brands}
+        selected={selectedBrands}
+        toggle={(id) => toggle(id, "brand")}
+        onAdd={() => setBrandModal({ open: true, editId: null, initial: "" })}
+        onEdit={(item) =>
+          setBrandModal({ open: true, editId: item.id, initial: item.name })
+        }
+        onDelete={deleteBrand}
+        onDeleteSelected={() => deleteSelected("brand")}
+        deletingIds={deletingIds}
+        bulkDeleting={bulkDeleting.brand}
+      />
+
+      {/* === DIALOGS === */}
+      <DialogCatalog
+        open={categoryModal.open}
+        onClose={() =>
+          setCategoryModal({ open: false, editId: null, initial: "" })
+        }
+        onConfirm={(val) => {
+          saveCategory(val, categoryModal.editId);
+          setCategoryModal({ open: false, editId: null, initial: "" });
+        }}
+        label={categoryModal.editId ? "Editar Categoría" : "Categoría"}
+        initialValue={categoryModal.initial}
+      />
+
+      <DialogCatalog
+        open={brandModal.open}
+        onClose={() =>
+          setBrandModal({ open: false, editId: null, initial: "" })
+        }
+        onConfirm={(val) => {
+          saveBrand(val, brandModal.editId);
+          setBrandModal({ open: false, editId: null, initial: "" });
+        }}
+        label={brandModal.editId ? "Editar Marca" : "Marca"}
+        initialValue={brandModal.initial}
+      />
+    </div>
+  );
+}
+
+/* ---------- Sección reutilizable ---------- */
+function Section({
+  title,
+  items,
+  selected,
+  toggle,
+  onAdd,
+  onEdit,
+  onDelete,
+  onDeleteSelected,
+  deletingIds,
+  bulkDeleting,
+}) {
+  return (
+    <div>
+      <div className="flex justify-between items-center gap-2 mb-4">
+        <h2 className="text-xl font-semibold mb-2">{title}</h2>
+        <div className="flex gap-2">
+          <Button onClick={onAdd} className="bg-gray-300 hover:bg-gray-400">
+            Agregar<IconPlus />
           </Button>
-          {selectedBrands.length > 0 && (
+          {selected.length > 0 && (
             <Button
               variant="destructive"
-              onClick={handleDeleteSelectedBrands}
-              disabled={bulkDeletingBrands}
+              onClick={onDeleteSelected}
+              disabled={bulkDeleting}
+              className="bg-red-400 hover:bg-red-500"
             >
-              {bulkDeletingBrands && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
-              Eliminar Seleccionadas ({selectedBrands.length})
+              {bulkDeleting && (
+                <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              <IconTrash />Eliminar ({selected.length})
             </Button>
           )}
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead></TableHead>
-              <TableHead>ID</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {brands.map((brand) => (
-              <TableRow
-                key={brand.id}
-                className={selectedBrands.includes(brand.id) ? "bg-gray-100" : ""}
-              >
-                <TableCell>
-                  <input
-                    type="checkbox"
-                    checked={selectedBrands.includes(brand.id)}
-                    onChange={() => toggleBrand(brand.id)}
-                  />
-                </TableCell>
-                <TableCell>{brand.id}</TableCell>
-                <TableCell>
-                  <Input
-                    value={brand.name}
-                    onChange={(e) =>
-                      setBrands(
-                        brands.map((b) =>
-                          b.id === brand.id ? { ...b, name: e.target.value } : b
-                        )
-                      )
-                    }
-                  />
-                </TableCell>
-                <TableCell className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => handleEditBrand(brand.id, brand.name)}
-                    disabled={editingBrandId === brand.id}
-                  >
-                    {editingBrandId === brand.id && (
-                      <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Editar
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDeleteBrand(brand.id)}
-                    disabled={deletingIds.has(brand.id)}
-                  >
-                    {deletingIds.has(brand.id) && (
-                      <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Eliminar
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
       </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead></TableHead>
+            <TableHead>ID</TableHead>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((item) => (
+            <TableRow
+              key={item.id}
+              className={selected.includes(item.id) ? "bg-gray-100" : ""}
+            >
+              <TableCell>
+                <input
+                  type="checkbox"
+                  checked={selected.includes(item.id)}
+                  onChange={() => toggle(item.id)}
+                />
+              </TableCell>
+              <TableCell>{item.id}</TableCell>
+              <TableCell>{item.name}</TableCell>
+              <TableCell className="flex gap-2">
+                <Button size="sm" className="bg-green-300 hover:bg-green-400" onClick={() => onEdit(item)}>
+                  <IconBallpen />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => onDelete(item.id)}
+                  disabled={deletingIds.has(item.id)}
+                  className="bg-red-400 hover:bg-red-500"
+                >
+                  {deletingIds.has(item.id) && (
+                    <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  <IconTrash />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

@@ -38,7 +38,7 @@ const navData = {
   navMain: [
     { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
     { title: "Productos", url: "/dashboard/products", icon: IconReport },
-    { title: "Categorías", url: "/dashboard/categories", icon: IconCategory2 },
+    { title: "Catálogo", url: "/dashboard/catalog", icon: IconCategory2 },
     { title: "Pedidos", url: "/dashboard/orders", icon: IconShoppingCart },
     { title: "Clientes", url: "/dashboard/clients", icon: IconUsers },
     { title: "Equipo", url: "/dashboard/users", icon: IconUsersGroup },
