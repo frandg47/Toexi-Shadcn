@@ -1,7 +1,7 @@
 import { SiteHeader } from "@/components/site-header";
 import {DialogTeam } from "../components/DialogTeam";
 
-const Users = ({ titulo }) => {
+const TeamPage = ({ titulo }) => {
   return (
     <>
       <SiteHeader titulo={titulo || "Equipo"} />
@@ -10,4 +10,4 @@ const Users = ({ titulo }) => {
   );
 };
 
-export default Users;
+export default TeamPage;

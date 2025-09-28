@@ -3,30 +3,10 @@ import CatalogTable from "../components/CatalogTable";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { IconFilter, IconPlus } from "@tabler/icons-react";
+import ContributorsTable from "../components/ruixen-contributors-table";
 
 
 const CatalogPage = ({ titulo }) => {
-
-
-  const handleAdd = () => {
-    return null;
-  }
-
-  const actions = (
-  <>
-    <Input
-      type="text"
-      placeholder="Buscar..."
-      className="h-8 px-3 rounded-2xl border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-    />
-    <Button variant="default" size="sm" className="bg-gray-300 hover:bg-gray-400">
-      <IconFilter className="text-white" />
-    </Button>
-    <Button variant="default" size="sm" className="bg-gray-300 hover:bg-gray-400" onClick={handleAdd}>
-      <IconPlus className="h-4 w-4 text-white" />
-    </Button>
-  </>
-);
 
   return (
     <>

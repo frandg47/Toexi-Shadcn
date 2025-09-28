@@ -1,6 +1,4 @@
 import { SiteHeader } from "@/components/site-header";
-import { DataTable } from "@/components/data-table";
-import products from "../helpers/products.json";
 import ProductsTable from "../components/ProductsTable";
 
 const Products = ({ titulo }) => {
