@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ChartSalesByUser } from "./ChartSalesByUser";
+import ConcentricLoader from "../components/ui/loading";
 
 export default function ProductsTable() {
   const [products, setProducts] = useState([]);
@@ -177,7 +178,7 @@ export default function ProductsTable() {
     setOpenEdit(true);
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div><ConcentricLoader /></div>;
 
   return (
     <div className="overflow-x-auto">

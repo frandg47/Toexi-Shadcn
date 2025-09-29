@@ -3,6 +3,7 @@
 import * as React from "react";
 import { AreaChart, Area, CartesianGrid, XAxis, Tooltip } from "recharts";
 import { supabase } from "../lib/supabaseClient";
+import ConcentricLoader from "./ui/loading";
 
 export function ChartSalesByUser() {
   const [salesData, setSalesData] = React.useState([]);
@@ -52,7 +53,7 @@ export function ChartSalesByUser() {
     setLoading(false);
   };
 
-  if (loading) return <div>Cargando...</div>;
+  if (loading) return <div><ConcentricLoader /></div>;
   if (salesData.length === 0) return <div>No hay ventas aún</div>;
 
   // Obtener todos los usuarios para pintar un Area por cada uno

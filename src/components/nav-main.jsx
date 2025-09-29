@@ -1,11 +1,12 @@
-import { NavLink } from "react-router-dom";
+import { useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { IconCirclePlusFilled } from "@tabler/icons-react";
+import { IconCirclePlusFilled, IconChevronDown } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 
 export function NavMain({ items }) {
@@ -15,10 +16,7 @@ export function NavMain({ items }) {
         {/* Botón Nueva venta (opcional) */}
         <SidebarMenu>
           <SidebarMenuItem>
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-            >
+            <Button variant="outline" className="w-full justify-start">
               <IconCirclePlusFilled className="mr-2 h-5 w-5" />
               Nueva venta
             </Button>
@@ -27,27 +25,89 @@ export function NavMain({ items }) {
 
         {/* Links de navegación */}
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
+          {items.map((item) =>
+            item.items ? (
+              <DropMenu key={item.title} item={item} />
+            ) : (
+              <SidebarMenuItem key={item.title}>
+                <NavLink
+                  to={item.url}
+                  end={item.url === "/dashboard"}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors
+                     ${
+                       isActive
+                         ? "bg-primary text-primary-foreground shadow-sm"
+                         : "hover:bg-muted hover:text-foreground"
+                     }`
+                  }
+                >
+                  {item.icon && <item.icon className="h-5 w-5" />}
+                  <span>{item.title}</span>
+                </NavLink>
+              </SidebarMenuItem>
+            )
+          )}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
+
+/* --- Subcomponente para dropdown --- */
+function DropMenu({ item }) {
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+
+  // Verificar si alguna subruta coincide con la ruta actual
+  const isAnyChildActive = item.items.some((sub) => location.pathname === sub.url);
+
+  return (
+    <SidebarMenuItem className="flex flex-col">
+      {/* Botón padre con el mismo estilo que un NavLink */}
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-sm transition-colors
+          ${
+            open || isAnyChildActive
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "hover:bg-muted hover:text-foreground"
+          }`}
+      >
+        <span className="flex items-center gap-2">
+          {item.icon && <item.icon className="h-5 w-5" />}
+          {item.title}
+        </span>
+        <IconChevronDown
+          className={`h-4 w-4 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {/* Submenú desplegable */}
+      {open && (
+        <SidebarMenu className="ml-6 mt-1 flex flex-col gap-1">
+          {item.items.map((sub) => (
+            <SidebarMenuItem key={sub.title}>
               <NavLink
-                to={item.url}
-                end={item.url === "/dashboard"}
+                to={sub.url}
                 className={({ isActive }) =>
                   `flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors
-         ${
-           isActive
-             ? "bg-primary text-primary-foreground shadow-sm"
-             : "hover:bg-muted hover:text-foreground"
-         }`
+                   ${
+                     isActive
+                       ? "bg-primary text-primary-foreground"
+                       : "hover:bg-muted hover:text-foreground"
+                   }`
                 }
               >
-                {item.icon && <item.icon className="h-5 w-5" />}
-                <span>{item.title}</span>
+                {sub.icon && <sub.icon className="mr-2 h-4 w-4" />}
+                {sub.title}
               </NavLink>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
+      )}
+    </SidebarMenuItem>
   );
 }

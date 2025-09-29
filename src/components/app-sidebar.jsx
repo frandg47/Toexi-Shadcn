@@ -1,19 +1,16 @@
 import React from "react";
 import {
   IconDashboard,
-  IconPhone,
   IconCategory2,
   IconShoppingCart,
   IconUsers,
   IconSettings,
   IconHelp,
-  IconDatabase,
   IconReport,
-  IconBrandProducthunt,
-  IconUserCircle,
-  IconUsersGroup
+  IconUsersGroup,
+  IconMenu4,
+  IconBrandApple,
 } from "@tabler/icons-react";
-import { Link } from "react-router-dom";
 
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
@@ -29,27 +26,56 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-const navData = {
-  user: {
-    name: "Admin Tienda",
-    email: "admin@tiendacelulares.com",
-    avatar: "/avatars/admin.jpg",
+import { useAuth } from "@/context/AuthContextProvider"; // 👈 Importá el hook
+
+const navMain = [
+  { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
+  { title: "Productos", url: "/dashboard/products", icon: IconReport },
+  {
+    title: "Catálogo",
+    icon: IconMenu4,
+    items: [
+      {
+        title: "Marcas",
+        url: "/dashboard/catalog/brands",
+        icon: IconBrandApple,
+      },
+      {
+        title: "Categorías",
+        url: "/dashboard/catalog/categories",
+        icon: IconCategory2,
+      },
+    ],
   },
-  navMain: [
-    { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
-    { title: "Productos", url: "/dashboard/products", icon: IconReport },
-    { title: "Catálogo", url: "/dashboard/catalog", icon: IconCategory2 },
-    { title: "Pedidos", url: "/dashboard/orders", icon: IconShoppingCart },
-    { title: "Clientes", url: "/dashboard/clients", icon: IconUsers },
-    { title: "Equipo", url: "/dashboard/users", icon: IconUsersGroup },
-  ],
-  navSecondary: [
-    { title: "Configuración", url: "/dashboard/settings", icon: IconSettings },
-    { title: "Ayuda", url: "/dashboard/help", icon: IconHelp },
-  ],
-};
+  { title: "Pedidos", url: "/dashboard/orders", icon: IconShoppingCart },
+  { title: "Clientes", url: "/dashboard/clients", icon: IconUsers },
+  { title: "Equipo", url: "/dashboard/team", icon: IconUsersGroup },
+];
+
+const navSecondary = [
+  { title: "Configuración", url: "/dashboard/settings", icon: IconSettings },
+  { title: "Ayuda", url: "/dashboard/help", icon: IconHelp },
+];
 
 export default function AppSidebar(props) {
+  const { user } = useAuth(); // 👉 usuario de supabase
+
+  // Mientras carga la sesión podés mostrar algo por defecto
+  const displayUser = user
+    ? {
+        name: user.user_metadata?.name || "Usuario",
+        email: user.email,
+        avatar:
+          user.user_metadata?.avatar_url ||
+          user.user_metadata?.picture || // Google
+          "/avatars/default.jpg",
+      }
+    : {
+        name: "Cargando…",
+        email: "",
+        avatar: "/avatars/default.jpg",
+      };
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -63,12 +89,13 @@ export default function AppSidebar(props) {
       </SidebarHeader>
 
       <SidebarContent>
-        <NavMain items={navData.navMain} />
-        <NavSecondary items={navData.navSecondary} className="mt-auto" />
+        <NavMain items={navMain} />
+        <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
 
       <SidebarFooter>
-        <NavUser user={navData.user} />
+        {/* 👇 Pasamos los datos dinámicos */}
+        <NavUser user={displayUser} />
       </SidebarFooter>
     </Sidebar>
   );
