@@ -10,14 +10,19 @@ import Clients from "./pages/Clients";
 import TeamPage from "./pages/TeamPage";
 import LoginPage from "./pages/LoginPage";
 import Orders from "./pages/Orders";
+import ConcentricLoader from "./components/ui/loading";
 
 // --- Rutas protegidas usando el contexto ---
-function ProtectedRoute({ children }) {
-  const { user } = useAuth();         // 👈 Tomamos el usuario del contexto
-  if (user === undefined) return <div>Cargando...</div>;
+function ProtectedRoute({ children, allowedRoles = ["superadmin"] }) {
+  const { user, role } = useAuth();
+
+  if (user === undefined) return <div className="m-auto w-full h-full"><ConcentricLoader /></div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (!allowedRoles.includes(role)) return <Navigate to="/dashboard" replace />;
+
   return children;
 }
+
 
 export default function App() {
   return (
@@ -32,7 +37,7 @@ export default function App() {
           <Route
             path="/dashboard/*"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin"]}>
                 <DashboardLayout />
               </ProtectedRoute>
             }
