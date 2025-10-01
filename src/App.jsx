@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthContextProvider, useAuth } from "./context/AuthContextProvider";
 
@@ -10,19 +10,35 @@ import Clients from "./pages/Clients";
 import TeamPage from "./pages/TeamPage";
 import LoginPage from "./pages/LoginPage";
 import Orders from "./pages/Orders";
+import UnauthorizedPage from "./pages/UnauthorizedPage";
 import ConcentricLoader from "./components/ui/loading";
 
-// --- Rutas protegidas usando el contexto ---
-function ProtectedRoute({ children, allowedRoles = ["superadmin"] }) {
-  const { user, role } = useAuth();
+function ProtectedRoute({ children, allowedRoles }) {
+  const location = useLocation();
+  const { user, role, isActive, status } = useAuth();
 
-  if (user === undefined) return <div className="m-auto w-full h-full"><ConcentricLoader /></div>;
-  if (!user) return <Navigate to="/login" replace />;
-  if (!allowedRoles.includes(role)) return <Navigate to="/dashboard" replace />;
+  if (status === "loading") {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <ConcentricLoader />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  if (!isActive) {
+    return <Navigate to="/login?disabled=1" replace />;
+  }
+
+  if (Array.isArray(allowedRoles) && allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
 
   return children;
 }
-
 
 export default function App() {
   return (
@@ -30,10 +46,9 @@ export default function App() {
       <Toaster position="top-center" />
       <AuthContextProvider>
         <Routes>
-          {/* Login */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-          {/* Dashboard y subrutas protegidas */}
           <Route
             path="/dashboard/*"
             element={
@@ -44,16 +59,14 @@ export default function App() {
           >
             <Route index element={<Dashboard />} />
             <Route path="products" element={<Products />} />
-            <Route path="catalog" element={<CatalogPage />} >
-              <Route path="brands" element={<CatalogPage titulo="Marcas" />} />
-              <Route path="categories" element={<CatalogPage titulo="Categorías" />} />
-            </Route>
+            <Route path="catalog" element={<CatalogPage />} />
+            <Route path="catalog/brands" element={<CatalogPage />} />
+            <Route path="catalog/categories" element={<CatalogPage />} />
             <Route path="clients" element={<Clients />} />
             <Route path="team" element={<TeamPage />} />
             <Route path="orders" element={<Orders />} />
           </Route>
 
-          {/* Redirección por defecto */}
           <Route
             path="*"
             element={

@@ -1,0 +1,182 @@
+import { useForm, Controller } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
+import Swal from "sweetalert2";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { registerUser } from "../lib/registerUser";
+
+const schema = yup.object({
+  name: yup.string().required("El nombre es obligatorio"),
+  lastName: yup.string().required("El apellido es obligatorio"),
+  dni: yup.string().required("El DNI es obligatorio"),
+  phone: yup.string().required("El telefono es obligatorio"),
+  address: yup.string().required("La direccion es obligatoria"),
+  email: yup.string().email("Email invalido").required("El email es obligatorio"),
+  password: yup
+    .string()
+    .min(6, "La contrasena debe tener al menos 6 caracteres")
+    .required("La contrasena es obligatoria"),
+  role: yup.string().oneOf(["seller", "superadmin"], "Selecciona un rol valido"),
+  state: yup.boolean(),
+});
+
+const roleOptions = [
+  { value: "seller", label: "Vendedor" },
+  { value: "superadmin", label: "Super administrador" },
+];
+
+const FormRegisterNewUser = ({ onSuccess }) => {
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+  } = useForm({
+    resolver: yupResolver(schema),
+    defaultValues: {
+      name: "",
+      lastName: "",
+      dni: "",
+      phone: "",
+      address: "",
+      email: "",
+      password: "",
+      role: "seller",
+      state: false,
+    },
+  });
+
+  const onSubmit = async (data) => {
+    try {
+      await registerUser({
+        ...data,
+        state: Boolean(data.state),
+      });
+
+      Swal.fire({
+        icon: "success",
+        title: "Usuario registrado",
+        text: "El usuario fue creado correctamente",
+      });
+
+      reset();
+      onSuccess?.();
+    } catch (error) {
+      console.error(error);
+      Swal.fire({
+        icon: "error",
+        title: "Error al registrar usuario",
+        text: error.message,
+      });
+    }
+  };
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="default">Registrar nuevo usuario</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[520px]">
+        <DialogHeader>
+          <DialogTitle>Registrar nuevo usuario</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          {[
+            { id: "name", label: "Nombre" },
+            { id: "lastName", label: "Apellido" },
+            { id: "dni", label: "DNI" },
+            { id: "phone", label: "Telefono" },
+            { id: "address", label: "Direccion" },
+            { id: "email", label: "Email", type: "email" },
+            { id: "password", label: "Contrasena", type: "password" },
+          ].map((field) => (
+            <div key={field.id} className="grid gap-2">
+              <Label htmlFor={field.id}>{field.label}</Label>
+              <Input
+                id={field.id}
+                type={field.type || "text"}
+                {...register(field.id)}
+              />
+              {errors[field.id] && (
+                <p className="text-sm text-red-500">{errors[field.id].message}</p>
+              )}
+            </div>
+          ))}
+
+          <div className="grid gap-2">
+            <Label>Rol</Label>
+            <Controller
+              name="role"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roleOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.role && (
+              <p className="text-sm text-red-500">{errors.role.message}</p>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between gap-2 rounded-md border p-3">
+            <div>
+              <Label htmlFor="state" className="font-medium">
+                Cuenta activa
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Permite al usuario iniciar sesion de inmediato.
+              </p>
+            </div>
+            <Controller
+              name="state"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="state"
+                  checked={Boolean(field.value)}
+                  onCheckedChange={(value) => field.onChange(Boolean(value))}
+                />
+              )}
+            />
+          </div>
+
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Registrando..." : "Registrar"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default FormRegisterNewUser;
