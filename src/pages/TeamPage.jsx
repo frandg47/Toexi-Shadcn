@@ -15,10 +15,9 @@ const TeamPage = ({ titulo }) => {
     <>
       <SiteHeader
         titulo={titulo || "Equipo"}
-        actions={<FormRegisterNewUser onSuccess={handleUserCreated} />}
       />
       <div className="mt-6">
-        <UsersTable refreshToken={refreshToken} />
+        <UsersTable refreshToken={refreshToken} onAdd={<FormRegisterNewUser onSuccess={handleUserCreated} />} />
       </div>
     </>
   );

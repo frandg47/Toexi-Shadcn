@@ -3,20 +3,47 @@ import Swal from "sweetalert2";
 
 import { supabase } from "../lib/supabaseClient";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  IconRefresh,
+  IconTrash,
+  IconEdit,
+  IconBriefcase,
+  IconUserShield,
+} from "@tabler/icons-react";
+import DialogEditUser from "./DialogEditUser";
 
-const ROLE_OPTIONS = [
-  { value: "superadmin", label: "Super administrador" },
-  { value: "seller", label: "Vendedor" },
+// const ROLE_OPTIONS = [
+//   { value: "superadmin", label: "Administrador" },
+//   { value: "seller", label: "Vendedor" },
+// ];
+
+// Actualiza la lista de columnas disponibles
+const TABLE_COLUMNS = [
+  { id: "name", label: "Nombre" },
+  { id: "email", label: "Email" },
+  { id: "phone", label: "Teléfono" },
+  { id: "role", label: "Rol" },
+  { id: "state", label: "Estado" },
+  { id: "created_at", label: "Creación" },
+  { id: "actions", label: "Acciones" },
 ];
 
 const formatDate = (value) => {
@@ -37,10 +64,17 @@ const buildFullName = (user) => {
   return [user?.name, user?.last_name].filter(Boolean).join(" ");
 };
 
-const UsersTable = ({ refreshToken = 0 }) => {
+const UsersTable = ({ refreshToken = 0, onAdd }) => {
+  // Actualiza el estado inicial de columnas visibles
+  const [visibleColumns, setVisibleColumns] = useState(
+    TABLE_COLUMNS.map((col) => col.id)
+  );
+  // Agregamos estados para filtros y columnas
+  const [nameFilter, setNameFilter] = useState("");
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [editingUserId, setEditingUserId] = useState(null);
 
   const fetchUsers = useCallback(async (showSkeleton = false) => {
     if (showSkeleton) {
@@ -52,7 +86,9 @@ const UsersTable = ({ refreshToken = 0 }) => {
     try {
       const { data, error } = await supabase
         .from("users")
-        .select("id, name, last_name, email, role, state, phone, dni, adress, created_at")
+        .select(
+          "id, name, last_name, email, role, state, phone, dni, adress, created_at"
+        )
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -88,7 +124,9 @@ const UsersTable = ({ refreshToken = 0 }) => {
         Swal.fire({
           icon: "success",
           title: "Estado actualizado",
-          text: `La cuenta de ${user.email} ahora esta ${!user.state ? "activa" : "inactiva"}.`,
+          text: `La cuenta de ${user.email} ahora esta ${
+            !user.state ? "activa" : "inactiva"
+          }.`,
           timer: 1800,
           showConfirmButton: false,
         });
@@ -97,39 +135,6 @@ const UsersTable = ({ refreshToken = 0 }) => {
         Swal.fire({
           icon: "error",
           title: "No se pudo actualizar el estado",
-          text: error.message,
-        });
-      } finally {
-        setRefreshing(false);
-      }
-    },
-    [fetchUsers]
-  );
-
-  const handleRoleChange = useCallback(
-    async (user, newRole) => {
-      if (user.role === newRole) return;
-      try {
-        setRefreshing(true);
-        const { error } = await supabase
-          .from("users")
-          .update({ role: newRole })
-          .eq("id", user.id);
-
-        if (error) throw error;
-        await fetchUsers();
-        Swal.fire({
-          icon: "success",
-          title: "Rol actualizado",
-          text: `${user.email} ahora es ${newRole}.`,
-          timer: 1800,
-          showConfirmButton: false,
-        });
-      } catch (error) {
-        console.error(error);
-        Swal.fire({
-          icon: "error",
-          title: "No se pudo actualizar el rol",
           text: error.message,
         });
       } finally {
@@ -183,28 +188,88 @@ const UsersTable = ({ refreshToken = 0 }) => {
     [fetchUsers]
   );
 
-  const isEmpty = useMemo(() => !loading && users.length === 0, [loading, users]);
+  // Función para alternar columnas visibles
+  const toggleColumn = useCallback((columnName) => {
+    setVisibleColumns((current) =>
+      current.includes(columnName)
+        ? current.filter((col) => col !== columnName)
+        : [...current, columnName]
+    );
+  }, []);
+
+  // Filtrar usuarios por nombre
+  const filteredUsers = useMemo(() => {
+    if (!nameFilter.trim()) return users;
+
+    return users.filter((user) =>
+      buildFullName(user).toLowerCase().includes(nameFilter.toLowerCase())
+    );
+  }, [users, nameFilter]);
+
+  // Modificar el isEmpty para usar filteredUsers
+  const isEmpty = useMemo(
+    () => !loading && filteredUsers.length === 0,
+    [loading, filteredUsers]
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Usuarios registrados</h2>
-        <Button variant="outline" onClick={() => fetchUsers()} disabled={refreshing}>
-          {refreshing ? "Actualizando..." : "Refrescar"}
-        </Button>
+        <Input
+          placeholder="Buscar por nombre..."
+          onChange={(e) => setNameFilter(e.target.value)}
+          className="w-80 max-w-sm"
+        />
+        <div className="flex gap-2 flex-wrap items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                Columnas
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-40">
+              {TABLE_COLUMNS.map((col) => (
+                <DropdownMenuCheckboxItem
+                  key={col.id}
+                  checked={visibleColumns.includes(col.id)}
+                  onCheckedChange={() => toggleColumn(col.id)}
+                >
+                  {col.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {onAdd}
+          <Button
+            variant="outline"
+            onClick={() => fetchUsers()}
+            disabled={refreshing}
+          >
+            <IconRefresh />
+            {refreshing ? "Actualizando..." : "Refrescar"}
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Telefono</TableHead>
-              <TableHead>Rol</TableHead>
-              <TableHead>Activa</TableHead>
-              <TableHead>Creada</TableHead>
-              <TableHead className="w-[160px] text-right">Acciones</TableHead>
+              {visibleColumns.includes("name") && <TableHead>Nombre</TableHead>}
+              {visibleColumns.includes("email") && <TableHead>Email</TableHead>}
+              {visibleColumns.includes("phone") && (
+                <TableHead>Teléfono</TableHead>
+              )}
+              {visibleColumns.includes("role") && <TableHead>Rol</TableHead>}
+              {visibleColumns.includes("state") && (
+                <TableHead>Activa</TableHead>
+              )}
+              {visibleColumns.includes("created_at") && (
+                <TableHead>Creada</TableHead>
+              )}
+              {visibleColumns.includes("actions") && (
+                <TableHead className="w-[160px] text-right">Acciones</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -222,68 +287,105 @@ const UsersTable = ({ refreshToken = 0 }) => {
 
             {isEmpty && (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={7}
+                  className="py-10 text-center text-muted-foreground"
+                >
                   Todavia no se registraron usuarios.
                 </TableCell>
               </TableRow>
             )}
 
             {!loading &&
-              users.map((user) => (
+              filteredUsers.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="font-medium">{buildFullName(user)}</div>
-                    <div className="text-sm text-muted-foreground">DNI: {user.dni || "-"}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div>{user.email}</div>
-                    <div className="text-sm text-muted-foreground">{user.adress || "Sin direccion"}</div>
-                  </TableCell>
-                  <TableCell>{user.phone || "-"}</TableCell>
-                  <TableCell>
-                    <Select value={user.role} onValueChange={(value) => handleRoleChange(user, value)}>
-                      <SelectTrigger className="w-[160px]">
-                        <SelectValue placeholder="Selecciona un rol" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ROLE_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <Checkbox
-                      checked={Boolean(user.state)}
-                      onCheckedChange={() => handleToggleActive(user)}
-                      aria-label={"Cambiar estado de " + user.email}
-                    />
-                  </TableCell>
-                  <TableCell>{formatDate(user.created_at)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDelete(user)}
-                      disabled={refreshing}
-                    >
-                      Eliminar
-                    </Button>
-                  </TableCell>
+                  {visibleColumns.includes("name") && (
+                    <TableCell>
+                      <div className="font-medium">{buildFullName(user)}</div>
+                      <div className="text-sm text-muted-foreground">
+                        DNI: {user.dni || "-"}
+                      </div>
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes("email") && (
+                    <TableCell>
+                      <div>{user.email}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {user.adress || "Sin dirección"}
+                      </div>
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes("phone") && (
+                    <TableCell>{user.phone || "-"}</TableCell>
+                  )}
+                  {visibleColumns.includes("role") && (
+                    <TableCell>
+                      {user.role === "superadmin" ? (
+                        <Badge
+                          variant="secondary"
+                          className="bg-blue-500 text-white dark:bg-blue-600"
+                        >
+                          <IconUserShield className="h-4 w-4" />
+                          Admin
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                        >
+                          <IconBriefcase className="h-4 w-4" />
+                          Vendedor
+                        </Badge>
+                      )}
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes("state") && (
+                    <TableCell>
+                      <Switch
+                        checked={Boolean(user.state)}
+                        onCheckedChange={() => handleToggleActive(user)}
+                        aria-label={"Cambiar estado de " + user.email}
+                      />
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes("created_at") && (
+                    <TableCell>{formatDate(user.created_at)}</TableCell>
+                  )}
+                  {visibleColumns.includes("actions") && (
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingUserId(user.id)}
+                          disabled={refreshing}
+                        >
+                          <IconEdit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDelete(user)}
+                          disabled={refreshing}
+                          className="bg-red-400 hover:bg-red-500"
+                        >
+                          <IconTrash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
           </TableBody>
         </Table>
+
+        <DialogEditUser
+          open={!!editingUserId}
+          onClose={() => setEditingUserId(null)}
+          userId={editingUserId}
+        />
       </div>
     </div>
   );
 };
 
 export default UsersTable;
-
-
-
-
-
