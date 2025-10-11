@@ -1,6 +1,11 @@
-import { useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import Swal from "sweetalert2";
+
 import { supabase } from "../lib/supabaseClient";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Table,
   TableBody,
@@ -9,379 +14,543 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2Icon, PlusIcon, PencilIcon } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ChartSalesByUser } from "./ChartSalesByUser";
-import ConcentricLoader from "../components/ui/loading";
+  IconCreditCard,
+  IconEdit,
+  IconRefresh,
+  IconTrash,
+} from "@tabler/icons-react";
 
-export default function ProductsTable() {
-  const [products, setProducts] = useState([]);
-  const [brands, setBrands] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState(null);
-  const [selectedProducts, setSelectedProducts] = useState([]);
+const TABLE_COLUMNS = [
+  { id: "image", label: "Imagen" },
+  { id: "name", label: "Producto" },
+  { id: "brand", label: "Marca" },
+  { id: "stock", label: "Stock" },
+  { id: "usd_price", label: "Precio USD" },
+  { id: "cash_price", label: "Efectivo / Transfer" },
+  { id: "payment_methods", label: "Metodos de pago" },
+  { id: "commission", label: "Comision" },
+  { id: "actions", label: "Acciones" },
+];
 
-  // --- Modal States ---
-  const [openCreate, setOpenCreate] = useState(false);
-  const [openEdit, setOpenEdit] = useState(false);
-  const [editProduct, setEditProduct] = useState(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    brand_id: "",
-    category_id: "",
-    usd_price: "",
-    commission_pct: "",
-    commission_fixed: "",
-    allow_backorder: false,
-    lead_time_label: "",
-    active: true,
-  });
+const DEFAULT_FX_RATE = 950;
+const PLACEHOLDER_IMAGE = "https://via.placeholder.com/80?text=Producto";
 
-  // ---- Fetch data ----
-  const fetchData = async () => {
-    setLoading(true);
+const SAMPLE_PRODUCTS = [
+  {
+    id: "sample-product-1",
+    name: "iPhone 15",
+    usd_price: 1200,
+    commission_pct: 5,
+    cover_image_url: "",
+    brands: { name: "Apple" },
+    inventory: { stock: 10 },
+  },
+  {
+    id: "sample-product-2",
+    name: "Samsung Galaxy S24",
+    usd_price: 980,
+    commission_pct: 4,
+    cover_image_url: "",
+    brands: { name: "Samsung" },
+    inventory: { stock: 6 },
+  },
+];
 
-    const { data: productsData, error: productsError } = await supabase
-      .from("products")
-      .select(
-        `
-        id,
-        name,
-        usd_price,
-        commission_pct,
-        commission_fixed,
-        allow_backorder,
-        lead_time_label,
-        active,
-        created_at,
-        cover_image_url,
+const SAMPLE_PAYMENT_METHODS = [
+  { id: "cash", name: "Efectivo / Transfer", multiplier: 1 },
+  { id: "visa", name: "Visa Credito", multiplier: 1.05 },
+  { id: "mastercard", name: "Mastercard Credito", multiplier: 1.08 },
+];
 
-        brands:brand_id ( id, name ),
-        categories:category_id ( id, name ),
-        inventory:inventory ( stock, updated_at )
-      `
-      )
-      .order("id");
+const currencyFormatterARS = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+});
 
-    const { data: brandsData } = await supabase.from("brands").select("*");
-    const { data: categoriesData } = await supabase
-      .from("categories")
-      .select("*");
+const currencyFormatterUSD = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
 
-    if (productsError) toast.error("Error al cargar productos");
-    else setProducts(productsData || []);
+const percentageFormatter = new Intl.NumberFormat("es-AR", {
+  maximumFractionDigits: 2,
+});
 
-    setBrands(brandsData || []);
-    setCategories(categoriesData || []);
-    setLoading(false);
+const formatCurrencyARS = (value) => {
+  if (value == null || Number.isNaN(Number(value))) return "-";
+  return currencyFormatterARS.format(Number(value));
+};
+
+const formatCurrencyUSD = (value) => {
+  if (value == null || Number.isNaN(Number(value))) return "-";
+  return currencyFormatterUSD.format(Number(value));
+};
+
+const formatPercentage = (value) => {
+  if (value == null || Number.isNaN(Number(value))) return "-";
+  return percentageFormatter.format(Number(value)) + "%";
+};
+
+const getProductInitials = (name) => {
+  if (!name) return "PR";
+  const parts = name.split(" ").filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+};
+
+const buildSampleProduct = (product, rate) => {
+  const usdPrice = Number(product.usd_price) || 0;
+  const commissionPct = product.commission_pct ?? null;
+  const commissionAmountUSD =
+    commissionPct === null ? null : (usdPrice * commissionPct) / 100;
+
+  return {
+    id: product.id,
+    name: product.name,
+    coverImageUrl: product.cover_image_url,
+    brandName: product?.brands?.name ?? "Marca demo",
+    stock: product?.inventory?.stock ?? 0,
+    usdPrice,
+    commissionPct,
+    commissionAmountUSD,
+    paymentOptions: SAMPLE_PAYMENT_METHODS.map((method) => ({
+      id: method.id,
+      name: method.name,
+      multiplier: method.multiplier,
+      priceARS: usdPrice * rate * method.multiplier,
+    })),
   };
+};
 
-  useEffect(() => {
-    fetchData();
+const ProductsTable = ({ refreshToken = 0 }) => {
+  const [visibleColumns, setVisibleColumns] = useState(
+    TABLE_COLUMNS.map((column) => column.id)
+  );
+  const [searchTerm, setSearchTerm] = useState("");
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [fxRate, setFxRate] = useState(DEFAULT_FX_RATE);
+
+  const fetchProducts = useCallback(async (showSkeleton = false) => {
+    if (showSkeleton) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+
+    try {
+      const [fxRatesRes, paymentMethodsRes, productsRes] = await Promise.all([
+        supabase
+          .from("fx_rates")
+          .select("id, rate, is_active")
+          .order("is_active", { ascending: false }),
+        supabase
+          .from("payment_methods")
+          .select("id, name, multiplier")
+          .order("name"),
+        supabase
+          .from("products")
+          .select(
+            `
+            id,
+            name,
+            brand_id,
+            usd_price,
+            commission_pct,
+            cover_image_url,
+            brands(name),
+            inventory(stock)
+          `
+          )
+          .order("name"),
+      ]);
+
+      let currentFxRate = DEFAULT_FX_RATE;
+      if (
+        !fxRatesRes.error &&
+        Array.isArray(fxRatesRes.data) &&
+        fxRatesRes.data.length
+      ) {
+        const activeRate =
+          fxRatesRes.data.find((item) => item.is_active) ?? fxRatesRes.data[0];
+        if (activeRate?.rate) {
+          currentFxRate = Number(activeRate.rate) || DEFAULT_FX_RATE;
+        }
+      }
+
+      const paymentMethods =
+        !paymentMethodsRes.error && Array.isArray(paymentMethodsRes.data)
+          ? paymentMethodsRes.data
+          : SAMPLE_PAYMENT_METHODS;
+
+      let rawProducts = [];
+      if (!productsRes.error && Array.isArray(productsRes.data)) {
+        rawProducts = productsRes.data;
+      } else {
+        console.warn("Falling back to sample products", productsRes.error);
+        rawProducts = SAMPLE_PRODUCTS;
+      }
+
+      let brandMap = {};
+      const missingBrandIds = rawProducts
+        .filter((product) => !product?.brands?.name && product?.brand_id)
+        .map((product) => product.brand_id);
+
+      if (missingBrandIds.length) {
+        const uniqueIds = [...new Set(missingBrandIds)];
+        const { data: brandsData, error: brandsError } = await supabase
+          .from("brands")
+          .select("id, name")
+          .in("id", uniqueIds);
+
+        if (!brandsError && Array.isArray(brandsData)) {
+          brandMap = brandsData.reduce((acc, brand) => {
+            acc[brand.id] = brand.name;
+            return acc;
+          }, {});
+        }
+      }
+
+      const preparedProducts = rawProducts.map((product) => {
+        const usdPrice = Number(product.usd_price) || 0;
+        const commissionPct =
+          product.commission_pct === null ||
+          product.commission_pct === undefined
+            ? null
+            : Number(product.commission_pct);
+        const commissionAmountUSD =
+          commissionPct === null ? null : (usdPrice * commissionPct) / 100;
+
+        return {
+          id: product.id ?? product,
+          name: product.name ?? "Producto sin nombre",
+          coverImageUrl: product.cover_image_url || "",
+          brandName:
+            product?.brands?.name ||
+            brandMap[product?.brand_id] ||
+            product?.brand_name ||
+            "Sin marca",
+          stock: product?.inventory?.stock ?? product?.stock ?? 0,
+          usdPrice,
+          commissionPct,
+          commissionAmountUSD,
+          paymentOptions: paymentMethods.map((method) => {
+            const multiplier = Number(method.multiplier) || 1;
+            return {
+              id: method.id,
+              name: method.name,
+              multiplier,
+              priceARS: usdPrice * currentFxRate * multiplier,
+            };
+          }),
+        };
+      });
+
+      setFxRate(currentFxRate);
+      setProducts(preparedProducts);
+    } catch (error) {
+      console.error(error);
+      setFxRate(DEFAULT_FX_RATE);
+      setProducts(
+        SAMPLE_PRODUCTS.map((product) =>
+          buildSampleProduct(product, DEFAULT_FX_RATE)
+        )
+      );
+
+      Swal.fire({
+        icon: "error",
+        title: "No se pudieron cargar los productos",
+        text: error.message,
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  // --- CRUD ---
-  const handleDeleteProduct = async (id) => {
-    setUpdatingId(id);
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    setUpdatingId(null);
+  useEffect(() => {
+    fetchProducts(refreshToken === 0);
+  }, [fetchProducts, refreshToken]);
 
-    if (error) toast.error("Error al eliminar");
-    else {
-      setProducts(products.filter((p) => p.id !== id));
-      setSelectedProducts(selectedProducts.filter((x) => x !== id));
-      toast.success("Producto eliminado");
-    }
+  const handleRefresh = () => fetchProducts(false);
+
+  const handleColumnToggle = (columnId) => {
+    setVisibleColumns((prev) => {
+      if (prev.includes(columnId)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((id) => id !== columnId);
+      }
+      return [...prev, columnId];
+    });
   };
 
-  const handleCreateProduct = async () => {
-    const { data, error } = await supabase
-      .from("products")
-      .insert([formData])
-      .select();
+  const handleEdit = useCallback((product) => {
+    Swal.fire({
+      icon: "info",
+      title: "Editar producto",
+      text: `${product.name} estara disponible para editar muy pronto.`,
+    });
+  }, []);
 
-    if (error) toast.error("Error al crear producto");
-    else {
-      toast.success("Producto creado");
-      setProducts([...products, data[0]]);
-      setOpenCreate(false);
-      resetForm();
-    }
-  };
-
-  const handleUpdateProduct = async () => {
-    if (!editProduct) return;
-    const { data, error } = await supabase
-      .from("products")
-      .update(formData)
-      .eq("id", editProduct.id)
-      .select();
-
-    if (error) toast.error("Error al actualizar");
-    else {
-      toast.success("Producto actualizado");
-      setProducts(products.map((p) => (p.id === editProduct.id ? data[0] : p)));
-      setOpenEdit(false);
-      resetForm();
-    }
-  };
-
-  // --- Helpers ---
-  const toggleProduct = (id) =>
-    setSelectedProducts((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-
-  const resetForm = () =>
-    setFormData({
-      name: "",
-      brand_id: "",
-      category_id: "",
-      usd_price: "",
-      commission_pct: "",
-      commission_fixed: "",
-      allow_backorder: false,
-      lead_time_label: "",
-      active: true,
+  const handleDelete = useCallback(async (product) => {
+    const result = await Swal.fire({
+      icon: "warning",
+      title: `Eliminar ${product.name}?`,
+      text: "Esta accion estara disponible proximamente.",
+      showCancelButton: true,
+      cancelButtonText: "Cancelar",
+      confirmButtonText: "Eliminar",
+      confirmButtonColor: "#ef4444",
     });
 
-  const openEditModal = (product) => {
-    setEditProduct(product);
-    setFormData({
-      name: product.name || "",
-      brand_id: product.brand_id || "",
-      category_id: product.category_id || "",
-      usd_price: product.usd_price || "",
-      commission_pct: product.commission_pct || "",
-      commission_fixed: product.commission_fixed || "",
-      allow_backorder: product.allow_backorder,
-      lead_time_label: product.lead_time_label || "",
-      active: product.active,
-    });
-    setOpenEdit(true);
-  };
+    if (result.isConfirmed) {
+      Swal.fire({
+        icon: "info",
+        title: "Eliminar producto",
+        text: "La eliminacion de productos aun esta en desarrollo.",
+      });
+    }
+  }, []);
 
-  if (loading) return <div><ConcentricLoader /></div>;
+  const filteredProducts = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return products;
+
+    return products.filter((product) => {
+      const nameMatch = product.name?.toLowerCase().includes(term);
+      const brandMatch = product.brandName?.toLowerCase().includes(term);
+      return nameMatch || brandMatch;
+    });
+  }, [products, searchTerm]);
+
+  const columnCount = Math.max(visibleColumns.length, 1);
+  const isEmpty = !loading && filteredProducts.length === 0;
 
   return (
-    <div className="overflow-x-auto">
-      <div className="flex justify-between mb-4">
-        <h2 className="text-xl font-bold">Productos</h2>
-        <Button onClick={() => setOpenCreate(true)}>
-          <PlusIcon className="mr-2 h-4 w-4" /> Nuevo producto
-        </Button>
+    <div className="space-y-4 rounded-lg border bg-card p-4 shadow-sm">
+      <div className="rounded-md border bg-muted/30 p-3 text-sm">
+        <span role="img" aria-label="dolar" className="me-1">
+          💱
+        </span>
+        Cotizacion actual del USD: ${Math.round(fxRate)} (1 USD ={" "}
+        {formatCurrencyARS(fxRate)})
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>
-              <Checkbox
-                checked={
-                  selectedProducts.length === products.length &&
-                  products.length > 0
-                }
-                onCheckedChange={(value) =>
-                  setSelectedProducts(value ? products.map((p) => p.id) : [])
-                }
-              />
-            </TableHead>
-            <TableHead>ID</TableHead>
-            <TableHead>Nombre</TableHead>
-            <TableHead>Marca</TableHead>
-            <TableHead>Categoría</TableHead>
-            <TableHead>USD Precio</TableHead>
-            <TableHead>Activo</TableHead>
-            <TableHead>Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Input
+          placeholder="Buscar por producto o marca"
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          className="sm:w-72"
+        />
 
-        <TableBody>
-          {products.map((p) => (
-            <TableRow
-              key={p.id}
-              className={selectedProducts.includes(p.id) ? "bg-gray-100" : ""}
-            >
-              <TableCell>
-                <Checkbox
-                  checked={selectedProducts.includes(p.id)}
-                  onCheckedChange={() => toggleProduct(p.id)}
-                />
-              </TableCell>
-              <TableCell>{p.id}</TableCell>
-              <TableCell>{p.name}</TableCell>
-              <TableCell>{p.brands?.name || "—"}</TableCell>
-              <TableCell>{p.categories?.name || "—"}</TableCell>
-              <TableCell>{p.usd_price}</TableCell>
-              <TableCell>
-                <Checkbox checked={p.active} disabled />
-              </TableCell>
-              <TableCell className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => openEditModal(p)}
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">Columnas</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {TABLE_COLUMNS.map((column) => (
+                <DropdownMenuCheckboxItem
+                  key={column.id}
+                  checked={visibleColumns.includes(column.id)}
+                  onCheckedChange={() => handleColumnToggle(column.id)}
                 >
-                  <PencilIcon className="h-4 w-4 mr-1" /> Editar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => handleDeleteProduct(p.id)}
-                  disabled={updatingId === p.id}
-                >
-                  {updatingId === p.id ? (
-                    <Loader2Icon className="animate-spin h-4 w-4" />
-                  ) : (
-                    "Eliminar"
-                  )}
-                </Button>
-              </TableCell>
+                  {column.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <IconRefresh
+              className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
+            />
+          </Button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {TABLE_COLUMNS.filter((column) =>
+                visibleColumns.includes(column.id)
+              ).map((column) => (
+                <TableHead key={column.id}>{column.label}</TableHead>
+              ))}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
 
-      {/* Gráfico de ventas por usuario */}
-      <ChartSalesByUser />
+          <TableBody>
+            {loading && (
+              <TableRow>
+                <TableCell colSpan={columnCount}>
+                  <div className="grid gap-2">
+                    {[...Array(3)].map((_, index) => (
+                      <Skeleton key={index} className="h-10 w-full" />
+                    ))}
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
 
-      {/* ---- Modal Crear ---- */}
-      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Crear Producto</DialogTitle>
-          </DialogHeader>
-          <ProductForm
-            formData={formData}
-            setFormData={setFormData}
-            brands={brands}
-            categories={categories}
-          />
-          <DialogFooter>
-            <Button onClick={handleCreateProduct}>Guardar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            {isEmpty && (
+              <TableRow>
+                <TableCell
+                  colSpan={columnCount}
+                  className="py-10 text-center text-muted-foreground"
+                >
+                  No hay productos disponibles.
+                </TableCell>
+              </TableRow>
+            )}
 
-      {/* ---- Modal Editar ---- */}
-      <Dialog open={openEdit} onOpenChange={setOpenEdit}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Editar Producto</DialogTitle>
-          </DialogHeader>
-          <ProductForm
-            formData={formData}
-            setFormData={setFormData}
-            brands={brands}
-            categories={categories}
-          />
-          <DialogFooter>
-            <Button onClick={handleUpdateProduct}>Actualizar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            {!loading &&
+              filteredProducts.map((product) => {
+                const cashPriceARS = product.usdPrice * fxRate;
+                const paymentColumnVisible =
+                  visibleColumns.includes("payment_methods");
+
+                return (
+                  <TableRow key={product.id}>
+                    {visibleColumns.includes("image") && (
+                      <TableCell className="w-[70px]">
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage
+                            src={product.coverImageUrl || PLACEHOLDER_IMAGE}
+                            alt={product.name}
+                          />
+                          <AvatarFallback>
+                            {getProductInitials(product.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </TableCell>
+                    )}
+
+                    {visibleColumns.includes("name") && (
+                      <TableCell>
+                        <div className="font-medium">{product.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatCurrencyUSD(product.usdPrice)}
+                        </div>
+                      </TableCell>
+                    )}
+
+                    {visibleColumns.includes("brand") && (
+                      <TableCell>
+                        <Badge variant="outline">{product.brandName}</Badge>
+                      </TableCell>
+                    )}
+
+                    {visibleColumns.includes("stock") && (
+                      <TableCell>{product.stock}</TableCell>
+                    )}
+
+                    {visibleColumns.includes("usd_price") && (
+                      <TableCell>
+                        {formatCurrencyUSD(product.usdPrice)}
+                      </TableCell>
+                    )}
+
+                    {visibleColumns.includes("cash_price") && (
+                      <TableCell>{formatCurrencyARS(cashPriceARS)}</TableCell>
+                    )}
+
+                    {paymentColumnVisible && (
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex items-center gap-2"
+                            >
+                              <IconCreditCard className="h-4 w-4" />
+                              Metodos ({product.paymentOptions.length})
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-60">
+                            <DropdownMenuLabel>
+                              Montos estimados
+                            </DropdownMenuLabel>
+                            {product.paymentOptions.map((method) => (
+                              <DropdownMenuItem
+                                key={method.id}
+                                className="flex items-center justify-between gap-2"
+                              >
+                                <span>{method.name}</span>
+                                <span className="text-sm text-muted-foreground">
+                                  {formatCurrencyARS(method.priceARS)}
+                                </span>
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    )}
+
+                    {visibleColumns.includes("commission") && (
+                      <TableCell>
+                        {product.commissionPct === null ? (
+                          "-"
+                        ) : (
+                          <div className="space-y-1">
+                            <div>{formatPercentage(product.commissionPct)}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {formatCurrencyUSD(product.commissionAmountUSD)}
+                            </div>
+                          </div>
+                        )}
+                      </TableCell>
+                    )}
+
+                    {visibleColumns.includes("actions") && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(product)}
+                            disabled={refreshing}
+                          >
+                            <IconEdit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDelete(product)}
+                            disabled={refreshing}
+                          >
+                            <IconTrash className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
-}
+};
 
-/** Subcomponente para el formulario de producto */
-function ProductForm({ formData, setFormData, brands, categories }) {
-  const handleChange = (field, value) =>
-    setFormData((prev) => ({ ...prev, [field]: value }));
-
-  return (
-    <div className="grid gap-4 py-4">
-      <Input
-        placeholder="Nombre"
-        value={formData.name}
-        onChange={(e) => handleChange("name", e.target.value)}
-      />
-      <Select
-        value={formData.brand_id}
-        onValueChange={(v) => handleChange("brand_id", v)}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="Marca" />
-        </SelectTrigger>
-        <SelectContent>
-          {brands.map((b) => (
-            <SelectItem key={b.id} value={b.id}>
-              {b.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Select
-        value={formData.category_id}
-        onValueChange={(v) => handleChange("category_id", v)}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="Categoría" />
-        </SelectTrigger>
-        <SelectContent>
-          {categories.map((c) => (
-            <SelectItem key={c.id} value={c.id}>
-              {c.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Input
-        type="number"
-        placeholder="Precio USD"
-        value={formData.usd_price}
-        onChange={(e) => handleChange("usd_price", e.target.value)}
-      />
-      <Input
-        type="number"
-        placeholder="Comisión %"
-        value={formData.commission_pct}
-        onChange={(e) => handleChange("commission_pct", e.target.value)}
-      />
-      <Input
-        type="number"
-        placeholder="Comisión fija"
-        value={formData.commission_fixed}
-        onChange={(e) => handleChange("commission_fixed", e.target.value)}
-      />
-      <Input
-        placeholder="Lead time"
-        value={formData.lead_time_label}
-        onChange={(e) => handleChange("lead_time_label", e.target.value)}
-      />
-      <div className="flex items-center gap-2">
-        <Checkbox
-          checked={formData.allow_backorder}
-          onCheckedChange={(v) => handleChange("allow_backorder", v)}
-        />
-        <span>Permitir backorder</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <Checkbox
-          checked={formData.active}
-          onCheckedChange={(v) => handleChange("active", v)}
-        />
-        <span>Activo</span>
-      </div>
-    </div>
-  );
-}
+export default ProductsTable;

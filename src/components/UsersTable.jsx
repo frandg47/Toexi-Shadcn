@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Table,
   TableBody,
@@ -37,6 +38,7 @@ import DialogEditUser from "./DialogEditUser";
 
 // Actualiza la lista de columnas disponibles
 const TABLE_COLUMNS = [
+  { id: "avatar", label: "Avatar" },
   { id: "name", label: "Nombre" },
   { id: "email", label: "Email" },
   { id: "phone", label: "Teléfono" },
@@ -62,6 +64,22 @@ const formatDate = (value) => {
 const buildFullName = (user) => {
   if (!user?.name && !user?.last_name) return "Sin nombre";
   return [user?.name, user?.last_name].filter(Boolean).join(" ");
+};
+
+const getInitials = (user) => {
+  const name = buildFullName(user);
+  if (!name || name === "Sin nombre") return "?";
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+};
+
+const getGoogleAvatarUrl = (email) => {
+  if (!email) return undefined;
+  return `https://www.google.com/s2/photos/profile/${encodeURIComponent(email)}`;
 };
 
 const UsersTable = ({ refreshToken = 0, onAdd }) => {
@@ -212,6 +230,8 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
     [loading, filteredUsers]
   );
 
+  const columnCount = visibleColumns.length;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -255,6 +275,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
         <Table>
           <TableHeader>
             <TableRow>
+              {visibleColumns.includes("avatar") && <TableHead>Avatar</TableHead>}
               {visibleColumns.includes("name") && <TableHead>Nombre</TableHead>}
               {visibleColumns.includes("email") && <TableHead>Email</TableHead>}
               {visibleColumns.includes("phone") && (
@@ -275,7 +296,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
           <TableBody>
             {loading && (
               <TableRow>
-                <TableCell colSpan={7}>
+                <TableCell colSpan={columnCount}>
                   <div className="grid gap-2">
                     {[...Array(3)].map((_, index) => (
                       <Skeleton key={index} className="h-10 w-full" />
@@ -288,7 +309,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
             {isEmpty && (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={columnCount}
                   className="py-10 text-center text-muted-foreground"
                 >
                   Todavia no se registraron usuarios.
@@ -299,6 +320,17 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
             {!loading &&
               filteredUsers.map((user) => (
                 <TableRow key={user.id}>
+                  {visibleColumns.includes("avatar") && (
+                    <TableCell className="w-[70px]">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage
+                          src={getGoogleAvatarUrl(user.email)}
+                          alt={buildFullName(user)}
+                        />
+                        <AvatarFallback>{getInitials(user)}</AvatarFallback>
+                      </Avatar>
+                    </TableCell>
+                  )}
                   {visibleColumns.includes("name") && (
                     <TableCell>
                       <div className="font-medium">{buildFullName(user)}</div>
