@@ -42,7 +42,7 @@ const TABLE_COLUMNS = [
   { id: "actions", label: "Acciones" },
 ];
 
-const DEFAULT_FX_RATE = 950;
+const DEFAULT_FX_RATE = 1000;
 const PLACEHOLDER_IMAGE = "https://via.placeholder.com/80?text=Producto";
 
 const SAMPLE_PRODUCTS = [
@@ -143,117 +143,134 @@ const ProductsTable = ({ refreshToken = 0 }) => {
   const [fxRate, setFxRate] = useState(DEFAULT_FX_RATE);
 
   const fetchProducts = useCallback(async (showSkeleton = false) => {
-    if (showSkeleton) {
-      setLoading(true);
-    } else {
-      setRefreshing(true);
-    }
+    if (showSkeleton) setLoading(true);
+    else setRefreshing(true);
 
     try {
-      const [fxRatesRes, paymentMethodsRes, productsRes] = await Promise.all([
-        supabase
-          .from("fx_rates")
-          .select("id, rate, is_active")
-          .order("is_active", { ascending: false }),
-        supabase
-          .from("payment_methods")
-          .select("id, name, multiplier")
-          .order("name"),
-        supabase
-          .from("products")
-          .select(
-            `
+      // Consultas paralelas
+      const [fxRatesRes, paymentMethodsRes, productsRes, commissionRulesRes] =
+        await Promise.all([
+          supabase
+            .from("fx_rates")
+            .select("id, rate, is_active")
+            .order("is_active", { ascending: false }),
+          supabase
+            .from("payment_methods")
+            .select("id, name, multiplier")
+            .order("name"),
+          supabase
+            .from("products")
+            .select(
+              `
             id,
             name,
             brand_id,
+            category_id,
             usd_price,
             commission_pct,
+            commission_fixed,
             cover_image_url,
             brands(name),
             inventory(stock)
           `
-          )
-          .order("name"),
-      ]);
+            )
+            .order("name"),
+          supabase
+            .from("commission_rules")
+            .select(
+              `id, brand_id, category_id, commission_pct, commission_fixed, priority`
+            )
+            .order("priority", { ascending: true }),
+        ]);
 
+      // Cotización activa
       let currentFxRate = DEFAULT_FX_RATE;
-      if (
-        !fxRatesRes.error &&
-        Array.isArray(fxRatesRes.data) &&
-        fxRatesRes.data.length
-      ) {
+      if (fxRatesRes?.data?.length) {
         const activeRate =
-          fxRatesRes.data.find((item) => item.is_active) ?? fxRatesRes.data[0];
-        if (activeRate?.rate) {
-          currentFxRate = Number(activeRate.rate) || DEFAULT_FX_RATE;
+          fxRatesRes.data.find((r) => r.is_active) ?? fxRatesRes.data[0];
+        currentFxRate = Number(activeRate.rate) || DEFAULT_FX_RATE;
+      }
+
+      const paymentMethods = paymentMethodsRes?.data?.length
+        ? paymentMethodsRes.data
+        : SAMPLE_PAYMENT_METHODS;
+
+      const rules = commissionRulesRes?.data ?? [];
+
+      const rawProducts = productsRes?.data?.length
+        ? productsRes.data
+        : SAMPLE_PRODUCTS;
+
+      // --- 💡 Función que devuelve la mejor comisión para un producto
+      // --- 💡 Función que devuelve la mejor comisión para un producto
+      const findCommissionForProduct = (product) => {
+        // 1️⃣ Si el producto tiene comisión propia
+        if (
+          product.commission_pct != null ||
+          product.commission_fixed != null
+        ) {
+          return {
+            pct: product.commission_pct ?? null,
+            fixed: product.commission_fixed ?? null,
+            source: "Producto",
+            priority: 0,
+          };
         }
-      }
 
-      const paymentMethods =
-        !paymentMethodsRes.error && Array.isArray(paymentMethodsRes.data)
-          ? paymentMethodsRes.data
-          : SAMPLE_PAYMENT_METHODS;
+        // 2️⃣ Filtrar todas las reglas que aplican por marca o categoría
+        const applicableRules = rules.filter((rule) => {
+          const matchesBrand =
+            rule.brand_id && rule.brand_id === product.brand_id;
+          const matchesCategory =
+            rule.category_id && rule.category_id === product.category_id;
+          const globalRule = !rule.brand_id && !rule.category_id; // regla general (sin marca ni categoría)
+          return matchesBrand || matchesCategory || globalRule;
+        });
 
-      let rawProducts = [];
-      if (!productsRes.error && Array.isArray(productsRes.data)) {
-        rawProducts = productsRes.data;
-      } else {
-        console.warn("Falling back to sample products", productsRes.error);
-        rawProducts = SAMPLE_PRODUCTS;
-      }
+        if (applicableRules.length === 0) return null;
 
-      let brandMap = {};
-      const missingBrandIds = rawProducts
-        .filter((product) => !product?.brands?.name && product?.brand_id)
-        .map((product) => product.brand_id);
+        // 3️⃣ Ordenar las reglas por prioridad (menor número = más prioridad)
+        applicableRules.sort((a, b) => a.priority - b.priority);
 
-      if (missingBrandIds.length) {
-        const uniqueIds = [...new Set(missingBrandIds)];
-        const { data: brandsData, error: brandsError } = await supabase
-          .from("brands")
-          .select("id, name")
-          .in("id", uniqueIds);
-
-        if (!brandsError && Array.isArray(brandsData)) {
-          brandMap = brandsData.reduce((acc, brand) => {
-            acc[brand.id] = brand.name;
-            return acc;
-          }, {});
-        }
-      }
-
-      const preparedProducts = rawProducts.map((product) => {
-        const usdPrice = Number(product.usd_price) || 0;
-        const commissionPct =
-          product.commission_pct === null ||
-          product.commission_pct === undefined
-            ? null
-            : Number(product.commission_pct);
-        const commissionAmountUSD =
-          commissionPct === null ? null : (usdPrice * commissionPct) / 100;
+        // 4️⃣ Tomar la regla más prioritaria
+        const best = applicableRules[0];
 
         return {
-          id: product.id ?? product,
-          name: product.name ?? "Producto sin nombre",
-          coverImageUrl: product.cover_image_url || "",
-          brandName:
-            product?.brands?.name ||
-            brandMap[product?.brand_id] ||
-            product?.brand_name ||
-            "Sin marca",
-          stock: product?.inventory?.stock ?? product?.stock ?? 0,
+          pct: best.commission_pct ?? null,
+          fixed: best.commission_fixed ?? null,
+          source: "Regla",
+          priority: best.priority,
+        };
+      };
+
+      // --- Construcción de productos
+      const preparedProducts = rawProducts.map((product) => {
+        const usdPrice = Number(product.usd_price) || 0;
+
+        const commission = findCommissionForProduct(product);
+        const pct = commission?.pct ?? null;
+        const fixed = commission?.fixed ?? null;
+
+        const commissionAmountUSD =
+          fixed !== null ? fixed : pct !== null ? (usdPrice * pct) / 100 : null;
+
+        return {
+          id: product.id,
+          name: product.name,
+          brandName: product?.brands?.name ?? "Sin marca",
+          stock: product?.inventory?.stock ?? 0,
           usdPrice,
-          commissionPct,
+          commissionPct: pct,
+          commissionFixed: fixed,
           commissionAmountUSD,
-          paymentOptions: paymentMethods.map((method) => {
-            const multiplier = Number(method.multiplier) || 1;
-            return {
-              id: method.id,
-              name: method.name,
-              multiplier,
-              priceARS: usdPrice * currentFxRate * multiplier,
-            };
-          }),
+          commissionSource: commission?.source ?? "-",
+          commissionPriority: commission?.priority ?? "-",
+          paymentOptions: paymentMethods.map((method) => ({
+            id: method.id,
+            name: method.name,
+            multiplier: method.multiplier,
+            priceARS: usdPrice * currentFxRate * method.multiplier,
+          })),
         };
       });
 
@@ -261,18 +278,10 @@ const ProductsTable = ({ refreshToken = 0 }) => {
       setProducts(preparedProducts);
     } catch (error) {
       console.error(error);
-      setFxRate(DEFAULT_FX_RATE);
+      Swal.fire("Error", "No se pudieron cargar los productos", "error");
       setProducts(
-        SAMPLE_PRODUCTS.map((product) =>
-          buildSampleProduct(product, DEFAULT_FX_RATE)
-        )
+        SAMPLE_PRODUCTS.map((p) => buildSampleProduct(p, DEFAULT_FX_RATE))
       );
-
-      Swal.fire({
-        icon: "error",
-        title: "No se pudieron cargar los productos",
-        text: error.message,
-      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -508,13 +517,25 @@ const ProductsTable = ({ refreshToken = 0 }) => {
 
                     {visibleColumns.includes("commission") && (
                       <TableCell>
-                        {product.commissionPct === null ? (
+                        {product.commissionPct === null &&
+                        product.commissionFixed === null ? (
                           "-"
                         ) : (
                           <div className="space-y-1">
-                            <div>{formatPercentage(product.commissionPct)}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {formatCurrencyUSD(product.commissionAmountUSD)}
+                            {product.commissionPct && (
+                              <div>
+                                {formatPercentage(product.commissionPct)}
+                              </div>
+                            )}
+                            {product.commissionFixed && (
+                              <div>
+                                {formatCurrencyUSD(product.commissionFixed)}
+                              </div>
+                            )}
+                            <div className="text-xs text-muted-foreground">
+                              {product.commissionSource === "Regla"
+                                ? `Regla (prioridad ${product.commissionPriority})`
+                                : "Definido en producto"}
                             </div>
                           </div>
                         )}
