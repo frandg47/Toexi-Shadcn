@@ -60,7 +60,9 @@ function DropMenu({ item }) {
   const location = useLocation();
 
   // Verificar si alguna subruta coincide con la ruta actual
-  const isAnyChildActive = item.items.some((sub) => location.pathname === sub.url);
+  const isAnyChildActive = item.items.some(
+    (sub) => location.pathname === sub.url
+  );
 
   return (
     <SidebarMenuItem className="flex flex-col">
@@ -79,15 +81,13 @@ function DropMenu({ item }) {
           {item.title}
         </span>
         <IconChevronDown
-          className={`h-4 w-4 transition-transform ${
-            open ? "rotate-180" : ""
-          }`}
+          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
       {/* Submenú desplegable */}
       {open && (
-        <SidebarMenu className="ml-6 mt-1 flex flex-col gap-1">
+        <SidebarMenu className="pl-3 mt-1 flex flex-col gap-1 overflow-x-hidden w-[calc(100%-0.75rem)]">
           {item.items.map((sub) => (
             <SidebarMenuItem key={sub.title}>
               <NavLink
@@ -101,7 +101,7 @@ function DropMenu({ item }) {
                    }`
                 }
               >
-                {sub.icon && <sub.icon className="mr-2 h-4 w-4" />}
+                {sub.icon && <sub.icon className="h-4 w-4" />}
                 {sub.title}
               </NavLink>
             </SidebarMenuItem>
