@@ -26,6 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   IconCreditCard,
   IconEdit,
+  IconHomeDollar,
   IconRefresh,
   IconTrash,
 } from "@tabler/icons-react";
@@ -348,12 +349,9 @@ const ProductsTable = ({ refreshToken = 0 }) => {
 
   return (
     <div className="space-y-4 rounded-lg border bg-card p-4 shadow-sm">
-      <div className="rounded-md border bg-muted/30 p-3 text-sm">
-        <span role="img" aria-label="dolar" className="me-1">
-          💱
-        </span>
-        Cotizacion actual del USD: ${Math.round(fxRate)} (1 USD ={" "}
-        {formatCurrencyARS(fxRate)})
+      <div className="flex items-center gap-3 rounded-md border border-green-500 bg-gray-200/20 p-3 text-xl">
+        <IconHomeDollar className="h-6 w-6 text-green-500" />
+        Cotizacion actual del USD: {formatCurrencyARS(fxRate)}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -364,7 +362,7 @@ const ProductsTable = ({ refreshToken = 0 }) => {
           className="sm:w-72"
         />
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">Columnas</Button>
@@ -384,13 +382,12 @@ const ProductsTable = ({ refreshToken = 0 }) => {
 
           <Button
             variant="outline"
-            size="icon"
             onClick={handleRefresh}
             disabled={refreshing}
           >
             <IconRefresh
               className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
-            />
+            />Refrescar
           </Button>
         </div>
       </div>
