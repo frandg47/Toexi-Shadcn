@@ -358,7 +358,7 @@ const ProductsTable = ({ refreshToken = 0 }) => {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Input
-          placeholder="Buscar por producto o marca"
+          placeholder="Buscar por producto o marca..."
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
           className="sm:w-72"

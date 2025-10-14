@@ -104,9 +104,8 @@ const FormRegisterNewUser = ({ onSuccess }) => {
         <Button
           variant="default"
           size="sm"
-          className="bg-gray-400 hover:bg-gray-500"
         >
-          <IconPlus className="mr-1 h-4 w-4" />
+          <IconPlus className="h-4 w-4" />
           Agregar
         </Button>
       </DialogTrigger>

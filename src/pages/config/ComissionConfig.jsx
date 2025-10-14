@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { IconCurrencyDollar, IconEdit, IconTrash, IconPlus } from "@tabler/icons-react";
+import { IconCurrencyDollar, IconRefresh, IconEdit, IconTrash, IconPlus } from "@tabler/icons-react";
 import Swal from "sweetalert2";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -121,9 +121,12 @@ const ComissionConfig = () => {
     <>
       <SiteHeader titulo="Configuración de Comisiones" />
       <div className="mt-6 space-y-6">
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={fetchData}>
+            <IconRefresh className="h-4 w-4" /> Refrescar
+          </Button>
           <Button onClick={() => setOpenDialog(true)}>
-            <IconPlus className="h-4 w-4 mr-2" /> Nueva Regla
+            <IconPlus className="h-4 w-4" /> Nueva Regla
           </Button>
         </div>
 

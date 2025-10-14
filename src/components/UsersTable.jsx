@@ -79,7 +79,9 @@ const getInitials = (user) => {
 
 const getGoogleAvatarUrl = (email) => {
   if (!email) return undefined;
-  return `https://www.google.com/s2/photos/profile/${encodeURIComponent(email)}`;
+  return `https://www.google.com/s2/photos/profile/${encodeURIComponent(
+    email
+  )}`;
 };
 
 const UsersTable = ({ refreshToken = 0, onAdd }) => {
@@ -259,7 +261,6 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          {onAdd}
           <Button
             variant="outline"
             onClick={() => fetchUsers()}
@@ -268,6 +269,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
             <IconRefresh />
             {refreshing ? "Actualizando..." : "Refrescar"}
           </Button>
+          {onAdd}
         </div>
       </div>
 
@@ -275,7 +277,9 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
         <Table>
           <TableHeader>
             <TableRow>
-              {visibleColumns.includes("avatar") && <TableHead>Avatar</TableHead>}
+              {visibleColumns.includes("avatar") && (
+                <TableHead>Avatar</TableHead>
+              )}
               {visibleColumns.includes("name") && <TableHead>Nombre</TableHead>}
               {visibleColumns.includes("email") && <TableHead>Email</TableHead>}
               {visibleColumns.includes("phone") && (
@@ -361,9 +365,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
                           Admin
                         </Badge>
                       ) : (
-                        <Badge
-                          variant="outline"
-                        >
+                        <Badge variant="outline">
                           <IconBriefcase className="h-4 w-4" />
                           Vendedor
                         </Badge>

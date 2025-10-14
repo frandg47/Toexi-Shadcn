@@ -214,54 +214,57 @@ const FxRatesConfig = () => {
 
       <div className="mt-6 space-y-6">
         {/* Filtros globales */}
-        <div className="flex flex-wrap items-center gap-3">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2">
-                <IconCalendar className="h-4 w-4" />
-                {dateRange?.from
-                  ? `${dateRange.from.toLocaleDateString("es-AR")} → ${
-                      dateRange.to
-                        ? dateRange.to.toLocaleDateString("es-AR")
-                        : "..."
-                    }`
-                  : "Seleccionar rango"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="p-2">
-              <Calendar
-                mode="range"
-                selected={dateRange}
-                onSelect={setDateRange}
-                className="rounded-lg border shadow-sm"
+        <div className="flex flex-wrap items-center gap-3 justify-between">
+          <div className="flex gap-3">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <IconCalendar className="h-4 w-4" />
+                  {dateRange?.from
+                    ? `${dateRange.from.toLocaleDateString("es-AR")} → ${
+                        dateRange.to
+                          ? dateRange.to.toLocaleDateString("es-AR")
+                          : "..."
+                      }`
+                    : "Seleccionar rango"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="p-2">
+                <Calendar
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  className="rounded-lg border shadow-sm"
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Button
+              variant="outline"
+              onClick={() => setDateRange(getDefaultWeekRange())}
+            >
+              Semana actual
+            </Button>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={fetchFxRates}
+              disabled={refreshing}
+            >
+              <IconRefresh
+                className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
               />
-            </PopoverContent>
-          </Popover>
+              Refrescar
+            </Button>
 
-          <Button
-            variant="outline"
-            onClick={() => setDateRange(getDefaultWeekRange())}
-          >
-            Semana actual
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={fetchFxRates}
-            disabled={refreshing}
-          >
-            <IconRefresh
-              className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
-            />
-            Refrescar
-          </Button>
-
-          <Button
-            onClick={() => setIsDialogOpen(true)}
-            className="flex items-center gap-1"
-          >
-            <IconPlus className="h-4 w-4" /> Nueva
-          </Button>
+            <Button
+              onClick={() => setIsDialogOpen(true)}
+              className="flex items-center gap-1"
+            >
+              <IconPlus className="h-4 w-4" />Nueva
+            </Button>
+          </div>
         </div>
 
         {/* Cards por cada tipo de fuente */}
