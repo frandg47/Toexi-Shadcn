@@ -1,4 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { supabase } from "../lib/supabaseClient";
 
 const AuthContext = createContext({
@@ -20,7 +27,9 @@ export const AuthContextProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
 
   const loadUser = useCallback(async (sessionUser) => {
-    setStatus("loading");
+    if (status === "loading" || !user || user?.id !== sessionUser?.id) {
+      setStatus("loading");
+    }
 
     if (!sessionUser) {
       setUser(null);
@@ -72,10 +81,12 @@ export const AuthContextProvider = ({ children }) => {
 
     initialize();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!isSubscribed) return;
-      loadUser(session?.user ?? null);
-    });
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!isSubscribed) return;
+        loadUser(session?.user ?? null);
+      }
+    );
 
     return () => {
       isSubscribed = false;
@@ -100,8 +111,3 @@ export const AuthContextProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
-
-
-
-
-
