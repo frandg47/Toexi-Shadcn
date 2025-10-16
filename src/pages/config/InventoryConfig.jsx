@@ -25,15 +25,22 @@ const InventoryConfig = () => {
     user?.user_metadata?.full_name || user?.email || "Usuario desconocido";
 
   const [inventory, setInventory] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [inventoryAll, setInventoryAll] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // 🔹 Filtros
+  const [brands, setBrands] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   // 🔹 Ajuste de stock
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [adjustment, setAdjustment] = useState({
     type: "ajuste",
-    quantity: 0,
+    quantity: "",
     reason: "",
   });
 
@@ -46,52 +53,78 @@ const InventoryConfig = () => {
   });
   const [availableProducts, setAvailableProducts] = useState([]);
 
-  // 🔹 Obtener inventario
+  // 🔹 Obtener inventario + marcas + categorías
   const fetchInventory = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("inventory")
-      .select("product_id, stock, updated_at, products(name, brands(name))");
 
-    if (error) {
-      console.error("error", error);
+    const [
+      { data: inv, error: invError },
+      { data: brandData },
+      { data: catData },
+    ] = await Promise.all([
+      supabase
+        .from("inventory")
+        .select(
+          "product_id, stock, updated_at, products(id, name, brand_id, category_id, brands(name), categories(name))"
+        ),
+      supabase.from("brands").select("id, name").order("name"),
+      supabase.from("categories").select("id, name").order("name"),
+    ]);
+
+    if (invError) {
+      console.error(invError);
       Swal.fire("Error", "No se pudo cargar el inventario", "error");
     } else {
-      const sorted = data.sort((a, b) =>
+      const sorted = inv.sort((a, b) =>
         a.products.name.localeCompare(b.products.name)
       );
       setInventory(sorted);
       setInventoryAll(sorted);
+      setBrands(brandData || []);
+      setCategories(catData || []);
     }
 
     setLoading(false);
   };
 
-  const handleSearch = (value) => {
-  const query = value.toLowerCase();
-  if (!query) {
-    setInventory(inventoryAll); // 👈 si está vacío, restaurar todo
-    return;
-  }
-
-  const filtered = inventoryAll.filter((item) => {
-    const productName = item.products?.name?.toLowerCase() || "";
-    const brandName = item.products?.brands?.name?.toLowerCase() || "";
-    return (
-      productName.includes(query) ||
-      brandName.includes(query)
-    );
-  });
-
-  setInventory(filtered);
-};
-
-
   useEffect(() => {
     fetchInventory();
   }, []);
 
-  // 🔹 Traer productos que aún no tienen inventario
+  // 🔹 Aplicar filtros y búsqueda
+  const applyFilters = () => {
+    let filtered = [...inventoryAll];
+    const query = searchTerm.toLowerCase();
+
+    if (query) {
+      filtered = filtered.filter((item) => {
+        const productName = item.products?.name?.toLowerCase() || "";
+        const brandName = item.products?.brands?.name?.toLowerCase() || "";
+        return productName.includes(query) || brandName.includes(query);
+      });
+    }
+
+    if (selectedBrand) {
+      filtered = filtered.filter(
+        (item) => item.products.brand_id === parseInt(selectedBrand)
+      );
+    }
+
+    if (selectedCategory) {
+      filtered = filtered.filter(
+        (item) => item.products.category_id === parseInt(selectedCategory)
+      );
+    }
+
+    setInventory(filtered);
+  };
+
+  // 👇 Ejecuta el filtro automáticamente cada vez que cambian los valores
+  useEffect(() => {
+    applyFilters();
+  }, [searchTerm, selectedBrand, selectedCategory, inventoryAll]);
+
+  // 🔹 Traer productos sin inventario
   const fetchAvailableProducts = async () => {
     const { data, error } = await supabase
       .from("products")
@@ -99,46 +132,72 @@ const InventoryConfig = () => {
 
     if (error) {
       Swal.fire("Error", "No se pudieron cargar los productos", "error");
-      console.log("error", error);
       return;
     }
 
-    // Filtrar los productos ya existentes en inventario
     const withoutInventory = data.filter(
       (p) => !inventory.some((i) => i.product_id === p.id)
     );
     setAvailableProducts(withoutInventory);
   };
 
-  // 🔹 Guardar ajuste de stock
+  // 🔹 Guardar ajuste de stock y actualizar en Supabase
   const handleStockAdjust = async () => {
     const { type, quantity, reason } = adjustment;
-    const value = parseInt(quantity);
-    if (!value || value <= 0) {
-      setIsDialogOpen(false);
+
+    // permitir 0, validar solo que sea número y no negativo
+    const amount = Number(quantity);
+    if (!Number.isFinite(amount) || amount < 0) {
       await Swal.fire("Error", "Cantidad inválida", "warning");
       return;
     }
-    const movement = {
-      product_id: selectedProduct.product_id,
-      type,
-      quantity: value,
-      reason: reason || "Ajuste manual",
-      created_by: currentUser,
-    };
 
-    const { error } = await supabase
-      .from("inventory_movements")
-      .insert([movement]);
+    const productId = selectedProduct.product_id;
+    const current = Number(selectedProduct?.stock ?? 0);
 
-    if (error) {
-      setIsDialogOpen(false);
-      await Swal.fire("Error", "No se pudo registrar el movimiento", "error");
+    let newStock = current;
+    if (type === "entrada") {
+      newStock = current + amount;
+    } else if (type === "salida") {
+      newStock = Math.max(0, current - amount);
     } else {
-      Swal.fire("Éxito", "Stock actualizado correctamente", "success");
-      setIsDialogOpen(false);
-      fetchInventory();
+      // ajuste
+      newStock = amount;
     }
+    console.log("actualizo", productId, current, amount, newStock);
+
+    // 1) Actualizar inventario
+    const { error: updateError } = await supabase
+      .from("inventory")
+      .update({ stock: newStock, updated_at: new Date() })
+      .eq("product_id", productId);
+
+    if (updateError) {
+      await Swal.fire("Error", "No se pudo actualizar el stock", "error");
+      return;
+    }
+
+    // 2) Registrar movimiento (guardamos la cantidad ingresada)
+    const { error: movementError } = await supabase
+      .from("inventory_movements")
+      .insert([
+        {
+          product_id: productId,
+          type,
+          quantity: amount, // delta para entrada/salida, valor final en ajuste si preferís podés guardar newStock
+          reason: reason || "Ajuste manual",
+          created_by: currentUser,
+        },
+      ]);
+
+    if (movementError) {
+      await Swal.fire("Error", "No se pudo registrar el movimiento", "error");
+      return;
+    }
+
+    setIsDialogOpen(false);
+    await Swal.fire("Éxito", "Stock actualizado correctamente", "success");
+    fetchInventory();
   };
 
   // 🔹 Agregar nuevo inventario
@@ -146,7 +205,6 @@ const InventoryConfig = () => {
     const { product_id, stock, notes } = newInventory;
 
     if (!product_id || !stock) {
-      setIsNewDialogOpen(false);
       await Swal.fire(
         "Campos requeridos",
         "Seleccioná producto y cantidad",
@@ -166,7 +224,6 @@ const InventoryConfig = () => {
     if (error) {
       Swal.fire("Error", "No se pudo agregar el inventario", "error");
     } else {
-      // Registrar movimiento inicial
       await supabase.from("inventory_movements").insert([
         {
           product_id: parseInt(product_id),
@@ -187,15 +244,43 @@ const InventoryConfig = () => {
   return (
     <>
       <SiteHeader titulo="Configuración de Inventario" />
-      <div className="flex justify-between items-center mt-4">
-        <div className="">
+      <div className="flex flex-wrap justify-between items-center mt-4 gap-2">
+        <div className="flex gap-2 flex-wrap items-center">
           <Input
             type="text"
             placeholder="Buscar por producto o marca..."
-            className="w-72"
-            onChange={(e) => handleSearch(e.target.value)}
+            className="w-64"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
+
+          <select
+            className="border rounded-md p-2 text-sm"
+            value={selectedBrand}
+            onChange={(e) => setSelectedBrand(e.target.value)}
+          >
+            <option value="">Todas las marcas</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="border rounded-md p-2 text-sm"
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
+            <option value="">Todas las categorías</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </div>
+
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchInventory}>
             <IconRefresh className="h-4 w-4" /> Refrescar
@@ -211,9 +296,10 @@ const InventoryConfig = () => {
           </Button>
         </div>
       </div>
+
       <div className="mt-6 space-y-6">
         <Card>
-          <CardHeader className="flex items-center justify-between">
+          <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <IconBox className="text-amber-600" />
               Inventario de Productos
@@ -233,10 +319,12 @@ const InventoryConfig = () => {
                     <div>
                       <p className="font-medium">{item.products.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {item.products.brands?.name}
+                        {item.products.brands?.name} •{" "}
+                        {item.products.categories?.name}
                       </p>
                       <Badge
                         variant={item.stock <= 2 ? "destructive" : "outline"}
+                        className={item.stock > 2 && "bg-blue-500 text-white"}
                       >
                         Stock actual: {item.stock}
                       </Badge>
@@ -249,7 +337,7 @@ const InventoryConfig = () => {
                         setSelectedProduct(item);
                         setAdjustment({
                           type: "ajuste",
-                          quantity: 0,
+                          quantity: String(item.stock ?? 0),
                           reason: "",
                         });
                         setIsDialogOpen(true);
@@ -283,9 +371,18 @@ const InventoryConfig = () => {
               <Label>Tipo de movimiento</Label>
               <select
                 value={adjustment.type}
-                onChange={(e) =>
-                  setAdjustment({ ...adjustment, type: e.target.value })
-                }
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  setAdjustment((prev) => ({
+                    ...prev,
+                    type: newType,
+                    // si paso a entrada/salida, dejo vacío; si es ajuste, prefijo stock actual
+                    quantity:
+                      newType === "ajuste"
+                        ? String(selectedProduct?.stock ?? 0)
+                        : "",
+                  }));
+                }}
                 className="border rounded-md p-2"
               >
                 <option value="entrada">Entrada</option>
@@ -294,11 +391,17 @@ const InventoryConfig = () => {
               </select>
             </div>
 
+            <p className="text-sm text-muted-foreground">
+              Stock actual: {selectedProduct?.stock ?? "-"}
+            </p>
+
             <div className="grid gap-2">
-              <Label>Cantidad</Label>
+              <Label>Nuevo stock</Label>
               <Input
                 type="number"
-                placeholder="Ej: 10"
+                placeholder={
+                  adjustment.type === "ajuste" ? "Stock final" : "Cantidad"
+                }
                 value={adjustment.quantity}
                 onChange={(e) =>
                   setAdjustment({ ...adjustment, quantity: e.target.value })

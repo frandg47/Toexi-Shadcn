@@ -1,12 +1,30 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { SiteHeader } from "@/components/site-header";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { IconCurrencyDollar, IconRefresh, IconEdit, IconTrash, IconPlus } from "@tabler/icons-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  IconCurrencyDollar,
+  IconRefresh,
+  IconEdit,
+  IconTrash,
+  IconPlus,
+} from "@tabler/icons-react";
 import Swal from "sweetalert2";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -29,7 +47,8 @@ const ComissionConfig = () => {
       const [rulesRes, brandsRes, categoriesRes] = await Promise.all([
         supabase
           .from("commission_rules")
-          .select(`
+          .select(
+            `
             id,
             brand_id,
             category_id,
@@ -38,7 +57,8 @@ const ComissionConfig = () => {
             priority,
             brands(name),
             categories(name)
-          `)
+          `
+          )
           .order("priority", { ascending: true }),
         supabase.from("brands").select("id, name").order("name"),
         supabase.from("categories").select("id, name").order("name"),
@@ -50,7 +70,11 @@ const ComissionConfig = () => {
       setCategories(categoriesRes.data || []);
     } catch (error) {
       console.error(error);
-      Swal.fire("Error", "No se pudieron cargar las reglas de comisión", "error");
+      Swal.fire(
+        "Error",
+        "No se pudieron cargar las reglas de comisión",
+        "error"
+      );
     }
   }, []);
 
@@ -71,7 +95,10 @@ const ComissionConfig = () => {
 
     if (!result.isConfirmed) return;
 
-    const { error } = await supabase.from("commission_rules").delete().eq("id", id);
+    const { error } = await supabase
+      .from("commission_rules")
+      .delete()
+      .eq("id", id);
     if (error) {
       Swal.fire("Error", "No se pudo eliminar la regla", "error");
     } else {
@@ -81,16 +108,80 @@ const ComissionConfig = () => {
   };
 
   const handleSave = async () => {
+    if (
+      !formData.priority ||
+      isNaN(formData.priority) ||
+      parseInt(formData.priority) < 1
+    ) {
+      setOpenDialog(false);
+      Swal.fire(
+        "Error",
+        "La prioridad debe ser un número entero positivo",
+        "error"
+      );
+      return;
+    }
+
+    if (!formData.brand_id && !formData.category_id) {
+      setOpenDialog(false);
+      Swal.fire("Error", "Debe seleccionar una marca o una categoría", "error");
+      return;
+    }
+
+    if (!formData.commission_pct && !formData.commission_fixed) {
+      setOpenDialog(false);
+      Swal.fire(
+        "Error",
+        "Debe definir un porcentaje o una comisión fija",
+        "error"
+      );
+      return;
+    }
+
+    if (
+      formData.commission_pct &&
+      (isNaN(formData.commission_pct) ||
+        parseFloat(formData.commission_pct) < 0)
+    ) {
+      setOpenDialog(false);
+      Swal.fire(
+        "Error",
+        "El porcentaje de comisión debe ser un número positivo",
+        "error"
+      );
+      return;
+    }
+    if (
+      formData.commission_fixed &&
+      (isNaN(formData.commission_fixed) ||
+        parseFloat(formData.commission_fixed) < 0)
+    ) {
+      setOpenDialog(false);
+      Swal.fire(
+        "Error",
+        "La comisión fija debe ser un número positivo",
+        "error"
+      );
+      return;
+    }
+
     const payload = {
       brand_id: formData.brand_id ? parseInt(formData.brand_id) : null,
       category_id: formData.category_id ? parseInt(formData.category_id) : null,
-      commission_pct: formData.commission_pct ? parseFloat(formData.commission_pct) : null,
-      commission_fixed: formData.commission_fixed ? parseFloat(formData.commission_fixed) : null,
+      commission_pct: formData.commission_pct
+        ? parseFloat(formData.commission_pct)
+        : null,
+      commission_fixed: formData.commission_fixed
+        ? parseFloat(formData.commission_fixed)
+        : null,
       priority: parseInt(formData.priority),
     };
 
     const { error } = editingRule
-      ? await supabase.from("commission_rules").update(payload).eq("id", editingRule.id)
+      ? await supabase
+          .from("commission_rules")
+          .update(payload)
+          .eq("id", editingRule.id)
       : await supabase.from("commission_rules").insert([payload]);
 
     if (error) {
@@ -101,7 +192,13 @@ const ComissionConfig = () => {
     Swal.fire("Éxito", "La regla fue guardada correctamente", "success");
     setOpenDialog(false);
     setEditingRule(null);
-    setFormData({ brand_id: "", category_id: "", commission_pct: "", commission_fixed: "", priority: 100 });
+    setFormData({
+      brand_id: "",
+      category_id: "",
+      commission_pct: "",
+      commission_fixed: "",
+      priority: 100,
+    });
     fetchData();
   };
 
@@ -125,7 +222,19 @@ const ComissionConfig = () => {
           <Button variant="outline" onClick={fetchData}>
             <IconRefresh className="h-4 w-4" /> Refrescar
           </Button>
-          <Button onClick={() => setOpenDialog(true)}>
+          <Button
+            onClick={() => {
+              setEditingRule(null);
+              setFormData({
+                brand_id: "",
+                category_id: "",
+                commission_pct: "",
+                commission_fixed: "",
+                priority: 100,
+              });
+              setOpenDialog(true);
+            }}
+          >
             <IconPlus className="h-4 w-4" /> Nueva Regla
           </Button>
         </div>
@@ -162,7 +271,11 @@ const ComissionConfig = () => {
                 </CardContent>
 
                 <CardFooter className="flex justify-end gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleEdit(rule)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEdit(rule)}
+                  >
                     <IconEdit className="h-4 w-4" />
                   </Button>
                   <Button
@@ -185,7 +298,9 @@ const ComissionConfig = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingRule ? "Editar Regla de Comisión" : "Nueva Regla de Comisión"}
+              {editingRule
+                ? "Editar Regla de Comisión"
+                : "Nueva Regla de Comisión"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -193,8 +308,16 @@ const ComissionConfig = () => {
               <Label>Marca</Label>
               <select
                 value={formData.brand_id}
-                onChange={(e) => setFormData({ ...formData, brand_id: e.target.value })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    brand_id: e.target.value,
+                    // Si elijo marca, limpio categoría
+                    category_id: e.target.value ? "" : formData.category_id,
+                  })
+                }
                 className="w-full rounded-md border border-input bg-background px-3 py-2"
+                disabled={!!formData.category_id} // 🔹 Desactiva si hay categoría seleccionada
               >
                 <option value="">Todas</option>
                 {brands.map((b) => (
@@ -209,8 +332,16 @@ const ComissionConfig = () => {
               <Label>Categoría</Label>
               <select
                 value={formData.category_id}
-                onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    category_id: e.target.value,
+                    // Si elijo categoría, limpio marca
+                    brand_id: e.target.value ? "" : formData.brand_id,
+                  })
+                }
                 className="w-full rounded-md border border-input bg-background px-3 py-2"
+                disabled={!!formData.brand_id} // 🔹 Desactiva si hay marca seleccionada
               >
                 <option value="">Todas</option>
                 {categories.map((c) => (
@@ -227,7 +358,9 @@ const ComissionConfig = () => {
                 <Input
                   type="number"
                   value={formData.commission_pct}
-                  onChange={(e) => setFormData({ ...formData, commission_pct: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, commission_pct: e.target.value })
+                  }
                   placeholder="Ej: 5"
                 />
               </div>
@@ -237,7 +370,12 @@ const ComissionConfig = () => {
                 <Input
                   type="number"
                   value={formData.commission_fixed}
-                  onChange={(e) => setFormData({ ...formData, commission_fixed: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      commission_fixed: e.target.value,
+                    })
+                  }
                   placeholder="Ej: 100"
                 />
               </div>
@@ -248,7 +386,9 @@ const ComissionConfig = () => {
               <Input
                 type="number"
                 value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, priority: e.target.value })
+                }
               />
             </div>
           </div>
