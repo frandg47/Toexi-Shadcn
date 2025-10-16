@@ -59,7 +59,7 @@ const navSecondary = [
 
 export default function AppSidebar(props) {
   const { user } = useAuth(); // 👉 usuario de supabase
-
+  console.log("usuario en sidebar:", user);
   // Mientras carga la sesión podés mostrar algo por defecto
   const displayUser = user
     ? {

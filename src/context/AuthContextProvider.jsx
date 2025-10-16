@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { supabase } from "../lib/supabaseClient";
+import Swal from "sweetalert2";
 
 const AuthContext = createContext({
   user: null,
@@ -26,11 +27,13 @@ export const AuthContextProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [profile, setProfile] = useState(null);
 
+  // 🔹 Cargar o crear usuario
   const loadUser = useCallback(async (sessionUser) => {
     if (status === "loading" || !user || user?.id !== sessionUser?.id) {
       setStatus("loading");
     }
 
+    // 🔸 Si no hay sesión → limpiar estados
     if (!sessionUser) {
       setUser(null);
       setRole(null);
@@ -43,21 +46,76 @@ export const AuthContextProvider = ({ children }) => {
 
     setUser(sessionUser);
 
+    // 🔹 Buscar en tu tabla "users"
     const { data, error: queryError } = await supabase
       .from("users")
-      .select("id, name, last_name, role, state")
+      .select("id, name, last_name, role, state, email")
       .eq("id_auth", sessionUser.id)
-      .single();
+      .maybeSingle();
 
-    if (queryError || !data) {
+    // 🧱 Si no existe el registro en tu tabla "users" → crear
+    if (!data) {
+      // Verificar existencia manual por si otro listener ya insertó
+      const { data: existing } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id_auth", sessionUser.id)
+        .maybeSingle();
+
+      if (!existing) {
+        const { error: insertError } = await supabase.from("users").insert([
+          {
+            id_auth: sessionUser.id,
+            name:
+              sessionUser.user_metadata?.full_name ||
+              sessionUser.user_metadata?.name ||
+              "",
+            email: sessionUser.email,
+            role: "seller",
+            state: false, // inactivo por defecto
+          },
+        ]);
+
+        if (insertError && insertError.code !== "23505") {
+          // 23505 = unique violation, si ya existe lo ignoramos
+          console.error("Error al insertar usuario:", insertError.message);
+          setError(insertError.message);
+        } else if (!insertError) {
+          Swal.fire(
+            "Cuenta pendiente de activación",
+            "Tu cuenta fue creada correctamente, pero un administrador deberá activarla antes de ingresar.",
+            "info"
+          );
+        }
+      }
+
+      await supabase.auth.signOut();
+      setUser(null);
       setRole(null);
       setIsActive(false);
       setProfile(null);
-      setError(queryError?.message ?? "User profile not found");
       setStatus("ready");
       return;
     }
 
+    // 🧩 Si sí existe, pero está inactiva
+    if (!data.state) {
+      Swal.fire(
+        "Cuenta inactiva",
+        "Tu cuenta aún no ha sido activada por un administrador.",
+        "warning"
+      );
+
+      await supabase.auth.signOut();
+      setUser(null);
+      setRole(null);
+      setIsActive(false);
+      setProfile(data);
+      setStatus("ready");
+      return;
+    }
+
+    // ✅ Usuario válido y activo
     setRole(data.role);
     setIsActive(Boolean(data.state));
     setProfile(data);
@@ -65,11 +123,13 @@ export const AuthContextProvider = ({ children }) => {
     setStatus("ready");
   }, []);
 
+  // 🔹 Refrescar perfil manualmente
   const refreshProfile = useCallback(async () => {
     const { data: sessionData } = await supabase.auth.getSession();
     await loadUser(sessionData?.session?.user ?? null);
   }, [loadUser]);
 
+  // 🔹 Inicialización + listener de sesión
   useEffect(() => {
     let isSubscribed = true;
 
@@ -94,6 +154,7 @@ export const AuthContextProvider = ({ children }) => {
     };
   }, [loadUser]);
 
+  // 🔹 Valor del contexto
   const value = useMemo(
     () => ({
       user,
