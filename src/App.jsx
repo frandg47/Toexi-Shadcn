@@ -3,6 +3,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthContextProvider, useAuth } from "./context/AuthContextProvider";
 
 import DashboardLayout from "./components/layout/DashboardLayout";
+import SellerLayout from "./components/layout/SellerLayout";
+
 import Dashboard from "./pages/Dashboard";
 import Products from "./pages/Products";
 import CatalogPage from "./pages/CatalogPage";
@@ -13,14 +15,17 @@ import Orders from "./pages/Orders";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import ConcentricLoader from "./components/ui/loading";
 import ConfigurationPage from "./pages/ConfigurationPage";
+import AuthCallback from "./pages/AuthCallback";
 
-// 🧩 Configuración
+// ⚙️ Configuración
 import ComissionConfig from "./pages/config/ComissionConfig";
 import FxRatesConfig from "./pages/config/FxRatesConfig";
 import PaymentMethodsConfig from "./pages/config/PaymentMethodsConfig";
 import InventoryConfig from "./pages/config/InventoryConfig";
 import SalesConfig from "./pages/config/SalesConfig";
 
+
+// 🔒 COMPONENTE DE RUTA PROTEGIDA
 function ProtectedRoute({ children, allowedRoles }) {
   const location = useLocation();
   const { user, role, isActive, status } = useAuth();
@@ -52,17 +57,20 @@ function ProtectedRoute({ children, allowedRoles }) {
   return children;
 }
 
+
+// 🧭 APP PRINCIPAL
 export default function App() {
   return (
     <>
       <Toaster position="top-center" />
       <AuthContextProvider>
         <Routes>
-          {/* 🔐 Páginas públicas */}
+          {/* 🔓 PÁGINAS PÚBLICAS */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
 
-          {/* 🧭 Dashboard protegido */}
+          {/* 🧭 DASHBOARD (solo superadmin) */}
           <Route
             path="/dashboard/*"
             element={
@@ -71,7 +79,7 @@ export default function App() {
               </ProtectedRoute>
             }
           >
-            {/* 📊 Rutas principales */}
+            {/* 🧩 RUTAS INTERNAS DEL DASHBOARD */}
             <Route index element={<Dashboard />} />
             <Route path="products" element={<Products />} />
             <Route path="catalog" element={<CatalogPage />} />
@@ -81,24 +89,38 @@ export default function App() {
             <Route path="team" element={<TeamPage />} />
             <Route path="orders" element={<Orders />} />
 
-            {/* ⚙️ Configuraciones */}
-            <Route path="settings" element={<ConfigurationPage titulo="Configuraciones" />} />
+            {/* ⚙️ CONFIGURACIONES */}
+            <Route
+              path="settings"
+              element={<ConfigurationPage titulo="Configuraciones" />}
+            />
             <Route path="settings/comission" element={<ComissionConfig />} />
             <Route path="settings/fx-rates" element={<FxRatesConfig />} />
-            <Route path="settings/payment-methods" element={<PaymentMethodsConfig />} />
+            <Route
+              path="settings/payment-methods"
+              element={<PaymentMethodsConfig />}
+            />
             <Route path="settings/inventory" element={<InventoryConfig />} />
             <Route path="settings/sales" element={<SalesConfig />} />
           </Route>
 
-          {/* 🚪 Redirección para rutas no válidas */}
+          {/* 🛍️ VISTA DE VENDEDORES */}
           <Route
-            path="*"
+            path="/seller/*"
             element={
-              <ProtectedRoute>
-                <Navigate to="/dashboard" replace />
+              <ProtectedRoute allowedRoles={["seller", "superadmin"]}>
+                <SellerLayout>
+                  <Routes>
+                    <Route index element={<Products />} />
+                    {/* Podrías agregar más páginas específicas del vendedor aquí */}
+                  </Routes>
+                </SellerLayout>
               </ProtectedRoute>
             }
           />
+
+          {/* 🚪 RUTA POR DEFECTO */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthContextProvider>
     </>

@@ -27,16 +27,17 @@ export function LoginForm({ className, ...props }) {
 
   const onSubmit = async (formData) => {
     try {
-      const { data: authResponse, error: authError } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
+      const { data: authResponse, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
 
       if (authError || !authResponse?.user) {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: "Email o contrasena incorrectos",
+          text: "Email o contraseña incorrectos",
         });
         return;
       }
@@ -51,7 +52,7 @@ export function LoginForm({ className, ...props }) {
         Swal.fire({
           icon: "error",
           title: "Acceso denegado",
-          text: "Tu cuenta no esta registrada en el sistema",
+          text: "Tu cuenta no está registrada en el sistema",
         });
         await supabase.auth.signOut();
         return;
@@ -61,7 +62,7 @@ export function LoginForm({ className, ...props }) {
         Swal.fire({
           icon: "warning",
           title: "Cuenta inactiva",
-          text: "Tu cuenta esta deshabilitada, contacta al administrador",
+          text: "Tu cuenta está deshabilitada, contacta al administrador",
         });
         await supabase.auth.signOut();
         return;
@@ -71,25 +72,43 @@ export function LoginForm({ className, ...props }) {
         icon: "success",
         title: profile.name ? `Bienvenido ${profile.name}` : "Bienvenido",
         text: "Accediste correctamente",
-        timer: 2000,
+        timer: 1800,
         showConfirmButton: false,
       });
 
-      const target = profile.role === "superadmin" ? "/dashboard" : "/unauthorized";
+      // ✅ Redirección según el rol
+      const target =
+        profile.role === "superadmin"
+          ? "/dashboard"
+          : profile.role === "seller"
+          ? "/products"
+          : "/unauthorized";
+
       navigate(target, { replace: true });
     } catch (error) {
       console.error(error);
       Swal.fire({
         icon: "error",
         title: "Error inesperado",
-        text: "Intenta de nuevo mas tarde",
+        text: "Intenta de nuevo más tarde",
       });
     }
   };
 
   const handleGoogleLogin = async () => {
     try {
-      await loginGoogle();
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+          redirectTo: window.location.origin + "/auth/callback",
+        },
+      });
+
+      if (error) throw error;
     } catch (error) {
       console.error(error);
       Swal.fire({
@@ -109,10 +128,11 @@ export function LoginForm({ className, ...props }) {
               <div className="flex flex-col items-center text-center">
                 <h1 className="text-2xl font-bold">Bienvenido</h1>
                 <p className="text-balance text-muted-foreground">
-                  Inicia sesion en tu cuenta de Toexi-Tech.
+                  Inicia sesión en tu cuenta de Toexi-Tech.
                 </p>
               </div>
 
+              {/* Email */}
               <div className="grid gap-3">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -124,23 +144,26 @@ export function LoginForm({ className, ...props }) {
                     required: "El email es obligatorio",
                     pattern: {
                       value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                      message: "Ingresa un email valido",
+                      message: "Ingresa un email válido",
                     },
                   })}
                 />
                 {errors.email && (
-                  <span className="text-sm text-red-500">{errors.email.message}</span>
+                  <span className="text-sm text-red-500">
+                    {errors.email.message}
+                  </span>
                 )}
               </div>
 
+              {/* Password */}
               <div className="grid gap-3">
                 <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">Contraseña</Label>
                   <a
                     href="#"
                     className="ml-auto text-sm underline-offset-2 hover:underline"
                   >
-                    Olvidaste tu contrasena?
+                    ¿Olvidaste tu contraseña?
                   </a>
                 </div>
                 <Input
@@ -148,7 +171,7 @@ export function LoginForm({ className, ...props }) {
                   type="password"
                   autoComplete="current-password"
                   {...register("password", {
-                    required: "La contrasena es obligatoria",
+                    required: "La contraseña es obligatoria",
                     minLength: {
                       value: 6,
                       message: "Debe tener al menos 6 caracteres",
@@ -156,20 +179,25 @@ export function LoginForm({ className, ...props }) {
                   })}
                 />
                 {errors.password && (
-                  <span className="text-sm text-red-500">{errors.password.message}</span>
+                  <span className="text-sm text-red-500">
+                    {errors.password.message}
+                  </span>
                 )}
               </div>
 
+              {/* Submit */}
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? "Ingresando..." : "Ingresar"}
               </Button>
 
+              {/* Divider */}
               <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-border">
                 <span className="relative z-10 bg-card px-2 text-muted-foreground">
-                  O continua con
+                  O continúa con
                 </span>
               </div>
 
+              {/* Google Login */}
               <div className="flex gap-4">
                 <Button
                   onClick={handleGoogleLogin}
@@ -194,6 +222,7 @@ export function LoginForm({ className, ...props }) {
             </div>
           </form>
 
+          {/* Imagen lateral */}
           <div className="relative hidden bg-muted md:block">
             <img
               src="/toexi.jpg"
@@ -204,11 +233,12 @@ export function LoginForm({ className, ...props }) {
         </CardContent>
       </Card>
 
+      {/* Footer */}
       <div className="text-balance text-center text-xs text-muted-foreground *:[a]:underline *:[a]:underline-offset-4 *:[a]:hover:text-primary">
-        Al hacer clic en continuar, aceptas nuestros <a href="#">Terminos de servicio</a> y <a href="#">Politica de privacidad</a>.
+        Al hacer clic en continuar, aceptas nuestros{" "}
+        <a href="#">Términos de servicio</a> y{" "}
+        <a href="#">Política de privacidad</a>.
       </div>
     </div>
   );
 }
-
-

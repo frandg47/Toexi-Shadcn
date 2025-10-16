@@ -81,7 +81,7 @@ const getProductInitials = (name) => {
     : (parts[0][0] + parts[1][0]).toUpperCase();
 };
 
-const ProductsTable = ({ refreshToken = 0 }) => {
+const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -233,6 +233,14 @@ const ProductsTable = ({ refreshToken = 0 }) => {
     fetchProducts(refreshToken === 0);
   }, [fetchProducts, refreshToken]);
 
+  const columnsToRender = useMemo(
+    () =>
+      isSellerView
+        ? TABLE_COLUMNS.filter((c) => c.id !== "actions")
+        : TABLE_COLUMNS,
+    [isSellerView]
+  );
+
   const handleRefresh = () => fetchProducts(false);
 
   const handleDelete = async (product) => {
@@ -320,11 +328,13 @@ const ProductsTable = ({ refreshToken = 0 }) => {
               Refrescar
             </Button>
 
-            <Button
-              onClick={() => setProductDialog({ open: true, product: null })}
-            >
-              <IconPlus className="h-4 w-4" /> Agregar
-            </Button>
+            {!isSellerView && (
+              <Button
+                onClick={() => setProductDialog({ open: true, product: null })}
+              >
+                <IconPlus className="h-4 w-4" /> Agregar
+              </Button>
+            )}
           </div>
         </div>
 
@@ -333,7 +343,7 @@ const ProductsTable = ({ refreshToken = 0 }) => {
           <Table>
             <TableHeader>
               <TableRow>
-                {TABLE_COLUMNS.map((c) => (
+                {columnsToRender.map((c) => (
                   <TableHead key={c.id}>{c.label}</TableHead>
                 ))}
               </TableRow>
@@ -518,26 +528,28 @@ const ProductsTable = ({ refreshToken = 0 }) => {
                         </Tooltip>
                       </TableCell>
 
-                      <TableCell>
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              setProductDialog({ open: true, product: p })
-                            }
-                          >
-                            <IconEdit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDelete(p)}
-                          >
-                            <IconTrash className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      {!isSellerView && (
+                        <TableCell>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setProductDialog({ open: true, product: p })
+                              }
+                            >
+                              <IconEdit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDelete(p)}
+                            >
+                              <IconTrash className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })
@@ -547,12 +559,14 @@ const ProductsTable = ({ refreshToken = 0 }) => {
         </div>
       </div>
 
-      <DialogProduct
-        open={productDialog.open}
-        onClose={() => setProductDialog({ open: false, product: null })}
-        product={productDialog.product}
-        onSave={handleRefresh}
-      />
+      {!isSellerView && (
+        <DialogProduct
+          open={productDialog.open}
+          onClose={() => setProductDialog({ open: false, product: null })}
+          product={productDialog.product}
+          onSave={handleRefresh}
+        />
+      )}
     </TooltipProvider>
   );
 };

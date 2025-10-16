@@ -158,7 +158,7 @@ export const AuthContextProvider = ({ children }) => {
   const value = useMemo(
     () => ({
       user,
-      role,
+      role: profile?.role || role,
       isActive,
       status,
       error,

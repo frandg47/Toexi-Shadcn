@@ -58,23 +58,30 @@ const navSecondary = [
 ];
 
 export default function AppSidebar(props) {
-  const { user } = useAuth(); // 👉 usuario de supabase
-  console.log("usuario en sidebar:", user);
-  // Mientras carga la sesión podés mostrar algo por defecto
-  const displayUser = user
-    ? {
-        name: user.user_metadata?.name || "Usuario",
-        email: user.email,
-        avatar:
-          user.user_metadata?.avatar_url ||
-          user.user_metadata?.picture || // Google
-          "/avatars/default.jpg",
-      }
-    : {
-        name: "Cargando…",
-        email: "",
-        avatar: "/avatars/default.jpg",
-      };
+  const { user, profile } = useAuth();
+
+  const displayUser =
+    user || profile
+      ? {
+          name:
+            profile?.name ||
+            user?.user_metadata?.full_name ||
+            user?.user_metadata?.name ||
+            "Usuario",
+          email: profile?.email || user?.email || "",
+          avatar:
+            user?.user_metadata?.avatar_url ||
+            user?.user_metadata?.picture ||
+            "/avatars/default.jpg",
+          role: profile?.role || "",
+        }
+      : {
+          name: "Cargando…",
+          email: "",
+          avatar: "/avatars/default.jpg",
+        };
+
+  console.log("user", displayUser);
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
