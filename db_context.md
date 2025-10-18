@@ -137,7 +137,7 @@
 | email | text | Correo electrónico. |
 | role | text | Rol (ej. empleado, cliente). |
 | adress | text | Dirección. |
-| state | boolean | Estado (activo/inactivo). |
+| is_active | boolean | Estado (activo/inactivo). |
 | id_auth | uuid (FK → auth.users.id) | ID del usuario autenticado. |
 
 ---

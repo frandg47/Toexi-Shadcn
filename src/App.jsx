@@ -24,13 +24,16 @@ import PaymentMethodsConfig from "./pages/config/PaymentMethodsConfig";
 import InventoryConfig from "./pages/config/InventoryConfig";
 import SalesConfig from "./pages/config/SalesConfig";
 
-
 // 🔒 COMPONENTE DE RUTA PROTEGIDA
 function ProtectedRoute({ children, allowedRoles }) {
   const location = useLocation();
   const { user, role, isActive, status } = useAuth();
 
-  if (status === "loading") {
+  // 🔍 Debug temporal (podés quitarlo después)
+  console.log("ROLE DETECTADO:", role, "Allowed:", allowedRoles);
+
+  // ⏳ Mostrar loader mientras se carga la sesión o el rol
+  if (status === "loading" || !role) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <ConcentricLoader />
@@ -38,25 +41,36 @@ function ProtectedRoute({ children, allowedRoles }) {
     );
   }
 
+  // 🔐 Si no hay usuario autenticado
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
+  // 🚫 Si el usuario está deshabilitado
   if (!isActive) {
     return <Navigate to="/login?disabled=1" replace />;
   }
 
+  // 🎭 Normalizar rol (por si viene con mayúsculas)
+  const normalizedRole = role.toLowerCase();
+
+  // 🚷 Si el rol no tiene permiso
   if (
     Array.isArray(allowedRoles) &&
     allowedRoles.length > 0 &&
-    !allowedRoles.includes(role)
+    !allowedRoles.includes(normalizedRole)
   ) {
+    // Si es vendedor y entra a dashboard → redirigir a su panel
+    if (normalizedRole === "seller") {
+      return <Navigate to="/seller/products" replace />;
+    }
+
     return <Navigate to="/unauthorized" replace />;
   }
 
+  // ✅ Si pasa todas las validaciones, renderizar el contenido
   return children;
 }
-
 
 // 🧭 APP PRINCIPAL
 export default function App() {
@@ -109,15 +123,13 @@ export default function App() {
             path="/seller/*"
             element={
               <ProtectedRoute allowedRoles={["seller", "superadmin"]}>
-                <SellerLayout>
-                  <Routes>
-                    <Route index element={<Products />} />
-                    {/* Podrías agregar más páginas específicas del vendedor aquí */}
-                  </Routes>
-                </SellerLayout>
+                <SellerLayout />
               </ProtectedRoute>
             }
-          />
+          >
+            <Route path="products" element={<Products />} />
+            {/* Agregá más rutas específicas del vendedor aquí */}
+          </Route>
 
           {/* 🚪 RUTA POR DEFECTO */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -27,6 +27,7 @@ import {
 } from "@tabler/icons-react";
 import Swal from "sweetalert2";
 import { supabase } from "@/lib/supabaseClient";
+import { ConfigLoading } from "../../components/ui/loading/config-loading";
 
 const ComissionConfig = () => {
   const [rules, setRules] = useState([]);
@@ -34,6 +35,7 @@ const ComissionConfig = () => {
   const [categories, setCategories] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     brand_id: "",
     category_id: "",
@@ -43,6 +45,7 @@ const ComissionConfig = () => {
   });
 
   const fetchData = useCallback(async () => {
+    setLoading(true);
     try {
       const [rulesRes, brandsRes, categoriesRes] = await Promise.all([
         supabase
@@ -75,6 +78,8 @@ const ComissionConfig = () => {
         "No se pudieron cargar las reglas de comisión",
         "error"
       );
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -240,10 +245,8 @@ const ComissionConfig = () => {
         </div>
 
         {/* Cards de reglas */}
-        {rules.length === 0 ? (
-          <p className="text-center text-muted-foreground mt-10">
-            No hay reglas de comisión configuradas.
-          </p>
+        {rules.length === 0 || loading ? (
+          <ConfigLoading />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {rules.map((rule) => (
@@ -282,7 +285,6 @@ const ComissionConfig = () => {
                     variant="destructive"
                     size="sm"
                     onClick={() => handleDelete(rule.id)}
-                    className="bg-red-500 hover:bg-red-600"
                   >
                     <IconTrash className="h-4 w-4" />
                   </Button>

@@ -1,64 +1,50 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
 import Swal from "sweetalert2";
+
+import Loader from "@/components/ui/loading";
+import { useAuthStore } from "@/store/AuthStore";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
+  const { syncUser } = useAuthStore();
+  const hasRun = useRef(false);
 
   useEffect(() => {
-    const handleAuth = async () => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const user = sessionData?.session?.user;
+    if (hasRun.current) return;
+    hasRun.current = true;
 
-      if (!user) {
-        navigate("/login");
-        return;
+    const verifySession = async () => {
+      try {
+        const result = await syncUser();
+        const icon = result?.icon ?? (result?.ok ? "success" : "error");
+        const title =
+          result?.title ??
+          (result?.ok ? "Sesión verificada" : "No se pudo validar tu sesión");
+        const text = result?.text ?? "";
+
+        await Swal.fire({
+          icon,
+          title,
+          text,
+          timer: 1600,
+          showConfirmButton: !result?.ok,
+        });
+
+        navigate(result?.redirectPath ?? "/login", { replace: true });
+      } catch (error) {
+        console.error(error);
+        await Swal.fire({
+          icon: "error",
+          title: "Error inesperado",
+          text: "Ocurrió un problema al verificar la sesión.",
+        });
+        navigate("/login", { replace: true });
       }
-
-      const { data: profile } = await supabase
-        .from("users")
-        .select("role, state, name")
-        .eq("id_auth", user.id)
-        .single();
-
-      if (!profile) {
-        Swal.fire("Error", "Tu cuenta no está registrada", "error");
-        await supabase.auth.signOut();
-        navigate("/login");
-        return;
-      }
-
-      if (!profile.state) {
-        Swal.fire("Cuenta inactiva", "Contacta al administrador", "warning");
-        await supabase.auth.signOut();
-        navigate("/login");
-        return;
-      }
-
-      Swal.fire({
-        icon: "success",
-        title: `Bienvenido ${profile.name}`,
-        timer: 1500,
-        showConfirmButton: false,
-      });
-
-      const target =
-        profile.role === "superadmin"
-          ? "/dashboard"
-          : profile.role === "seller"
-          ? "/products"
-          : "/unauthorized";
-
-      navigate(target, { replace: true });
     };
 
-    handleAuth();
-  }, [navigate]);
+    verifySession();
+  }, [syncUser, navigate]);
 
-  return (
-    <div className="flex h-screen items-center justify-center text-lg">
-      Verificando cuenta...
-    </div>
-  );
+  return <Loader message="Verificando sesión..." />;
 }

@@ -31,19 +31,13 @@ import {
 } from "@tabler/icons-react";
 import DialogEditUser from "./DialogEditUser";
 
-// const ROLE_OPTIONS = [
-//   { value: "superadmin", label: "Administrador" },
-//   { value: "seller", label: "Vendedor" },
-// ];
-
-// Actualiza la lista de columnas disponibles
 const TABLE_COLUMNS = [
   { id: "avatar", label: "Avatar" },
   { id: "name", label: "Nombre" },
   { id: "email", label: "Email" },
   { id: "phone", label: "Teléfono" },
   { id: "role", label: "Rol" },
-  { id: "state", label: "Estado" },
+  { id: "is_active", label: "Activa" },
   { id: "created_at", label: "Creación" },
   { id: "actions", label: "Acciones" },
 ];
@@ -85,11 +79,9 @@ const getGoogleAvatarUrl = (email) => {
 };
 
 const UsersTable = ({ refreshToken = 0, onAdd }) => {
-  // Actualiza el estado inicial de columnas visibles
   const [visibleColumns, setVisibleColumns] = useState(
     TABLE_COLUMNS.map((col) => col.id)
   );
-  // Agregamos estados para filtros y columnas
   const [nameFilter, setNameFilter] = useState("");
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -107,7 +99,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
       const { data, error } = await supabase
         .from("users")
         .select(
-          "id, name, last_name, email, role, state, phone, dni, adress, created_at"
+          "id, name, last_name, email, role, is_active, phone, dni, adress, created_at"
         )
         .order("created_at", { ascending: false });
 
@@ -136,7 +128,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
         setRefreshing(true);
         const { error } = await supabase
           .from("users")
-          .update({ state: !user.state })
+          .update({ is_active: !user.is_active })
           .eq("id", user.id);
 
         if (error) throw error;
@@ -144,8 +136,8 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
         Swal.fire({
           icon: "success",
           title: "Estado actualizado",
-          text: `La cuenta de ${user.email} ahora esta ${
-            !user.state ? "activa" : "inactiva"
+          text: `La cuenta de ${user.email} ahora está ${
+            !user.is_active ? "activa" : "inactiva"
           }.`,
           timer: 1800,
           showConfirmButton: false,
@@ -169,7 +161,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
       const result = await Swal.fire({
         icon: "warning",
         title: "Eliminar usuario",
-        text: `Esta accion quitara a ${user.email} del listado. Confirma que deseas continuar?`,
+        text: `Esta acción quitará a ${user.email} del listado. ¿Confirmás que deseas continuar?`,
         showCancelButton: true,
         confirmButtonText: "Eliminar",
         cancelButtonText: "Cancelar",
@@ -208,7 +200,6 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
     [fetchUsers]
   );
 
-  // Función para alternar columnas visibles
   const toggleColumn = useCallback((columnName) => {
     setVisibleColumns((current) =>
       current.includes(columnName)
@@ -217,16 +208,13 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
     );
   }, []);
 
-  // Filtrar usuarios por nombre
   const filteredUsers = useMemo(() => {
     if (!nameFilter.trim()) return users;
-
     return users.filter((user) =>
       buildFullName(user).toLowerCase().includes(nameFilter.toLowerCase())
     );
   }, [users, nameFilter]);
 
-  // Modificar el isEmpty para usar filteredUsers
   const isEmpty = useMemo(
     () => !loading && filteredUsers.length === 0,
     [loading, filteredUsers]
@@ -245,9 +233,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
         <div className="flex gap-2 flex-wrap items-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                Columnas
-              </Button>
+              <Button variant="outline">Columnas</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-40">
               {TABLE_COLUMNS.map((col) => (
@@ -263,11 +249,13 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
           </DropdownMenu>
           <Button
             variant="outline"
-            onClick={() => fetchUsers()}
+            onClick={() => fetchUsers(false)}
             disabled={refreshing}
           >
-            <IconRefresh />
-            {refreshing ? "Actualizando..." : "Refrescar"}
+            <IconRefresh
+              className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
+            />
+            Refrescar
           </Button>
           {onAdd}
         </div>
@@ -277,21 +265,13 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
         <Table>
           <TableHeader>
             <TableRow>
-              {visibleColumns.includes("avatar") && (
-                <TableHead>Avatar</TableHead>
-              )}
+              {visibleColumns.includes("avatar") && <TableHead>Avatar</TableHead>}
               {visibleColumns.includes("name") && <TableHead>Nombre</TableHead>}
               {visibleColumns.includes("email") && <TableHead>Email</TableHead>}
-              {visibleColumns.includes("phone") && (
-                <TableHead>Teléfono</TableHead>
-              )}
+              {visibleColumns.includes("phone") && <TableHead>Teléfono</TableHead>}
               {visibleColumns.includes("role") && <TableHead>Rol</TableHead>}
-              {visibleColumns.includes("state") && (
-                <TableHead>Activa</TableHead>
-              )}
-              {visibleColumns.includes("created_at") && (
-                <TableHead>Creada</TableHead>
-              )}
+              {visibleColumns.includes("is_active") && <TableHead>Activa</TableHead>}
+              {visibleColumns.includes("created_at") && <TableHead>Creada</TableHead>}
               {visibleColumns.includes("actions") && (
                 <TableHead className="w-[160px] text-right">Acciones</TableHead>
               )}
@@ -316,7 +296,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
                   colSpan={columnCount}
                   className="py-10 text-center text-muted-foreground"
                 >
-                  Todavia no se registraron usuarios.
+                  Todavía no se registraron usuarios.
                 </TableCell>
               </TableRow>
             )}
@@ -372,10 +352,10 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
                       )}
                     </TableCell>
                   )}
-                  {visibleColumns.includes("state") && (
+                  {visibleColumns.includes("is_active") && (
                     <TableCell>
                       <Switch
-                        checked={Boolean(user.state)}
+                        checked={Boolean(user.is_active)}
                         onCheckedChange={() => handleToggleActive(user)}
                         aria-label={"Cambiar estado de " + user.email}
                       />
@@ -400,7 +380,6 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
                           size="sm"
                           onClick={() => handleDelete(user)}
                           disabled={refreshing}
-                          className="bg-red-400 hover:bg-red-500"
                         >
                           <IconTrash className="h-4 w-4" />
                         </Button>
@@ -416,6 +395,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
           open={!!editingUserId}
           onClose={() => setEditingUserId(null)}
           userId={editingUserId}
+          onSuccess={() => fetchUsers(false)}
         />
       </div>
     </div>

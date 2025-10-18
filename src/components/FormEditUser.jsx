@@ -15,7 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Loader2Icon } from "lucide-react";
 
-export default function FormEditUser({ userId, onClose }) {
+export default function FormEditUser({ userId, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState({
     name: "",
@@ -25,17 +25,17 @@ export default function FormEditUser({ userId, onClose }) {
     phone: "",
     adress: "", // Nota: está como "adress" en la BD
     role: "",
-    state: false
+    is_active: false,
   });
 
   useEffect(() => {
     const fetchUser = async () => {
       if (!userId) return;
-      
+
       const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
+        .from("users")
+        .select("*")
+        .eq("id", userId)
         .single();
 
       if (error) {
@@ -44,7 +44,7 @@ export default function FormEditUser({ userId, onClose }) {
       }
 
       setUser(data);
-      console.log("usuario cargado:", data);
+      console.log("Usuario cargado:", data);
     };
 
     fetchUser();
@@ -61,7 +61,7 @@ export default function FormEditUser({ userId, onClose }) {
       }
 
       const { error } = await supabase
-        .from('users')
+        .from("users")
         .update({
           name: user.name,
           last_name: user.last_name,
@@ -69,13 +69,14 @@ export default function FormEditUser({ userId, onClose }) {
           phone: user.phone,
           role: user.role,
           adress: user.adress,
-          state: user.state
+          is_active: user.is_active,
         })
-        .eq('id', userId);
+        .eq("id", userId);
 
       if (error) throw error;
 
       toast.success("Usuario actualizado correctamente");
+      if (onSuccess) await onSuccess();
       onClose();
     } catch (error) {
       toast.error(error.message || "Error al actualizar el usuario");
@@ -162,13 +163,16 @@ export default function FormEditUser({ userId, onClose }) {
           />
         </div>
 
+        {/* ✅ Campo de estado actualizado */}
         <div className="flex items-center space-x-2 sm:col-span-2">
           <Switch
-            id="state"
-            checked={user.state}
-            onCheckedChange={(checked) => setUser({ ...user, state: checked })}
+            id="is_active"
+            checked={user.is_active}
+            onCheckedChange={(checked) =>
+              setUser({ ...user, is_active: checked })
+            }
           />
-          <Label htmlFor="state">Usuario activo</Label>
+          <Label htmlFor="is_active">Usuario activo</Label>
         </div>
       </div>
 

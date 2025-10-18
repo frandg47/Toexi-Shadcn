@@ -103,7 +103,6 @@ const FormRegisterNewUser = ({ onSuccess }) => {
       <DialogTrigger asChild>
         <Button
           variant="default"
-          size="sm"
         >
           <IconPlus className="h-4 w-4" />
           Agregar

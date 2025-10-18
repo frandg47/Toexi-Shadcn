@@ -6,14 +6,17 @@ import {
 } from "@/components/ui/dialog";
 import FormEditUser from "./FormEditUser";
 
-export default function DialogEditUser({ open, onClose, userId }) {
+export default function DialogEditUser({ open, onClose, userId, onSuccess }) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Editar Usuario</DialogTitle>
         </DialogHeader>
-        <FormEditUser userId={userId} onClose={onClose} />
+        <FormEditUser 
+          userId={userId} 
+          onClose={onClose}
+          onSuccess={onSuccess} />
       </DialogContent>
     </Dialog>
   );

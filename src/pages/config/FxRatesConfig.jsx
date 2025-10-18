@@ -2,8 +2,8 @@ import React, { useEffect, useState, useCallback } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ConfigLoading } from "../../components/ui/loading/config-loading";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -69,6 +69,7 @@ const FxRatesConfig = () => {
   const [dateRange, setDateRange] = useState(getDefaultWeekRange());
 
   const fetchFxRates = useCallback(async () => {
+    setLoading(true);
     setRefreshing(true);
     try {
       const { data, error } = await supabase
@@ -262,7 +263,8 @@ const FxRatesConfig = () => {
               onClick={() => setIsDialogOpen(true)}
               className="flex items-center gap-1"
             >
-              <IconPlus className="h-4 w-4" />Nueva
+              <IconPlus className="h-4 w-4" />
+              Nueva
             </Button>
           </div>
         </div>
@@ -298,7 +300,7 @@ const FxRatesConfig = () => {
                 </CardTitle>
 
                 <Button
-                  size="icon"
+                  size="sm"
                   variant="outline"
                   onClick={() => {
                     setEditingRate({ ...currentRate, notes: "" });
@@ -313,7 +315,7 @@ const FxRatesConfig = () => {
 
               <CardContent>
                 {loading ? (
-                  <Skeleton className="h-16 w-full" />
+                  <ConfigLoading />
                 ) : currentRate ? (
                   <>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -367,9 +369,7 @@ const FxRatesConfig = () => {
                     </div>
                   </>
                 ) : (
-                  <p className="text-muted-foreground text-sm">
-                    No hay cotizaciones registradas.
-                  </p>
+                  <ConfigLoading />
                 )}
               </CardContent>
             </Card>

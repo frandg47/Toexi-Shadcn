@@ -9,6 +9,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   IconBallpen,
+  IconEdit,
   IconPlus,
   IconRefresh,
   IconTrash,
@@ -136,7 +137,7 @@ export default function CatalogTable({ tipo }) {
 
   if (loading)
     return (
-      <div className="p-6">
+      <div className="flex items-center justify-center min-h-[360px]">
         <ConcentricLoader />
       </div>
     );
@@ -154,9 +155,8 @@ export default function CatalogTable({ tipo }) {
                 <span className={`font-semibold`}>{item.name}</span>
                 <div className="flex gap-2">
                   <Button
-                    size="icon"
+                    size="sm"
                     variant="outline"
-                    className="hover:bg-green-50"
                     onClick={() =>
                       setModal({
                         open: true,
@@ -166,12 +166,11 @@ export default function CatalogTable({ tipo }) {
                       })
                     }
                   >
-                    <IconBallpen className="h-4 w-4" />
+                    <IconEdit className="h-4 w-4" />
                   </Button>
                   <Button
-                    size="icon"
-                    variant="outline"
-                    className="bg-red-400 hover:bg-red-500 text-white hover:text-white"
+                    size="sm"
+                    variant="destructive"
                     onClick={() => deleteItem(item.id, type)}
                   >
                     <IconTrash className="h-4 w-4" />
@@ -206,8 +205,8 @@ export default function CatalogTable({ tipo }) {
           className="w-72"
         />
         <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchData}>
-            <IconRefresh className="h-4 w-4" /> Refrescar
+          <Button variant="outline" onClick={fetchData} disabled={loading}>
+            <IconRefresh className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} /> Refrescar
           </Button>
           <Button
             onClick={() =>

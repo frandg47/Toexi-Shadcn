@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import  ConcentricLoader  from "@/components/ui/loading";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -332,7 +333,7 @@ const InventoryConfig = () => {
 
                     <Button
                       variant="outline"
-                      size="icon"
+                      size="sm"
                       onClick={() => {
                         setSelectedProduct(item);
                         setAdjustment({

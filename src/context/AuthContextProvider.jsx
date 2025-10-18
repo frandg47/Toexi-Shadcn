@@ -49,13 +49,12 @@ export const AuthContextProvider = ({ children }) => {
     // 🔹 Buscar en tu tabla "users"
     const { data, error: queryError } = await supabase
       .from("users")
-      .select("id, name, last_name, role, state, email")
+      .select("id, name, last_name, role, is_active, email")
       .eq("id_auth", sessionUser.id)
       .maybeSingle();
 
     // 🧱 Si no existe el registro en tu tabla "users" → crear
     if (!data) {
-      // Verificar existencia manual por si otro listener ya insertó
       const { data: existing } = await supabase
         .from("users")
         .select("id")
@@ -72,12 +71,11 @@ export const AuthContextProvider = ({ children }) => {
               "",
             email: sessionUser.email,
             role: "seller",
-            state: false, // inactivo por defecto
+            is_active: false, // inactivo por defecto
           },
         ]);
 
         if (insertError && insertError.code !== "23505") {
-          // 23505 = unique violation, si ya existe lo ignoramos
           console.error("Error al insertar usuario:", insertError.message);
           setError(insertError.message);
         } else if (!insertError) {
@@ -99,7 +97,7 @@ export const AuthContextProvider = ({ children }) => {
     }
 
     // 🧩 Si sí existe, pero está inactiva
-    if (!data.state) {
+    if (!data.is_active) {
       Swal.fire(
         "Cuenta inactiva",
         "Tu cuenta aún no ha sido activada por un administrador.",
@@ -117,7 +115,7 @@ export const AuthContextProvider = ({ children }) => {
 
     // ✅ Usuario válido y activo
     setRole(data.role);
-    setIsActive(Boolean(data.state));
+    setIsActive(Boolean(data.is_active));
     setProfile(data);
     setError(null);
     setStatus("ready");

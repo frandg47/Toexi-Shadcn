@@ -3,6 +3,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { SiteHeader } from "@/components/site-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import ConcentricLoader from "@/components/ui/loading";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -227,7 +229,7 @@ export default function PaymentMethodsConfig() {
               </CardTitle>
               <div className="flex gap-2">
                 <Button
-                  size="icon"
+                  size="sm"
                   variant="outline"
                   onClick={() =>
                     setMethodModal({
@@ -241,11 +243,11 @@ export default function PaymentMethodsConfig() {
                   <IconEdit className="h-4 w-4" />
                 </Button>
                 <Button
-                  size="icon"
-                  variant="outline"
+                  size="sm"
+                  variant="destructive"
                   onClick={() => handleDeleteMethod(method.id)}
                 >
-                  <IconTrash className="h-4 w-4 text-red-600" />
+                  <IconTrash className="h-4 w-4" />
                 </Button>
               </div>
             </CardHeader>
@@ -273,7 +275,7 @@ export default function PaymentMethodsConfig() {
                     >
                       {i.multiplier > 1 ? (
                         <span>
-                          {i.installments} cuotas — 
+                          {i.installments} cuotas —
                           <b className="text-red-700 ml-1">
                             +{((i.multiplier - 1) * 100).toFixed(2)}%
                           </b>
@@ -292,7 +294,7 @@ export default function PaymentMethodsConfig() {
 
                       <div className="flex gap-2">
                         <Button
-                          size="icon"
+                          size="sm"
                           variant="outline"
                           onClick={() =>
                             setInstallmentModal({
@@ -308,11 +310,11 @@ export default function PaymentMethodsConfig() {
                           <IconEdit className="h-4 w-4" />
                         </Button>
                         <Button
-                          size="icon"
+                          size="sm"
                           variant="outline"
                           onClick={() => handleDeleteInstallment(i.id)}
                         >
-                          <IconTrash className="h-4 w-4 text-red-600" />
+                          <IconTrash className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>

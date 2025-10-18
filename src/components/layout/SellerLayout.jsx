@@ -11,8 +11,9 @@ import {
 import { IconLogout, IconDotsVertical } from "@tabler/icons-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContextProvider";
+import { Outlet } from "react-router-dom";
 
-export default function SellerLayout({ children }) {
+export default function SellerLayout() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
 
@@ -59,10 +60,7 @@ export default function SellerLayout({ children }) {
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 rounded-md border px-3 py-1.5 hover:bg-muted transition text-sm">
               <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage
-                  src={displayUser.avatar}
-                  alt={displayUser.name}
-                />
+                <AvatarImage src={displayUser.avatar} alt={displayUser.name} />
                 <AvatarFallback className="rounded-lg">
                   {displayUser.name?.[0]?.toUpperCase() || "U"}
                 </AvatarFallback>
@@ -89,7 +87,9 @@ export default function SellerLayout({ children }) {
       </header>
 
       {/* 🔹 Contenido */}
-      <main className="flex-1 p-6 max-w-6xl mx-auto w-full">{children}</main>
+      <main className="flex-1 p-6 max-w-6xl mx-auto w-full">
+        <Outlet />
+      </main>
     </div>
   );
 }

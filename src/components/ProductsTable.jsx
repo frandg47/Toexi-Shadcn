@@ -49,7 +49,7 @@ const TABLE_COLUMNS = [
   { id: "actions", label: "Acciones" },
 ];
 
-const DEFAULT_FX_RATE = 1000;
+const DEFAULT_FX_RATE = "cargando...";
 const PLACEHOLDER_IMAGE = "https://via.placeholder.com/80?text=Producto";
 
 const currencyFormatterARS = new Intl.NumberFormat("es-AR", {
@@ -351,8 +351,12 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={TABLE_COLUMNS.length}>
-                    <Skeleton className="h-10 w-full" />
+                  <TableCell colSpan={columnsToRender.length}>
+                    <div className="grid gap-2">
+                      {[...Array(3)].map((_, index) => (
+                        <Skeleton key={index} className="h-10 w-full" />
+                      ))}
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : filteredProducts.length === 0 ? (
