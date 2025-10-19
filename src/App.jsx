@@ -36,7 +36,8 @@ function ProtectedRoute({ children, allowedRoles }) {
   if (status === "loading" || !role) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
-        <ConcentricLoader />
+        {/* <ConcentricLoader /> */}
+        CARGANDO...
       </div>
     );
   }

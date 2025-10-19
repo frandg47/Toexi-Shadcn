@@ -14,6 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import ProductDetailDialog from "../components/ProductDetailDialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipTrigger,
@@ -30,11 +36,6 @@ import {
   IconPlus,
   IconInfoCircle,
 } from "@tabler/icons-react";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
 import DialogProduct from "../components/DialogProduct";
 
 const TABLE_COLUMNS = [
@@ -44,7 +45,7 @@ const TABLE_COLUMNS = [
   { id: "stock", label: "Stock" },
   { id: "usd_price", label: "Precio USD" },
   { id: "cash_price", label: "Efec/Transf" },
-  { id: "payment_methods", label: "Métodos de pago" },
+  // { id: "payment_methods", label: "Métodos de pago" },
   { id: "commission", label: "Comisión" },
   { id: "actions", label: "Acciones" },
 ];
@@ -90,7 +91,10 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [fxRate, setFxRate] = useState(DEFAULT_FX_RATE);
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [paymentInstallments, setPaymentInstallments] = useState([]);
   const [productDialog, setProductDialog] = useState({
     open: false,
     product: null,
@@ -114,27 +118,35 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
           .from("products")
           .select(
             `
+            id,
+            name,
+            brand_id,
+            category_id,
+            usd_price,
+            commission_pct,
+            commission_fixed,
+            cover_image_url,
+            allow_backorder,
+            lead_time_label,
+            active,
+            brands (id, name),
+            categories (id, name),
+            product_variants (
               id,
-              name,
-              brand_id,
-              category_id,
+              storage,
+              ram,
+              color,
               usd_price,
-              commission_pct,
-              commission_fixed,
-              cover_image_url,
-              allow_backorder,
-              lead_time_label,
-              active,
-              brands (id, name),
-              categories (id, name),
-              inventory (stock)
-            `
+              stock,
+              image_url
+            )
+          `
           )
           .order("name"),
         supabase
           .from("payment_methods")
           .select(
-            "id, name, multiplier, payment_installments(id, installments, multiplier, description)"
+            "id, name, multiplier, payment_installments(id, installments, multiplier, description, payment_method_id)"
           )
           .order("id"),
         supabase.from("brands").select("id, name").order("name"),
@@ -149,13 +161,25 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
 
       const currentFxRate =
         fxRatesRes?.data?.find((r) => r.is_active)?.rate ?? DEFAULT_FX_RATE;
-      const methods = paymentMethodsRes?.data || [];
-      const rules = commissionRulesRes?.data || [];
 
-      // 🔹 Función para determinar la comisión aplicable
-      // 🔹 Función para determinar la comisión aplicable
+      const rules = commissionRulesRes?.data || [];
+      const methodsRaw = paymentMethodsRes?.data || [];
+
+      // 🔹 Separar métodos e installments
+      const flatInstallments = methodsRaw.flatMap(
+        (m) => m.payment_installments || []
+      );
+      const methods = methodsRaw.map(
+        ({ payment_installments, ...rest }) => rest
+      );
+
+      const filteredMethods = methods.filter(
+        (m) =>
+          !m.name.toLowerCase().includes("efectivo") &&
+          !m.name.toLowerCase().includes("transfer")
+      );
+
       const getCommissionForProduct = (p) => {
-        // Si tiene comisión propia → prioridad máxima
         if (p.commission_pct != null || p.commission_fixed != null) {
           return {
             pct: p.commission_pct,
@@ -165,18 +189,15 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
           };
         }
 
-        // Buscar reglas aplicables por marca o categoría
         const applicable = rules.filter(
           (r) =>
             (r.brand_id && r.brand_id === p.brand_id) ||
             (r.category_id && r.category_id === p.category_id)
         );
 
-        // Si no hay reglas globales → mostrar "Propia"
         if (applicable.length === 0)
           return { pct: null, fixed: null, ruleName: "Propia", priority: null };
 
-        // Seleccionar la regla con menor prioridad numérica (mayor prioridad real)
         const bestRule = applicable.reduce((a, b) =>
           a.priority < b.priority ? a : b
         );
@@ -193,6 +214,12 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
 
       const processed = (productsRes?.data || []).map((p) => {
         const commission = getCommissionForProduct(p);
+        const variants = p.product_variants || [];
+        const totalStock = variants.reduce((sum, v) => sum + (v.stock || 0), 0);
+        const minVariantPrice = Math.min(
+          ...variants.map((v) => Number(v.usd_price || p.usd_price))
+        );
+
         return {
           id: p.id,
           name: p.name,
@@ -200,19 +227,17 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
           category_id: p.category_id,
           brandName: p.brands?.name ?? "Sin marca",
           categoryName: p.categories?.name ?? "Sin categoría",
-          stock: p.inventory?.stock ?? 0,
-          usdPrice: Number(p.usd_price) || 0,
+          stock: totalStock,
+          usdPrice: minVariantPrice,
           commissionPct: commission.pct ?? null,
           commissionFixed: commission.fixed ?? null,
-          commissionRuleName: commission.ruleName, // ✅ agregado
-          coverImageUrl: p.cover_image_url || PLACEHOLDER_IMAGE,
+          commissionRuleName: commission.ruleName,
+          coverImageUrl:
+            p.cover_image_url || variants[0]?.image_url || PLACEHOLDER_IMAGE,
           allowBackorder: p.allow_backorder,
           leadTimeLabel: p.lead_time_label,
           active: p.active,
-          paymentOptions: methods.map((m) => ({
-            ...m,
-            priceARS: p.usd_price * currentFxRate * m.multiplier,
-          })),
+          variants,
         };
       });
 
@@ -220,6 +245,9 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       setProducts(processed);
       setBrands(brandsRes?.data || []);
       setCategories(categoriesRes?.data || []);
+      setPaymentMethods(filteredMethods);
+      setPaymentInstallments(flatInstallments);
+      console.log("Processed products:", processed);
     } catch (err) {
       console.error(err);
       Swal.fire("Error", "No se pudieron cargar los productos", "error");
@@ -232,14 +260,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   useEffect(() => {
     fetchProducts(refreshToken === 0);
   }, [fetchProducts, refreshToken]);
-
-  const columnsToRender = useMemo(
-    () =>
-      isSellerView
-        ? TABLE_COLUMNS.filter((c) => c.id !== "actions")
-        : TABLE_COLUMNS,
-    [isSellerView]
-  );
 
   const handleRefresh = () => fetchProducts(false);
 
@@ -275,11 +295,13 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   return (
     <TooltipProvider>
       <div className="space-y-4 rounded-lg border bg-card p-4 shadow-sm">
+        {/* Cotización */}
         <div className="flex items-center gap-3 rounded-md border border-green-500 bg-gray-200/20 p-3 text-xl">
           <IconHomeDollar className="h-6 w-6 text-green-500" />
           Cotización actual del USD: {formatCurrencyARS(fxRate)}
         </div>
 
+        {/* Filtros */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-2 items-center">
             <Input
@@ -288,7 +310,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="sm:w-64"
             />
-
             <select
               value={selectedBrand}
               onChange={(e) => setSelectedBrand(e.target.value)}
@@ -301,7 +322,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                 </option>
               ))}
             </select>
-
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
@@ -327,7 +347,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
               />
               Refrescar
             </Button>
-
             {!isSellerView && (
               <Button
                 onClick={() => setProductDialog({ open: true, product: null })}
@@ -338,23 +357,24 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
           </div>
         </div>
 
-        {/* 🧾 Tabla de productos */}
+        {/* Tabla */}
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                {columnsToRender.map((c) => (
+                {TABLE_COLUMNS.map((c) => (
                   <TableHead key={c.id}>{c.label}</TableHead>
                 ))}
               </TableRow>
             </TableHeader>
+
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={columnsToRender.length}>
+                  <TableCell colSpan={TABLE_COLUMNS.length}>
                     <div className="grid gap-2">
-                      {[...Array(3)].map((_, index) => (
-                        <Skeleton key={index} className="h-10 w-full" />
+                      {[...Array(3)].map((_, i) => (
+                        <Skeleton key={i} className="h-10 w-full" />
                       ))}
                     </div>
                   </TableCell>
@@ -369,194 +389,124 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredProducts.map((p) => {
-                  const cashPrice = p.usdPrice * fxRate;
-                  const methods = p.paymentOptions.filter(
-                    (m) =>
-                      !m.name.toLowerCase().includes("efectivo") &&
-                      !m.name.toLowerCase().includes("transfer")
-                  );
-                  const allPrices = methods.flatMap((m) =>
-                    m.payment_installments?.length
-                      ? m.payment_installments.map(
-                          (i) => p.usdPrice * fxRate * i.multiplier
-                        )
-                      : p.usdPrice * fxRate * m.multiplier
-                  );
-                  const minPrice = Math.min(...allPrices);
-                  const maxPrice = Math.max(...allPrices);
+                filteredProducts.map((p) => (
+                  <TableRow
+                    key={p.id}
+                    className="cursor-pointer hover:bg-muted/50 transition"
+                    onClick={() => setSelectedProduct(p)}
+                  >
+                    <TableCell>
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={p.coverImageUrl} alt={p.name} />
+                        <AvatarFallback>
+                          {getProductInitials(p.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </TableCell>
 
-                  return (
-                    <TableRow key={p.id}>
-                      <TableCell>
-                        <Avatar className="h-12 w-12">
-                          <AvatarImage src={p.coverImageUrl} alt={p.name} />
-                          <AvatarFallback>
-                            {getProductInitials(p.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                      </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{p.name}</div>
+                      <p className="text-xs text-muted-foreground">
+                        {p.categoryName}
+                      </p>
+                    </TableCell>
 
-                      <TableCell>
-                        <div className="font-medium">{p.name}</div>
-                        <p className="text-xs text-muted-foreground">
-                          {p.categoryName}
-                        </p>
-                      </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{p.brandName}</Badge>
+                    </TableCell>
 
-                      <TableCell>
-                        <Badge variant="outline">{p.brandName}</Badge>
-                      </TableCell>
+                    <TableCell>
+                      {" "}
+                      {p.stock === 0 && p.allowBackorder ? (
+                        <div className="flex flex-col leading-tight">
+                          {" "}
+                          <span className="font-medium text-amber-600">
+                            {" "}
+                            Pedido{" "}
+                          </span>{" "}
+                          <span className="text-sm text-muted-foreground">
+                            {" "}
+                            {p.leadTimeLabel || "Sin plazo"}{" "}
+                          </span>{" "}
+                        </div>
+                      ) : (
+                        p.stock
+                      )}{" "}
+                    </TableCell>
 
-                      <TableCell>
-                        {p.stock === 0 && p.allowBackorder ? (
-                          <div className="flex flex-col leading-tight">
-                            <span className="font-medium text-amber-600">
-                              Pedido
+                    <TableCell>{formatCurrencyUSD(p.usdPrice)}</TableCell>
+                    <TableCell>
+                      {formatCurrencyARS(p.usdPrice * fxRate)}
+                    </TableCell>
+
+                    {/* <TableCell>
+                      <span className="text-muted-foreground text-sm">
+                        Ver en detalle
+                      </span>
+                    </TableCell> */}
+
+                    <TableCell>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1">
+                            <span>
+                              {p.commissionPct
+                                ? formatPercentage(p.commissionPct)
+                                : p.commissionFixed
+                                ? formatCurrencyUSD(p.commissionFixed)
+                                : "-"}
                             </span>
-                            <span className="text-sm text-muted-foreground">
-                              {p.leadTimeLabel || "Sin plazo"}
-                            </span>
+                            <IconInfoCircle className="h-4 w-4 text-muted-foreground" />
                           </div>
-                        ) : (
-                          p.stock
-                        )}
-                      </TableCell>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{p.commissionRuleName}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableCell>
 
-                      <TableCell>{formatCurrencyUSD(p.usdPrice)}</TableCell>
-
-                      <TableCell>{formatCurrencyARS(cashPrice)}</TableCell>
-
+                    {!isSellerView && (
                       <TableCell>
-                        {methods.length ? (
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <div className="cursor-pointer border rounded-md p-2 hover:bg-muted transition">
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-muted-foreground">
-                                    Desde
-                                  </span>
-                                  <span className="font-semibold text-green-600">
-                                    {formatCurrencyARS(minPrice)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-muted-foreground">
-                                    Hasta
-                                  </span>
-                                  <span className="font-semibold text-red-600">
-                                    {formatCurrencyARS(maxPrice)}
-                                  </span>
-                                </div>
-                              </div>
-                            </PopoverTrigger>
+                        <div className="flex gap-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setProductDialog({
+                                    open: true,
+                                    product: p,
+                                  });
+                                }}
+                              >
+                                <IconEdit className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Editar</TooltipContent>
+                          </Tooltip>
 
-                            <PopoverContent align="end" className="w-80">
-                              <h4 className="font-medium mb-2 flex items-center gap-2">
-                                <IconCreditCard className="h-4 w-4 text-purple-600" />
-                                Métodos de pago
-                              </h4>
-                              {methods.map((m) => (
-                                <div
-                                  key={m.id}
-                                  className="border-b pb-1 mb-2 last:border-0"
-                                >
-                                  <p className="font-semibold text-sm">
-                                    {m.name}
-                                  </p>
-                                  {m.payment_installments?.length ? (
-                                    m.payment_installments.map((i) => (
-                                      <div
-                                        key={i.id}
-                                        className="flex justify-between text-xs text-muted-foreground"
-                                      >
-                                        <span>
-                                          {i.installments} cuotas{" "}
-                                          <span className="text-amber-600">
-                                            (+
-                                            {((i.multiplier - 1) * 100).toFixed(
-                                              1
-                                            )}
-                                            %)
-                                          </span>
-                                        </span>
-                                        <span>
-                                          {formatCurrencyARS(
-                                            p.usdPrice * fxRate * i.multiplier
-                                          )}
-                                        </span>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div className="flex justify-between text-xs text-muted-foreground">
-                                      <span>
-                                        1 pago (+
-                                        {((m.multiplier - 1) * 100).toFixed(1)}
-                                        %)
-                                      </span>
-                                      <span>
-                                        {formatCurrencyARS(
-                                          p.usdPrice * fxRate * m.multiplier
-                                        )}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </PopoverContent>
-                          </Popover>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">
-                            Sin métodos adicionales
-                          </span>
-                        )}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(p);
+                                }}
+                              >
+                                <IconTrash className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Eliminar</TooltipContent>
+                          </Tooltip>
+                        </div>
                       </TableCell>
-
-                      <TableCell>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="flex items-center gap-1">
-                              <span>
-                                {p.commissionPct
-                                  ? formatPercentage(p.commissionPct)
-                                  : p.commissionFixed
-                                  ? formatCurrencyUSD(p.commissionFixed)
-                                  : "-"}
-                              </span>
-                              <IconInfoCircle className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{p.commissionRuleName}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-
-                      {!isSellerView && (
-                        <TableCell>
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                setProductDialog({ open: true, product: p })
-                              }
-                            >
-                              <IconEdit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleDelete(p)}
-                            >
-                              <IconTrash className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  );
-                })
+                    )}
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
@@ -569,6 +519,17 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
           onClose={() => setProductDialog({ open: false, product: null })}
           product={productDialog.product}
           onSave={handleRefresh}
+        />
+      )}
+
+      {selectedProduct && (
+        <ProductDetailDialog
+          open={!!selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          product={selectedProduct}
+          fxRate={fxRate}
+          paymentMethods={paymentMethods}
+          paymentInstallments={paymentInstallments}
         />
       )}
     </TooltipProvider>

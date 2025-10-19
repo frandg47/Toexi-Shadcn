@@ -140,8 +140,13 @@ export const AuthContextProvider = ({ children }) => {
     initialize();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         if (!isSubscribed) return;
+
+        // ⚙️ Evitar reload innecesario al refrescar token
+        if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") return;
+
+        // Solo recargar si hay un login/logout real
         loadUser(session?.user ?? null);
       }
     );
