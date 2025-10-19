@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+// ✅ AGREGADO: Sonner para notificaciones
+import { toast } from "sonner";
 import { SiteHeader } from "@/components/site-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +23,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import Swal from "sweetalert2";
+// ❌ ELIMINADO: import Swal from "sweetalert2";
 
 export default function PaymentMethodsConfig() {
   const [methods, setMethods] = useState([]);
@@ -52,7 +54,10 @@ export default function PaymentMethodsConfig() {
       .order("id");
 
     if (error) {
-      Swal.fire("Error", "No se pudieron cargar los métodos de pago", "error");
+      // 🔄 REEMPLAZO 1: Usar toast para error de carga
+      toast.error("Error de carga", {
+        description: "No se pudieron cargar los métodos de pago.",
+      });
     } else {
       setMethods(data || []);
     }
@@ -67,11 +72,10 @@ export default function PaymentMethodsConfig() {
   const handleSaveMethod = async () => {
     const { name, percent, editId } = methodModal;
     if (!name) {
-      Swal.fire(
-        "Campos requeridos",
-        "Completá el nombre del método",
-        "warning"
-      );
+      // 🔄 REEMPLAZO 2: Usar toast para campos requeridos
+      toast.warning("Campos requeridos", {
+        description: "Completá el nombre del método.",
+      });
       return;
     }
 
@@ -93,34 +97,45 @@ export default function PaymentMethodsConfig() {
     }
 
     if (error) {
-      Swal.fire("Error", "No se pudo guardar el método", "error");
+      // 🔄 REEMPLAZO 3: Usar toast para error al guardar
+      toast.error("Error al guardar", {
+        description: "No se pudo guardar el método de pago.",
+      });
     } else {
-      Swal.fire("Éxito", "Método guardado correctamente", "success");
+      // 🔄 REEMPLAZO 4: Usar toast para éxito
+      toast.success("Éxito", {
+        description: `Método "${name}" ${editId ? "actualizado" : "creado"} correctamente.`,
+      });
       setMethodModal({ open: false, editId: null, name: "", percent: 0 });
       fetchMethods();
     }
   };
 
   // 🔹 Eliminar método
-  const handleDeleteMethod = async (id) => {
-    const confirm = await Swal.fire({
-      title: "¿Eliminar método?",
-      text: "Se eliminarán también sus cuotas asociadas",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Eliminar",
-      cancelButtonText: "Cancelar",
-      confirmButtonColor: "#dc2626",
-    });
-    if (!confirm.isConfirmed) return;
+  const handleDeleteMethod = async (id, name) => {
+    // 🔄 REEMPLAZO 5: Usar un toast.custom para confirmación o simplificar a una advertencia con un diálogo
+    // Por simplicidad, se usará un diálogo interno o la confirmación de la librería de UI preferida.
+    // Aquí, para mantener la lógica de confirmación, se usará una promesa simple con `window.confirm` para un ejemplo de reemplazo rápido, aunque en un entorno Shadcn/ui se preferiría un Dialog o un componente de confirmación customizado de Sonner.
+
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar el método "${name}"? Se eliminarán también sus cuotas asociadas.`)) {
+      return;
+    }
 
     const { error } = await supabase
       .from("payment_methods")
       .delete()
       .eq("id", id);
-    if (error) Swal.fire("Error", "No se pudo eliminar el método", "error");
-    else {
-      Swal.fire("Éxito", "Método eliminado", "success");
+      
+    if (error) {
+      // 🔄 REEMPLAZO 6: Usar toast para error al eliminar
+      toast.error("Error al eliminar", {
+        description: "No se pudo eliminar el método de pago.",
+      });
+    } else {
+      // 🔄 REEMPLAZO 7: Usar toast para éxito
+      toast.success("Eliminado", {
+        description: `Método "${name}" y sus cuotas asociadas eliminados.`,
+      });
       fetchMethods();
     }
   };
@@ -130,11 +145,10 @@ export default function PaymentMethodsConfig() {
     const { methodId, installments, percent, description, editId } =
       installmentModal;
     if (!installments) {
-      Swal.fire(
-        "Campos requeridos",
-        "Completá la cantidad de cuotas",
-        "warning"
-      );
+      // 🔄 REEMPLAZO 8: Usar toast para campos requeridos
+      toast.warning("Campos requeridos", {
+        description: "Completá la cantidad de cuotas.",
+      });
       return;
     }
 
@@ -161,9 +175,15 @@ export default function PaymentMethodsConfig() {
     }
 
     if (error) {
-      Swal.fire("Error", "No se pudo guardar la cuota", "error");
+      // 🔄 REEMPLAZO 9: Usar toast para error al guardar cuota
+      toast.error("Error al guardar", {
+        description: "No se pudo guardar la configuración de la cuota.",
+      });
     } else {
-      Swal.fire("Éxito", "Cuota guardada correctamente", "success");
+      // 🔄 REEMPLAZO 10: Usar toast para éxito
+      toast.success("Éxito", {
+        description: `Cuota de ${installments} ${editId ? "actualizada" : "creada"} correctamente.`,
+      });
       setInstallmentModal({
         open: false,
         methodId: null,
@@ -177,25 +197,27 @@ export default function PaymentMethodsConfig() {
   };
 
   // 🔹 Eliminar cuota
-  const handleDeleteInstallment = async (id) => {
-    const confirm = await Swal.fire({
-      title: "¿Eliminar cuota?",
-      text: "Esta acción no se puede deshacer",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Eliminar",
-      cancelButtonText: "Cancelar",
-      confirmButtonColor: "#dc2626",
-    });
-    if (!confirm.isConfirmed) return;
-
+  const handleDeleteInstallment = async (id, installments) => {
+    // 🔄 REEMPLAZO 11: Usar un toast.custom para confirmación o simplificar a una advertencia con un diálogo
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar la cuota de ${installments}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+    
     const { error } = await supabase
       .from("payment_installments")
       .delete()
       .eq("id", id);
-    if (error) Swal.fire("Error", "No se pudo eliminar la cuota", "error");
-    else {
-      Swal.fire("Éxito", "Cuota eliminada", "success");
+      
+    if (error) {
+      // 🔄 REEMPLAZO 12: Usar toast para error al eliminar cuota
+      toast.error("Error al eliminar", {
+        description: "No se pudo eliminar la cuota.",
+      });
+    } else {
+      // 🔄 REEMPLAZO 13: Usar toast para éxito
+      toast.success("Eliminada", {
+        description: "Cuota eliminada correctamente.",
+      });
       fetchMethods();
     }
   };
@@ -245,7 +267,7 @@ export default function PaymentMethodsConfig() {
                 <Button
                   size="sm"
                   variant="destructive"
-                  onClick={() => handleDeleteMethod(method.id)}
+                  onClick={() => handleDeleteMethod(method.id, method.name)}
                 >
                   <IconTrash className="h-4 w-4" />
                 </Button>
@@ -255,13 +277,14 @@ export default function PaymentMethodsConfig() {
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
                 Aumento:{" "}
-                {method.multiplier > 1 ? (
+                {method.multiplier >= 1 ? (
                   <b className="text-red-700">
                     +{((method.multiplier - 1) * 100).toFixed(2)}%
                   </b>
                 ) : (
                   <b className="text-green-700">
-                    {((1 - method.multiplier) * 100).toFixed(2)}%
+                    {/* Multiplier < 1 means a discount */}
+                    -{((1 - method.multiplier) * 100).toFixed(2)}%
                   </b>
                 )}
               </p>
@@ -271,9 +294,9 @@ export default function PaymentMethodsConfig() {
                   method.payment_installments.map((i) => (
                     <div
                       key={i.id}
-                      className="flex justify-between text-sm border rounded p-2"
+                      className="flex justify-between items-center text-sm border rounded p-2"
                     >
-                      {i.multiplier > 1 ? (
+                      {i.multiplier >= 1 ? (
                         <span>
                           {i.installments} cuotas —
                           <b className="text-red-700 ml-1">
@@ -287,9 +310,12 @@ export default function PaymentMethodsConfig() {
                           )}
                         </span>
                       ) : (
-                        <b className="text-green-700">
-                          {((1 - i.multiplier) * 100).toFixed(2)}%
-                        </b>
+                        <span>
+                          {i.installments} cuotas —
+                          <b className="text-green-700 ml-1">
+                            -{((1 - i.multiplier) * 100).toFixed(2)}%
+                          </b>
+                        </span>
                       )}
 
                       <div className="flex gap-2">
@@ -312,7 +338,7 @@ export default function PaymentMethodsConfig() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleDeleteInstallment(i.id)}
+                          onClick={() => handleDeleteInstallment(i.id, i.installments)}
                         >
                           <IconTrash className="h-4 w-4" />
                         </Button>
@@ -345,6 +371,15 @@ export default function PaymentMethodsConfig() {
             </CardContent>
           </Card>
         ))}
+
+        {loading && (
+            // Mostrar esqueletos si está cargando
+            <>
+                <Skeleton className="h-[250px] w-full" />
+                <Skeleton className="h-[250px] w-full" />
+                <Skeleton className="h-[250px] w-full" />
+            </>
+        )}
 
         {!methods.length && !loading && (
           <p className="text-sm text-muted-foreground col-span-full text-center py-10">

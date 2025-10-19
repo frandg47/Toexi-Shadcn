@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
+// ✅ AGREGADO: Sonner para notificaciones
+import { toast } from "sonner"; 
 import { SiteHeader } from "@/components/site-header";
 import {
   Card,
@@ -19,13 +21,24 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  // ✅ AGREGADO: Componentes de AlertDialog de shadcn/ui
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   IconCurrencyDollar,
   IconRefresh,
   IconEdit,
   IconTrash,
   IconPlus,
 } from "@tabler/icons-react";
-import Swal from "sweetalert2";
+// ❌ ELIMINADO: import Swal from "sweetalert2";
 import { supabase } from "@/lib/supabaseClient";
 import { ConfigLoading } from "../../components/ui/loading/config-loading";
 
@@ -36,6 +49,8 @@ const ComissionConfig = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
   const [loading, setLoading] = useState(false);
+  // 🆕 ESTADO: Para manejar el AlertDialog de eliminación
+  const [deleteRule, setDeleteRule] = useState({ open: false, id: null });
   const [formData, setFormData] = useState({
     brand_id: "",
     category_id: "",
@@ -60,7 +75,7 @@ const ComissionConfig = () => {
             priority,
             brands(name),
             categories(name)
-          `
+            `
           )
           .order("priority", { ascending: true }),
         supabase.from("brands").select("id, name").order("name"),
@@ -73,11 +88,10 @@ const ComissionConfig = () => {
       setCategories(categoriesRes.data || []);
     } catch (error) {
       console.error(error);
-      Swal.fire(
-        "Error",
-        "No se pudieron cargar las reglas de comisión",
-        "error"
-      );
+      // 🔄 REEMPLAZO 1: Usar toast para error de carga
+      toast.error("No se pudieron cargar las reglas de comisión", {
+        description: error.message || "Error desconocido al obtener datos.",
+      });
     } finally {
       setLoading(false);
     }
@@ -87,86 +101,84 @@ const ComissionConfig = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleDelete = async (id) => {
-    const result = await Swal.fire({
-      icon: "warning",
-      title: "¿Eliminar regla?",
-      text: "Esta acción no se puede deshacer",
-      showCancelButton: true,
-      confirmButtonText: "Eliminar",
-      cancelButtonText: "Cancelar",
-      confirmButtonColor: "#d33",
-    });
-
-    if (!result.isConfirmed) return;
-
+  // 🆕 FUNCIÓN: Abre el AlertDialog de eliminación
+  const handleOpenDeleteDialog = (id) => {
+    setDeleteRule({ open: true, id });
+  };
+  
+  // 🆕 FUNCIÓN: Ejecuta la eliminación
+  const handleConfirmDelete = async () => {
+    const id = deleteRule.id;
+    setDeleteRule({ open: false, id: null }); // Cerrar diálogo inmediatamente
+    
+    if (!id) return;
+    
     const { error } = await supabase
       .from("commission_rules")
       .delete()
       .eq("id", id);
+      
     if (error) {
-      Swal.fire("Error", "No se pudo eliminar la regla", "error");
+      // 🔄 REEMPLAZO 2: Usar toast para error de eliminación
+      toast.error("Error", {
+        description: "No se pudo eliminar la regla.",
+      });
     } else {
-      Swal.fire("Eliminado", "La regla fue eliminada correctamente", "success");
+      // 🔄 REEMPLAZO 3: Usar toast para éxito de eliminación
+      toast.success("Eliminado", {
+        description: "La regla fue eliminada correctamente.",
+      });
       fetchData();
     }
   };
 
   const handleSave = async () => {
+    let validationError = null;
+
+    // Validación de Prioridad
     if (
       !formData.priority ||
       isNaN(formData.priority) ||
       parseInt(formData.priority) < 1
     ) {
-      setOpenDialog(false);
-      Swal.fire(
-        "Error",
-        "La prioridad debe ser un número entero positivo",
-        "error"
-      );
-      return;
+      validationError = "La prioridad debe ser un número entero positivo.";
     }
 
-    if (!formData.brand_id && !formData.category_id) {
-      setOpenDialog(false);
-      Swal.fire("Error", "Debe seleccionar una marca o una categoría", "error");
-      return;
+    // Validación de Marca o Categoría
+    if (!validationError && !formData.brand_id && !formData.category_id) {
+      validationError = "Debe seleccionar una marca o una categoría.";
     }
 
-    if (!formData.commission_pct && !formData.commission_fixed) {
-      setOpenDialog(false);
-      Swal.fire(
-        "Error",
-        "Debe definir un porcentaje o una comisión fija",
-        "error"
-      );
-      return;
+    // Validación de Comisión
+    if (!validationError && !formData.commission_pct && !formData.commission_fixed) {
+      validationError = "Debe definir un porcentaje o una comisión fija.";
     }
 
+    // Validación de % Comisión
     if (
+      !validationError &&
       formData.commission_pct &&
-      (isNaN(formData.commission_pct) ||
-        parseFloat(formData.commission_pct) < 0)
+      (isNaN(formData.commission_pct) || parseFloat(formData.commission_pct) < 0)
     ) {
-      setOpenDialog(false);
-      Swal.fire(
-        "Error",
-        "El porcentaje de comisión debe ser un número positivo",
-        "error"
-      );
-      return;
+      validationError = "El porcentaje de comisión debe ser un número positivo.";
     }
+    
+    // Validación de Comisión Fija
     if (
+      !validationError &&
       formData.commission_fixed &&
-      (isNaN(formData.commission_fixed) ||
-        parseFloat(formData.commission_fixed) < 0)
+      (isNaN(formData.commission_fixed) || parseFloat(formData.commission_fixed) < 0)
     ) {
+      validationError = "La comisión fija debe ser un número positivo.";
+    }
+    
+    // Mostrar error si existe
+    if (validationError) {
       setOpenDialog(false);
-      Swal.fire(
-        "Error",
-        "La comisión fija debe ser un número positivo",
-        "error"
-      );
+      // 🔄 REEMPLAZO 4: Usar toast para errores de validación
+      toast.error("Error de validación", {
+        description: validationError,
+      });
       return;
     }
 
@@ -190,11 +202,17 @@ const ComissionConfig = () => {
       : await supabase.from("commission_rules").insert([payload]);
 
     if (error) {
-      Swal.fire("Error", "No se pudo guardar la regla", "error");
+      // 🔄 REEMPLAZO 5: Usar toast para error al guardar
+      toast.error("Error", {
+        description: "No se pudo guardar la regla.",
+      });
       return;
     }
 
-    Swal.fire("Éxito", "La regla fue guardada correctamente", "success");
+    // 🔄 REEMPLAZO 6: Usar toast para éxito al guardar
+    toast.success("Éxito", {
+      description: "La regla fue guardada correctamente.",
+    });
     setOpenDialog(false);
     setEditingRule(null);
     setFormData({
@@ -212,8 +230,9 @@ const ComissionConfig = () => {
     setFormData({
       brand_id: rule.brand_id || "",
       category_id: rule.category_id || "",
-      commission_pct: rule.commission_pct || "",
-      commission_fixed: rule.commission_fixed || "",
+      // Asegurar que los valores numéricos se carguen como strings para el input
+      commission_pct: rule.commission_pct?.toString() || "", 
+      commission_fixed: rule.commission_fixed?.toString() || "",
       priority: rule.priority,
     });
     setOpenDialog(true);
@@ -253,8 +272,8 @@ const ComissionConfig = () => {
               <Card key={rule.id} className="transition-all hover:shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <IconCurrencyDollar className="text-blue-600" />
+                    <span className="flex items-center gap-2 text-base font-semibold">
+                      <IconCurrencyDollar className="text-blue-600 h-5 w-5" />
                       {rule.brands?.name || "Todas las marcas"} /{" "}
                       {rule.categories?.name || "Todas las categorías"}
                     </span>
@@ -284,7 +303,7 @@ const ComissionConfig = () => {
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => handleDelete(rule.id)}
+                    onClick={() => handleOpenDeleteDialog(rule.id)}
                   >
                     <IconTrash className="h-4 w-4" />
                   </Button>
@@ -307,19 +326,19 @@ const ComissionConfig = () => {
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="grid gap-2">
-              <Label>Marca</Label>
+              <Label htmlFor="brand_id">Marca</Label>
               <select
+                id="brand_id"
                 value={formData.brand_id}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
                     brand_id: e.target.value,
-                    // Si elijo marca, limpio categoría
+                    // Si elijo marca, limpio categoría (y viceversa)
                     category_id: e.target.value ? "" : formData.category_id,
                   })
                 }
                 className="w-full rounded-md border border-input bg-background px-3 py-2"
-                // disabled={!!formData.category_id} // 🔹 Desactiva si hay categoría seleccionada
               >
                 <option value="">Todas</option>
                 {brands.map((b) => (
@@ -331,19 +350,19 @@ const ComissionConfig = () => {
             </div>
 
             <div className="grid gap-2">
-              <Label>Categoría</Label>
+              <Label htmlFor="category_id">Categoría</Label>
               <select
+                id="category_id"
                 value={formData.category_id}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
                     category_id: e.target.value,
-                    // Si elijo categoría, limpio marca
+                    // Si elijo categoría, limpio marca (y viceversa)
                     brand_id: e.target.value ? "" : formData.brand_id,
                   })
                 }
                 className="w-full rounded-md border border-input bg-background px-3 py-2"
-                // disabled={!!formData.brand_id} // 🔹 Desactiva si hay marca seleccionada
               >
                 <option value="">Todas</option>
                 {categories.map((c) => (
@@ -356,38 +375,48 @@ const ComissionConfig = () => {
 
             <div className="grid grid-cols-2 gap-2">
               <div className="grid gap-2">
-                <Label>% Comisión</Label>
+                <Label htmlFor="commission_pct">% Comisión</Label>
                 <Input
+                  id="commission_pct"
                   type="number"
                   value={formData.commission_pct}
                   onChange={(e) =>
-                    setFormData({ ...formData, commission_pct: e.target.value })
+                    setFormData({ 
+                      ...formData, 
+                      commission_pct: e.target.value, 
+                      // Si lleno %, limpio fijo
+                      commission_fixed: e.target.value ? "" : formData.commission_fixed 
+                    })
                   }
                   placeholder="Ej: 5"
-                  disabled={!!formData.commission_fixed} // 🔹 Desactiva si hay comisión fija
+                  disabled={!!formData.commission_fixed}
                 />
               </div>
 
               <div className="grid gap-2">
-                <Label>Comisión fija ($)</Label>
+                <Label htmlFor="commission_fixed">Comisión fija ($)</Label>
                 <Input
+                  id="commission_fixed"
                   type="number"
                   value={formData.commission_fixed}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
                       commission_fixed: e.target.value,
+                      // Si lleno fijo, limpio %
+                      commission_pct: e.target.value ? "" : formData.commission_pct,
                     })
                   }
                   placeholder="Ej: 100"
-                  disabled={!!formData.commission_pct} // 🔹 Desactiva si hay % de comisión
+                  disabled={!!formData.commission_pct}
                 />
               </div>
             </div>
 
             <div className="grid gap-2">
-              <Label>Prioridad</Label>
+              <Label htmlFor="priority">Prioridad</Label>
               <Input
+                id="priority"
                 type="number"
                 value={formData.priority}
                 onChange={(e) =>
@@ -404,6 +433,34 @@ const ComissionConfig = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* 🆕 COMPONENTE: AlertDialog para confirmar la eliminación */}
+      <AlertDialog
+        open={deleteRule.open}
+        onOpenChange={(open) => {
+          if (!open) setDeleteRule({ open: false, id: null });
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar regla de comisión?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará la regla de comisión seleccionada.
+              **Esta acción no se puede deshacer.** ¿Confirmas que deseas continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* FIN AlertDialog */}
     </>
   );
 };

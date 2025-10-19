@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
+// ✅ AGREGADO: Sonner para notificaciones
+import { toast } from "sonner";
 import { SiteHeader } from "@/components/site-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import  ConcentricLoader  from "@/components/ui/loading";
+import ConcentricLoader from "@/components/ui/loading";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +19,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabaseClient";
 import { IconBox, IconPlus, IconEdit, IconRefresh } from "@tabler/icons-react";
-import Swal from "sweetalert2";
+// ❌ ELIMINADO: import Swal from "sweetalert2";
 import { useAuth } from "../../context/AuthContextProvider";
 
 const InventoryConfig = () => {
@@ -74,7 +76,10 @@ const InventoryConfig = () => {
 
     if (invError) {
       console.error(invError);
-      Swal.fire("Error", "No se pudo cargar el inventario", "error");
+      // 🔄 REEMPLAZO 1: Usar toast para error de carga
+      toast.error("Error", {
+        description: "No se pudo cargar el inventario.",
+      });
     } else {
       const sorted = inv.sort((a, b) =>
         a.products.name.localeCompare(b.products.name)
@@ -132,7 +137,10 @@ const InventoryConfig = () => {
       .select("id, name, brands(name)");
 
     if (error) {
-      Swal.fire("Error", "No se pudieron cargar los productos", "error");
+      // 🔄 REEMPLAZO 2: Usar toast para error de carga de productos
+      toast.error("Error", {
+        description: "No se pudieron cargar los productos.",
+      });
       return;
     }
 
@@ -149,7 +157,10 @@ const InventoryConfig = () => {
     // permitir 0, validar solo que sea número y no negativo
     const amount = Number(quantity);
     if (!Number.isFinite(amount) || amount < 0) {
-      await Swal.fire("Error", "Cantidad inválida", "warning");
+      // 🔄 REEMPLAZO 3: Usar toast para cantidad inválida
+      toast.warning("Error", {
+        description: "Cantidad inválida. Debe ser un número no negativo.",
+      });
       return;
     }
 
@@ -165,7 +176,6 @@ const InventoryConfig = () => {
       // ajuste
       newStock = amount;
     }
-    console.log("actualizo", productId, current, amount, newStock);
 
     // 1) Actualizar inventario
     const { error: updateError } = await supabase
@@ -174,7 +184,10 @@ const InventoryConfig = () => {
       .eq("product_id", productId);
 
     if (updateError) {
-      await Swal.fire("Error", "No se pudo actualizar el stock", "error");
+      // 🔄 REEMPLAZO 4: Usar toast para error de actualización de stock
+      toast.error("Error", {
+        description: "No se pudo actualizar el stock en el inventario.",
+      });
       return;
     }
 
@@ -185,19 +198,25 @@ const InventoryConfig = () => {
         {
           product_id: productId,
           type,
-          quantity: amount, // delta para entrada/salida, valor final en ajuste si preferís podés guardar newStock
+          quantity: amount,
           reason: reason || "Ajuste manual",
           created_by: currentUser,
         },
       ]);
 
     if (movementError) {
-      await Swal.fire("Error", "No se pudo registrar el movimiento", "error");
+      // 🔄 REEMPLAZO 5: Usar toast para error de registro de movimiento
+      toast.error("Error", {
+        description: "Se actualizó el stock, pero no se pudo registrar el movimiento.",
+      });
       return;
     }
 
     setIsDialogOpen(false);
-    await Swal.fire("Éxito", "Stock actualizado correctamente", "success");
+    // 🔄 REEMPLAZO 6: Usar toast para éxito
+    toast.success("Éxito", {
+      description: `Stock de ${selectedProduct.products.name} actualizado a ${newStock}.`,
+    });
     fetchInventory();
   };
 
@@ -206,11 +225,10 @@ const InventoryConfig = () => {
     const { product_id, stock, notes } = newInventory;
 
     if (!product_id || !stock) {
-      await Swal.fire(
-        "Campos requeridos",
-        "Seleccioná producto y cantidad",
-        "warning"
-      );
+      // 🔄 REEMPLAZO 7: Usar toast para campos requeridos
+      toast.warning("Campos requeridos", {
+        description: "Seleccioná producto y cantidad inicial.",
+      });
       return;
     }
 
@@ -223,7 +241,10 @@ const InventoryConfig = () => {
     ]);
 
     if (error) {
-      Swal.fire("Error", "No se pudo agregar el inventario", "error");
+      // 🔄 REEMPLAZO 8: Usar toast para error al agregar inventario
+      toast.error("Error", {
+        description: "No se pudo agregar el producto al inventario.",
+      });
     } else {
       await supabase.from("inventory_movements").insert([
         {
@@ -235,7 +256,10 @@ const InventoryConfig = () => {
         },
       ]);
 
-      Swal.fire("Éxito", "Inventario agregado correctamente", "success");
+      // 🔄 REEMPLAZO 9: Usar toast para éxito
+      toast.success("Éxito", {
+        description: "Inventario agregado correctamente.",
+      });
       setIsNewDialogOpen(false);
       setNewInventory({ product_id: "", stock: "", notes: "" });
       fetchInventory();
@@ -386,9 +410,9 @@ const InventoryConfig = () => {
                 }}
                 className="border rounded-md p-2"
               >
-                <option value="entrada">Entrada</option>
-                <option value="salida">Salida</option>
-                <option value="ajuste">Ajuste</option>
+                <option value="entrada">Entrada (Sumar)</option>
+                <option value="salida">Salida (Restar)</option>
+                <option value="ajuste">Ajuste (Stock final)</option>
               </select>
             </div>
 
@@ -397,7 +421,9 @@ const InventoryConfig = () => {
             </p>
 
             <div className="grid gap-2">
-              <Label>Nuevo stock</Label>
+              <Label>
+                {adjustment.type === "ajuste" ? "Stock final" : "Cantidad"}
+              </Label>
               <Input
                 type="number"
                 placeholder={
@@ -413,7 +439,7 @@ const InventoryConfig = () => {
             <div className="grid gap-2">
               <Label>Motivo</Label>
               <Textarea
-                placeholder="Ej: ingreso de stock, venta manual..."
+                placeholder="Ej: ingreso de stock, venta manual, error de conteo..."
                 value={adjustment.reason}
                 onChange={(e) =>
                   setAdjustment({ ...adjustment, reason: e.target.value })

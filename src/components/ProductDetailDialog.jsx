@@ -1,4 +1,8 @@
 import { useMemo, useState } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { Button } from "@/components/ui/button";
+import { IconFileTypePdf } from "@tabler/icons-react";
 import {
   Dialog,
   DialogContent,
@@ -81,6 +85,141 @@ export default function ProductDetailDialog({
     }));
   }, [paymentMethods, paymentInstallments]);
 
+  // 🔹 Función para exportar el producto a PDF (con imagen y estructura)
+  const handleExportPDF = async () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let currentY = 10;
+
+    // 🔹 Si hay imagen, convertir a Base64 y agregarla
+    if (product.coverImageUrl) {
+      try {
+        const img = await fetch(product.coverImageUrl);
+        const blob = await img.blob();
+        const reader = new FileReader();
+        const imagePromise = new Promise((resolve) => {
+          reader.onloadend = () => resolve(reader.result);
+        });
+        reader.readAsDataURL(blob);
+        const imageData = await imagePromise;
+
+        const imgWidth = 60;
+        const imgHeight = 60;
+        const imgX = (pageWidth - imgWidth) / 2;
+        doc.addImage(imageData, "JPEG", imgX, currentY, imgWidth, imgHeight);
+        currentY += imgHeight + 10;
+      } catch (error) {
+        console.warn("No se pudo cargar la imagen para el PDF:", error);
+      }
+    }
+
+    // 🔹 Encabezado principal
+    doc.setFontSize(16);
+    doc.setTextColor(40, 40, 40);
+    doc.text(product.name, pageWidth / 2, currentY, { align: "center" });
+
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text(
+      `${product.brandName} — ${product.categoryName}`,
+      pageWidth / 2,
+      currentY + 8,
+      { align: "center" }
+    );
+
+    currentY += 18;
+
+    // 🔹 Datos generales
+    doc.setFontSize(11);
+    doc.setTextColor(60, 60, 60);
+    doc.text(`Cotización actual: ${formatCurrencyARS(fxRate)}`, 14, currentY);
+    if (product.allowBackorder) {
+      doc.setTextColor(200, 120, 0);
+      doc.text("Producto con pedido anticipado", 14, currentY + 6);
+    }
+
+    currentY += 12;
+
+    // 🔹 Tabla de variantes
+    const variantRows = realVariants.map((v) => [
+      v.color || "—",
+      v.storage || "—",
+      v.ram || "—",
+      formatCurrencyUSD(v.usd_price),
+      formatCurrencyARS(v.usd_price * fxRate),
+      v.stock ?? 0,
+    ]);
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [
+        ["Color", "Almacenamiento", "RAM", "Precio USD", "Precio ARS", "Stock"],
+      ],
+      body: variantRows,
+      styles: { fontSize: 10 },
+      headStyles: {
+        fillColor: [25, 118, 210],
+        textColor: 255,
+        fontStyle: "bold",
+      },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+
+    currentY = doc.lastAutoTable.finalY + 10;
+
+    // 🔹 Tabla de métodos de pago
+    const methodRows = enrichedMethods.flatMap((m) => {
+      const basePriceUSD = product.usdPrice;
+      if (m.installments.length === 0) {
+        return [
+          [m.name, "1 pago", formatCurrencyARS(basePriceUSD * fxRate), "—"],
+        ];
+      }
+
+      return m.installments.map((i) => {
+        const total = basePriceUSD * fxRate * i.multiplier;
+        const cuota = total / i.installments;
+        const extra = (i.multiplier - 1) * 100;
+        return [
+          m.name,
+          `${i.installments} cuotas`,
+          formatCurrencyARS(cuota),
+          `+${extra.toFixed(1)}%`,
+        ];
+      });
+    });
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [["Método", "Cuotas", "Monto por cuota", "Recargo"]],
+      body: methodRows,
+      styles: { fontSize: 10 },
+      headStyles: {
+        fillColor: [46, 125, 50],
+        textColor: 255,
+        fontStyle: "bold",
+      },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+
+    currentY = doc.lastAutoTable.finalY + 15;
+
+    // 🔹 Pie con cotización
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    doc.text(
+      `Cotización utilizada: ${formatCurrencyARS(
+        fxRate
+      )} — Generado automáticamente`,
+      pageWidth / 2,
+      currentY,
+      { align: "center" }
+    );
+
+    // 🔹 Guardar PDF
+    doc.save(`Producto_${product.name}.pdf`);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-6">
@@ -91,6 +230,16 @@ export default function ProductDetailDialog({
           <DialogDescription className="text-base text-muted-foreground">
             {product.brandName} — {product.categoryName}
           </DialogDescription>
+        </DialogHeader>
+        <DialogHeader className="space-y-2 text-center">
+
+          {/* 🔹 Botón de exportar PDF */}
+          <div className="flex justify-center mt-2">
+            <Button variant="outline" size="sm" onClick={handleExportPDF}>
+              <IconFileTypePdf className="w-4 h-4 mr-2 text-red-600" />
+              Exportar PDF
+            </Button>
+          </div>
         </DialogHeader>
 
         {/* Imagen y datos básicos */}

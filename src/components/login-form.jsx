@@ -1,6 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import Swal from "sweetalert2";
+// ❌ ELIMINADO: import Swal from "sweetalert2";
+
+// ✅ AGREGADO: Sonner para notificaciones
+import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,42 +24,63 @@ export default function LoginForm({ className, ...props }) {
     defaultValues: { email: "", password: "" },
   });
 
-  const showResultAlert = async (result, overrides = {}) => {
+  // 🔄 REEMPLAZO 1: Migrar la lógica de SweetAlert a Sonner (toast)
+  const showResultAlert = (result, overrides = {}) => {
     if (!result) return;
 
-    const icon = result.icon ?? (result.ok ? "success" : "info");
+    // Determinar el tipo de toast (success, error, info)
+    const toastType = result.icon ?? (result.ok ? "success" : "error"); // Asumimos 'error' si no es 'success' y falla
     const title = result.title ?? "";
     const text = result.text ?? "";
 
     if (title || text) {
-      await Swal.fire({
-        icon,
-        title,
-        text,
-        ...overrides,
-      });
+      // Configurar las opciones de Sonner
+      const toastOptions = {
+        duration: overrides.timer || 4000,
+        description: text,
+      };
+
+      // Mostrar el toast
+      if (toastType === "success") {
+        toast.success(title, toastOptions);
+      } else if (toastType === "error") {
+        toast.error(title, toastOptions);
+      } else {
+        // Usar toast.info o un valor predeterminado para otros íconos (como 'info')
+        toast.info(title, toastOptions);
+      }
     }
 
     if (result.redirectPath) {
-      navigate(result.redirectPath, { replace: true });
+      // Usamos setTimeout para dar tiempo a que el toast se muestre
+      // especialmente si se usó un timer corto (e.g., para un login exitoso).
+      const delay = overrides.timer || 0;
+      setTimeout(() => {
+        navigate(result.redirectPath, { replace: true });
+      }, delay + 50); 
     }
   };
+  // FIN REEMPLAZO 1
 
   const onSubmit = async (values) => {
+    // Nota: El uso de `await` con `showResultAlert` ya no es estrictamente necesario,
+    // ya que toast es asíncrono pero no bloqueante como lo era `Swal.fire`.
     const result = await loginWithPassword(values.email, values.password);
-    await showResultAlert(result);
+    showResultAlert(result);
   };
 
   const handleGoogleLogin = async () => {
     const result = await loginWithGoogle();
     if (!result) return;
 
+    // Si el login fue exitoso y no hay una redirección inmediata, establecemos un temporizador corto
+    // (similar a la lógica de Swal.fire con timer).
     const override =
       result.ok && !result.redirectPath
-        ? { timer: 1600, showConfirmButton: false }
+        ? { timer: 1600 }
         : undefined;
 
-    await showResultAlert(result, override);
+    showResultAlert(result, override);
   };
 
   return (

@@ -1,7 +1,10 @@
 import { useForm, Controller } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
-import Swal from "sweetalert2";
+// ❌ ELIMINADO: import Swal from "sweetalert2";
+
+// ✅ AGREGADO: Sonner para notificaciones
+import { toast } from "sonner";
 
 import {
   Dialog,
@@ -15,7 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch"
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -26,6 +29,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { registerUser } from "../lib/registerUser";
 import { IconPlus } from "@tabler/icons-react";
+
 const schema = yup.object({
   name: yup.string().required("El nombre es obligatorio"),
   lastName: yup.string().required("El apellido es obligatorio"),
@@ -74,18 +78,41 @@ const FormRegisterNewUser = ({ onSuccess }) => {
   });
 
   const onSubmit = async (data) => {
+    // 🔁 Reemplazo del flujo de SweetAlert por toast.promise para manejar el estado
     try {
-      await registerUser({
-        ...data,
-        state: Boolean(data.state),
-      });
+      await toast.promise(
+        registerUser({
+          ...data,
+          state: Boolean(data.state),
+        }),
+        {
+          loading: "Registrando usuario...",
+          success: "Usuario registrado: El usuario fue creado correctamente", // Concatenación de título y texto
+          error: (error) => {
+            // Usa el mensaje de error de la excepción
+            return `Error al registrar usuario: ${error.message || "Ocurrió un error desconocido"}`;
+          },
+        }
+      );
 
+      // Solo si la promesa es exitosa:
+      reset();
+      onSuccess?.();
+    } catch (error) {
+      // El error ya fue manejado y mostrado por toast.promise.
+      // Mantenemos el console.error para el debugging.
+      console.error(error);
+    }
+
+    // ❌ ELIMINADO: La lógica de éxito y error con Swal
+    /*
+    try {
+      await registerUser({ ...data, state: Boolean(data.state) });
       Swal.fire({
         icon: "success",
         title: "Usuario registrado",
         text: "El usuario fue creado correctamente",
       });
-
       reset();
       onSuccess?.();
     } catch (error) {
@@ -96,14 +123,13 @@ const FormRegisterNewUser = ({ onSuccess }) => {
         text: error.message,
       });
     }
+    */
   };
 
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button
-          variant="default"
-        >
+        <Button variant="default">
           <IconPlus className="h-4 w-4" />
           Agregar
         </Button>

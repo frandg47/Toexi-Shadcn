@@ -12,7 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import Swal from "sweetalert2";
+// ❌ ELIMINADO: import Swal from "sweetalert2";
+
+// ✅ AGREGADO: Import de Sonner para notificaciones
+import { toast } from "sonner";
 
 export default function DialogProduct({ open, onClose, product, onSave }) {
   const isEditing = !!product;
@@ -42,13 +45,13 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
         category_id: product.category_id || "",
         usd_price: product.usd_price || product.usdPrice || "",
         commission_pct:
-        product.commissionRuleName === "Propia"
-          ? product.commission_pct || product.commissionPct || ""
-          : "",
+          product.commissionRuleName === "Propia"
+            ? product.commission_pct || product.commissionPct || ""
+            : "",
         commission_fixed:
-        product.commissionRuleName === "Propia"
-          ? product.commission_fixed || product.commissionFixed || ""
-          : "",
+          product.commissionRuleName === "Propia"
+            ? product.commission_fixed || product.commissionFixed || ""
+            : "",
         cover_image_url: product.cover_image_url || product.coverImageUrl || "",
         allow_backorder:
           product.allow_backorder ?? product.allowBackorder ?? false,
@@ -96,12 +99,26 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
     setForm((prev) => ({ ...prev, [name]: checked }));
   };
 
+  const saveProduct = async (payload) => {
+    if (isEditing) {
+      const { error } = await supabase
+        .from("products")
+        .update(payload)
+        .eq("id", product.id);
+      if (error) throw new Error("Error al actualizar el producto.");
+    } else {
+      const { error } = await supabase
+        .from("products")
+        .insert([payload]);
+      if (error) throw new Error("Error al crear el producto.");
+    }
+  };
+
   const handleSubmit = async () => {
     if (!form.name || !form.usd_price) {
-      Swal.fire(
-        "Campos requeridos",
-        "Completa al menos nombre y precio",
-        "warning"
+      // ⚠️ Reemplazo 1: SweetAlert Warning por toast.warning
+      toast.warning(
+        "Campos requeridos: Completa al menos nombre y precio"
       );
       return;
     }
@@ -125,25 +142,41 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
       active: form.active,
     };
 
-    let error;
-    if (isEditing) {
-      const { error: updateError } = await supabase
-        .from("products")
-        .update(payload)
-        .eq("id", product.id);
-      error = updateError;
-    } else {
-      const { error: insertError } = await supabase
-        .from("products")
-        .insert([payload]);
-      error = insertError;
+    const successMessage = isEditing
+      ? "Producto actualizado correctamente"
+      : "Producto creado correctamente";
+    
+    // 🔁 Reemplazo 2: Flujo con loading, éxito y error usando toast.promise
+    try {
+      await toast.promise(saveProduct(payload), {
+        loading: "Guardando producto...",
+        success: successMessage,
+        error: (err) => {
+          // Si saveProduct lanza un error, se maneja aquí.
+          // Se usa el mensaje del error lanzado, o un default.
+          return err.message || "No se pudo guardar el producto";
+        },
+      });
+
+      // Si el promise fue exitoso, cerramos el diálogo y actualizamos la lista
+      onClose();
+      onSave();
+
+    } catch (e) {
+      // La promesa falló, el toast ya mostró el error. No hacemos nada más aquí.
+      // Si el error es manejado dentro del toast.promise, este catch
+      // es opcional, pero lo dejamos por si hay otros errores no capturados.
+      console.error("Error en el guardado (capturado por promise):", e);
     }
 
+    // ❌ ELIMINADO: La lógica de error y éxito de Swal se encapsuló en toast.promise
+    /*
+    let error;
+    // ... lógica de guardado con error
     if (error) {
       Swal.fire("Error", "No se pudo guardar el producto", "error");
       return;
     }
-
     Swal.fire(
       "Éxito",
       isEditing
@@ -153,6 +186,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
     );
     onClose();
     onSave();
+    */
   };
 
   return (

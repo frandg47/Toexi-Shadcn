@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import {
   Dialog,
@@ -12,7 +12,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { IconPlus, IconTrash, IconDeviceFloppy } from "@tabler/icons-react";
-import Swal from "sweetalert2";
+// ❌ ELIMINADO: import Swal from "sweetalert2";
+
+// ✅ AGREGADO: Sonner para notificaciones
+import { toast } from "sonner";
+
+// ✅ AGREGADO: AlertDialog para confirmaciones (showCancelButton: true)
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 
 export default function DialogVariants({ open, onClose, productId }) {
   const [variants, setVariants] = useState([]);
@@ -90,57 +106,95 @@ export default function DialogVariants({ open, onClose, productId }) {
     ]);
   };
 
-  const removeVariant = async (index, variant) => {
+  // Se refactoriza para manejar la lógica de eliminación sin el await Swal.fire
+  const handleDeleteVariant = useCallback(async (index, variant) => {
+    // Si la variante ya tiene ID, es decir, existe en la BD
     if (variant.id) {
-      const confirm = await Swal.fire({
-        title: "Eliminar variante",
-        text: "¿Deseas eliminar esta variante?",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonText: "Sí, eliminar",
-        cancelButtonText: "Cancelar",
-      });
-      if (!confirm.isConfirmed) return;
-
-      const { error } = await supabase
-        .from("product_variants")
-        .delete()
-        .eq("id", variant.id);
-
-      if (error) {
-        Swal.fire("Error", "No se pudo eliminar la variante", "error");
-        return;
-      }
+        // Se encapsula la eliminación de la base de datos en una promesa para toast.
+        const deletePromise = supabase
+            .from("product_variants")
+            .delete()
+            .eq("id", variant.id)
+            .then(({ error }) => {
+                if (error) {
+                    throw new Error("No se pudo eliminar la variante.");
+                }
+            });
+        
+        // 🔁 Reemplazo 2: Manejo de éxito/error de eliminación con toast.promise
+        await toast.promise(deletePromise, {
+            loading: "Eliminando variante...",
+            success: "Variante eliminada correctamente",
+            error: "No se pudo eliminar la variante",
+        });
     }
 
+    // Si la variante no tiene ID (es nueva) o fue eliminada de la BD, la quitamos del estado local
     setVariants((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // La función original removeVariant solo contendrá la confirmación y llamará a handleDeleteVariant
+  // En este componente, la confirmación se maneja directamente en el JSX de renderizado (ver más abajo).
+  // Mantenemos esta función simplificada para evitar complejidad de estado en el AlertDialog.
+  const removeVariant = async (index, variant) => {
+    // Nota: La lógica de confirmación (`Swal.fire`) se movió al JSX,
+    // por lo que si se llama a esta función, significa que el usuario ya confirmó.
+    await handleDeleteVariant(index, variant);
   };
+
 
   const saveVariants = async () => {
     const inserts = variants.filter((v) => !v.id);
     const updates = variants.filter((v) => v.id);
 
-    const { error: insertError } =
-      inserts.length > 0
-        ? await supabase.from("product_variants").insert(inserts)
-        : { error: null };
+    // Se refactoriza la lógica de guardado dentro de una función para usar toast.promise
+    const savePromise = async () => {
+        const { error: insertError } =
+            inserts.length > 0
+            ? await supabase.from("product_variants").insert(inserts)
+            : { error: null };
 
-    const { error: updateError } =
-      updates.length > 0
-        ? await Promise.all(
-            updates.map((v) =>
-              supabase.from("product_variants").update(v).eq("id", v.id)
-            )
-          )
-        : { error: null };
+        if (insertError) {
+            throw new Error("Error al insertar nuevas variantes.");
+        }
 
+        const updatePromises = updates.map((v) =>
+            supabase.from("product_variants").update(v).eq("id", v.id)
+        );
+
+        const updateResults = updates.length > 0 ? await Promise.all(updatePromises) : [];
+
+        const updateError = updateResults.find(r => r.error)?.error;
+        
+        if (updateError) {
+             throw new Error("Error al actualizar variantes existentes.");
+        }
+    };
+    
+    // 🔁 Reemplazo 3: Manejo de guardado con toast.promise
+    try {
+        await toast.promise(savePromise(), {
+            loading: "Guardando cambios...",
+            success: "Variantes guardadas correctamente",
+            error: "No se pudieron guardar los cambios",
+        });
+
+        onClose();
+
+    } catch (e) {
+        // El error ya fue notificado por toast.promise
+        console.error("Error al guardar variantes:", e);
+    }
+
+    // ❌ ELIMINADO: Lógica de error y éxito de Swal
+    /*
     if (insertError || updateError) {
       Swal.fire("Error", "No se pudieron guardar los cambios", "error");
       return;
     }
-
     Swal.fire("Éxito", "Variantes guardadas correctamente", "success");
     onClose();
+    */
   };
 
   return (
@@ -315,14 +369,44 @@ export default function DialogVariants({ open, onClose, productId }) {
                           {v.active ? "Activa" : "Inactiva"}
                         </span>
                       </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => removeVariant(index, v)}
-                      >
-                        <IconTrash className="h-4 w-4" />
-                      </Button>
+                      
+                      {/* 🔄 REEMPLAZO 1: SweetAlert a AlertDialog para confirmación */}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="hover:bg-destructive/10 hover:text-destructive"
+                            // Ya no llama a removeVariant directamente
+                          >
+                            <IconTrash className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              Eliminar variante
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              ¿Deseas eliminar esta variante?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>
+                              Cancelar
+                            </AlertDialogCancel>
+                            <AlertDialogAction 
+                              // Llama a la lógica de eliminación al confirmar
+                              onClick={() => handleDeleteVariant(index, v)}
+                              className="bg-destructive hover:bg-destructive/90"
+                            >
+                              Sí, eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      {/* FIN REEMPLAZO 1 */}
+                      
                     </div>
                   </div>
                 ))}

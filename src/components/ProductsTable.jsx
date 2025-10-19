@@ -1,5 +1,8 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
-import Swal from "sweetalert2";
+// ❌ ELIMINADO: import Swal from "sweetalert2";
+// ✅ AGREGADO: Sonner para notificaciones
+import { toast } from "sonner";
+
 import { supabase } from "../lib/supabaseClient";
 
 import { Button } from "@/components/ui/button";
@@ -40,6 +43,18 @@ import {
   IconVersions,
 } from "@tabler/icons-react";
 import DialogProduct from "../components/DialogProduct";
+
+// ✅ AGREGADO: Componente de diálogo de confirmación (asumiendo su existencia)
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const TABLE_COLUMNS = [
   { id: "image", label: "Imagen" },
@@ -107,6 +122,12 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
     product: null,
   });
 
+  // 🔄 REEMPLAZO 2: Estado para el AlertDialog de eliminación
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    product: null,
+  });
+
   const fetchProducts = useCallback(async (showSkeleton = false) => {
     if (showSkeleton) setLoading(true);
     else setRefreshing(true);
@@ -125,29 +146,29 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
           .from("products")
           .select(
             `
-            id,
-            name,
-            brand_id,
-            category_id,
-            usd_price,
-            commission_pct,
-            commission_fixed,
-            cover_image_url,
-            allow_backorder,
-            lead_time_label,
-            active,
-            brands (id, name),
-            categories (id, name),
-            product_variants (
-              id,
-              storage,
-              ram,
-              color,
-              usd_price,
-              stock,
-              image_url
-            )
-          `
+             id,
+             name,
+             brand_id,
+             category_id,
+             usd_price,
+             commission_pct,
+             commission_fixed,
+             cover_image_url,
+             allow_backorder,
+             lead_time_label,
+             active,
+             brands (id, name),
+             categories (id, name),
+             product_variants (
+               id,
+               storage,
+               ram,
+               color,
+               usd_price,
+               stock,
+               image_url
+             )
+           `
           )
           .order("name"),
         supabase
@@ -258,7 +279,11 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       console.log("Processed products:", processed);
     } catch (err) {
       console.error(err);
-      Swal.fire("Error", "No se pudieron cargar los productos", "error");
+      // 🔄 REEMPLAZO 3: Reemplazar Swal por toast
+      toast.error("Error al cargar los productos", {
+        description: err.message || "Ocurrió un error desconocido al cargar datos.",
+      });
+      // ❌ ELIMINADO: Swal.fire("Error", "No se pudieron cargar los productos", "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -271,19 +296,28 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
 
   const handleRefresh = () => fetchProducts(false);
 
-  const handleDelete = async (product) => {
-    const confirm = await Swal.fire({
-      icon: "warning",
-      title: `¿Eliminar ${product.name}?`,
-      text: "Esta acción no se puede deshacer",
-      showCancelButton: true,
-      confirmButtonText: "Eliminar",
-      confirmButtonColor: "#ef4444",
-    });
-    if (confirm.isConfirmed) {
-      Swal.fire("Info", "Funcionalidad aún en desarrollo", "info");
-    }
+  // 🔄 REEMPLAZO 4: Función para manejar la apertura del diálogo de eliminación
+  const handleOpenDeleteDialog = (product) => {
+    setDeleteDialog({ open: true, product });
   };
+
+  // 🔄 REEMPLAZO 5: Función que se ejecuta al confirmar la eliminación
+  const handleConfirmDelete = async () => {
+    if (!deleteDialog.product) return;
+    
+    // Aquí iría la lógica real de eliminación (e.g., await supabase.from('products').delete().eq('id', deleteDialog.product.id))
+
+    // Simulando el comportamiento original de solo mostrar una alerta
+    toast.info("Funcionalidad aún en desarrollo", {
+        description: `El producto ${deleteDialog.product.name} no fue eliminado.`,
+    });
+    
+    // ❌ ELIMINADO: Swal.fire("Info", "Funcionalidad aún en desarrollo", "info");
+    
+    // Cerrar el diálogo
+    setDeleteDialog({ open: false, product: null });
+  };
+  // FIN REEMPLAZO 5
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -518,7 +552,8 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                                 variant="destructive"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDelete(p);
+                                  // 🔄 REEMPLAZO 6: Usar la nueva función de diálogo
+                                  handleOpenDeleteDialog(p); 
                                 }}
                               >
                                 <IconTrash className="h-4 w-4" />
@@ -554,6 +589,34 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
             productId={selectedVariantProduct?.id}
             onSave={handleRefresh}
           />
+
+          {/* 🔄 REEMPLAZO 7: AlertDialog para la confirmación de eliminación */}
+          <AlertDialog
+            open={deleteDialog.open}
+            onOpenChange={(open) => setDeleteDialog({ open, product: null })}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  ¿Eliminar {deleteDialog.product?.name}?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción no se puede deshacer. ¿Estás seguro de que quieres
+                  eliminar este producto?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleConfirmDelete}
+                  className="bg-red-500 hover:bg-red-600"
+                >
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          {/* FIN REEMPLAZO 7 */}
         </>
       )}
 

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Swal from "sweetalert2";
+// ❌ ELIMINADO: import Swal from "sweetalert2";
+// ✅ AGREGADO: Sonner para notificaciones
+import { toast } from "sonner"; 
 
 import { supabase } from "../lib/supabaseClient";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,19 @@ import {
   IconUserShield,
 } from "@tabler/icons-react";
 import DialogEditUser from "./DialogEditUser";
+
+// ✅ AGREGADO: Componentes de AlertDialog de shadcn/ui
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 const TABLE_COLUMNS = [
   { id: "avatar", label: "Avatar" },
@@ -87,6 +102,12 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
+  
+  // 🆕 ESTADO: Para manejar el AlertDialog de eliminación
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    user: null,
+  });
 
   const fetchUsers = useCallback(async (showSkeleton = false) => {
     if (showSkeleton) {
@@ -107,10 +128,9 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
       setUsers(data ?? []);
     } catch (error) {
       console.error(error);
-      Swal.fire({
-        icon: "error",
-        title: "No se pudieron cargar los usuarios",
-        text: error.message,
+      // 🔄 REEMPLAZO 1: Usar toast para el error de carga
+      toast.error("No se pudieron cargar los usuarios", {
+        description: error.message,
       });
     } finally {
       setLoading(false);
@@ -133,21 +153,17 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
 
         if (error) throw error;
         await fetchUsers();
-        Swal.fire({
-          icon: "success",
-          title: "Estado actualizado",
-          text: `La cuenta de ${user.email} ahora está ${
+        // 🔄 REEMPLAZO 2: Usar toast para la confirmación de actualización
+        toast.success("Estado actualizado", {
+          description: `La cuenta de ${user.email} ahora está ${
             !user.is_active ? "activa" : "inactiva"
           }.`,
-          timer: 1800,
-          showConfirmButton: false,
         });
       } catch (error) {
         console.error(error);
-        Swal.fire({
-          icon: "error",
-          title: "No se pudo actualizar el estado",
-          text: error.message,
+        // 🔄 REEMPLAZO 3: Usar toast para el error de actualización
+        toast.error("No se pudo actualizar el estado", {
+            description: error.message,
         });
       } finally {
         setRefreshing(false);
@@ -156,20 +172,17 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
     [fetchUsers]
   );
 
-  const handleDelete = useCallback(
-    async (user) => {
-      const result = await Swal.fire({
-        icon: "warning",
-        title: "Eliminar usuario",
-        text: `Esta acción quitará a ${user.email} del listado. ¿Confirmás que deseas continuar?`,
-        showCancelButton: true,
-        confirmButtonText: "Eliminar",
-        cancelButtonText: "Cancelar",
-        confirmButtonColor: "#d33",
-      });
-
-      if (!result.isConfirmed) return;
-
+  // 🆕 FUNCIÓN: Abre el AlertDialog de eliminación
+  const handleOpenDeleteDialog = (user) => {
+    setDeleteDialog({ open: true, user });
+  };
+  
+  // 🆕 FUNCIÓN: Ejecuta la eliminación después de la confirmación del AlertDialog
+  const handleConfirmDelete = useCallback(
+    async () => {
+      const user = deleteDialog.user;
+      if (!user) return;
+      
       try {
         setRefreshing(true);
         const { error } = await supabase
@@ -179,25 +192,22 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
 
         if (error) throw error;
         await fetchUsers();
-        Swal.fire({
-          icon: "success",
-          title: "Usuario eliminado",
-          text: `${user.email} fue eliminado del sistema`,
-          timer: 1800,
-          showConfirmButton: false,
+        // 🔄 REEMPLAZO 4: Usar toast para la confirmación de eliminación
+        toast.success("Usuario eliminado", {
+          description: `${user.email} fue eliminado del sistema.`,
         });
       } catch (error) {
         console.error(error);
-        Swal.fire({
-          icon: "error",
-          title: "No se pudo eliminar",
-          text: error.message,
+        // 🔄 REEMPLAZO 5: Usar toast para el error de eliminación
+        toast.error("No se pudo eliminar", {
+          description: error.message,
         });
       } finally {
         setRefreshing(false);
+        setDeleteDialog({ open: false, user: null });
       }
     },
-    [fetchUsers]
+    [fetchUsers, deleteDialog.user]
   );
 
   const toggleColumn = useCallback((columnName) => {
@@ -378,7 +388,8 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => handleDelete(user)}
+                          // 🔄 REEMPLAZO 6: Usar la función para abrir el diálogo
+                          onClick={() => handleOpenDeleteDialog(user)} 
                           disabled={refreshing}
                         >
                           <IconTrash className="h-4 w-4" />
@@ -397,6 +408,35 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
           userId={editingUserId}
           onSuccess={() => fetchUsers(false)}
         />
+        
+        {/* 🆕 COMPONENTE: AlertDialog para confirmar la eliminación */}
+        <AlertDialog
+          open={deleteDialog.open}
+          onOpenChange={(open) => {
+            // Asegura que al cerrar, el usuario se resetee
+            if (!open) setDeleteDialog({ open: false, user: null });
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminar usuario</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción quitará a **{deleteDialog.user?.email}** del listado. 
+                ¿Confirmas que deseas continuar? Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDelete}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        {/* FIN AlertDialog */}
       </div>
     </div>
   );

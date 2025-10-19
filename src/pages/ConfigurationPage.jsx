@@ -32,12 +32,12 @@ const ConfigurationPage = ({ titulo }) => {
       icon: <IconCreditCard className="h-10 w-10 text-purple-600" />,
       path: "/dashboard/settings/payment-methods",
     },
-    {
-      id: "inventory",
-      label: "Inventario",
-      icon: <IconBox className="h-10 w-10 text-amber-600" />,
-      path: "/dashboard/settings/inventory",
-    },
+    // {
+    //   id: "inventory",
+    //   label: "Inventario",
+    //   icon: <IconBox className="h-10 w-10 text-amber-600" />,
+    //   path: "/dashboard/settings/inventory",
+    // },
     {
       id: "sales",
       label: "Ventas",

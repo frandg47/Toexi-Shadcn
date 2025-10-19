@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import { supabase } from "../lib/supabaseClient";
-import Swal from "sweetalert2";
+import { toast } from "sonner";
 
 const AuthContext = createContext({
   user: null,
@@ -29,11 +29,6 @@ export const AuthContextProvider = ({ children }) => {
 
   // 🔹 Cargar o crear usuario
   const loadUser = useCallback(async (sessionUser) => {
-    if (status === "loading" || !user || user?.id !== sessionUser?.id) {
-      setStatus("loading");
-    }
-
-    // 🔸 Si no hay sesión → limpiar estados
     if (!sessionUser) {
       setUser(null);
       setRole(null);
@@ -45,15 +40,22 @@ export const AuthContextProvider = ({ children }) => {
     }
 
     setUser(sessionUser);
+    setStatus("loading");
 
-    // 🔹 Buscar en tu tabla "users"
     const { data, error: queryError } = await supabase
       .from("users")
       .select("id, name, last_name, role, is_active, email")
       .eq("id_auth", sessionUser.id)
       .maybeSingle();
 
-    // 🧱 Si no existe el registro en tu tabla "users" → crear
+    if (queryError) {
+      console.error("Error al consultar usuario:", queryError.message);
+      setError(queryError.message);
+      setStatus("ready");
+      return;
+    }
+
+    // 🧱 Si no existe → crear
     if (!data) {
       const { data: existing } = await supabase
         .from("users")
@@ -69,9 +71,10 @@ export const AuthContextProvider = ({ children }) => {
               sessionUser.user_metadata?.full_name ||
               sessionUser.user_metadata?.name ||
               "",
+            last_name: sessionUser.user_metadata?.last_name || "",
             email: sessionUser.email,
             role: "seller",
-            is_active: false, // inactivo por defecto
+            is_active: false,
           },
         ]);
 
@@ -79,11 +82,11 @@ export const AuthContextProvider = ({ children }) => {
           console.error("Error al insertar usuario:", insertError.message);
           setError(insertError.message);
         } else if (!insertError) {
-          Swal.fire(
-            "Cuenta pendiente de activación",
-            "Tu cuenta fue creada correctamente, pero un administrador deberá activarla antes de ingresar.",
-            "info"
-          );
+          toast.info("Cuenta pendiente de activación", {
+            description:
+              "Tu cuenta fue creada correctamente, pero un administrador deberá activarla antes de ingresar.",
+            duration: 5000,
+          });
         }
       }
 
@@ -96,13 +99,12 @@ export const AuthContextProvider = ({ children }) => {
       return;
     }
 
-    // 🧩 Si sí existe, pero está inactiva
+    // 🧩 Usuario inactivo
     if (!data.is_active) {
-      Swal.fire(
-        "Cuenta inactiva",
-        "Tu cuenta aún no ha sido activada por un administrador.",
-        "warning"
-      );
+      toast.warning("Cuenta inactiva", {
+        description: "Tu cuenta aún no ha sido activada por un administrador.",
+        duration: 5000,
+      });
 
       await supabase.auth.signOut();
       setUser(null);
@@ -113,13 +115,16 @@ export const AuthContextProvider = ({ children }) => {
       return;
     }
 
-    // ✅ Usuario válido y activo
+    // ✅ Usuario activo y válido
+    if (JSON.stringify(profile) !== JSON.stringify(data)) {
+      setProfile(data);
+    }
+
     setRole(data.role);
     setIsActive(Boolean(data.is_active));
-    setProfile(data);
     setError(null);
     setStatus("ready");
-  }, []);
+  }, []); // ← sin dependencias
 
   // 🔹 Refrescar perfil manualmente
   const refreshProfile = useCallback(async () => {
@@ -142,11 +147,7 @@ export const AuthContextProvider = ({ children }) => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!isSubscribed) return;
-
-        // ⚙️ Evitar reload innecesario al refrescar token
         if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") return;
-
-        // Solo recargar si hay un login/logout real
         loadUser(session?.user ?? null);
       }
     );

@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
+// ✅ AGREGADO: Sonner para notificaciones
+import { toast } from "sonner";
 import { SiteHeader } from "@/components/site-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,12 +17,23 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar"; // 🗓️ Importamos el calendario
+import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  // ✅ AGREGADO: Componentes de AlertDialog de shadcn/ui
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -33,7 +46,7 @@ import {
   IconCalendar,
 } from "@tabler/icons-react";
 import { useAuth } from "../../context/AuthContextProvider";
-import Swal from "sweetalert2";
+// ❌ ELIMINADO: import Swal from "sweetalert2";
 import { Switch } from "@/components/ui/switch";
 
 const FxRatesConfig = () => {
@@ -49,6 +62,8 @@ const FxRatesConfig = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingRate, setEditingRate] = useState(null);
   const [selectedSource, setSelectedSource] = useState("");
+  // 🆕 ESTADO: Para controlar el modal de confirmación
+  const [confirmationDialog, setConfirmationDialog] = useState(false); 
 
   const [newRate, setNewRate] = useState({
     source: "",
@@ -80,10 +95,14 @@ const FxRatesConfig = () => {
       if (error) throw error;
       setRates(data || []);
     } catch {
-      Swal.fire("Error", "No se pudieron cargar las cotizaciones", "error");
+      // 🔄 REEMPLAZO 1: Usar toast para error de carga
+      toast.error("Error", {
+        description: "No se pudieron cargar las cotizaciones.",
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
+      console.log("datos", rates);
     }
   }, []);
 
@@ -99,47 +118,21 @@ const FxRatesConfig = () => {
         }).format(new Date(dateString))
       : "-";
 
-  const handleCreateRate = async () => {
+  // 🆕 FUNCIÓN: Inserta la nueva cotización y desactiva las anteriores
+  const confirmAndCreateRate = async () => {
     try {
-      if (!newRate.source.trim() || !newRate.rate.trim()) {
-        Swal.fire("Campos requeridos", "Completa todos los campos", "warning");
-        return;
-      }
-
-      const rateValue = parseFloat(newRate.rate);
-      if (isNaN(rateValue) || rateValue <= 0) {
-        Swal.fire("Valor inválido", "Debe ser un número positivo", "error");
-        return;
-      }
-
-      // 🚫 Chequeo previo para evitar duplicados activos
-      const activeExists = rates.some(
-        (r) => r.source === newRate.source && r.is_active
-      );
-
-      if (activeExists && newRate.is_active) {
-        const result = await Swal.fire({
-          title: "Ya existe una cotización activa",
-          text: "¿Deseas reemplazarla por la nueva?",
-          icon: "warning",
-          showCancelButton: true,
-          confirmButtonText: "Sí, reemplazar",
-          cancelButtonText: "Cancelar",
-        });
-        if (!result.isConfirmed) return;
-      }
-
       // Desactivar otras activas (de esa fuente)
       await supabase
         .from("fx_rates")
         .update({ is_active: false })
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .eq("source", newRate.source); // Desactivar solo para la fuente específica
 
       // Insertar nueva cotización
       const { error } = await supabase.from("fx_rates").insert([
         {
           source: newRate.source,
-          rate: rateValue,
+          rate: parseFloat(newRate.rate),
           is_active: newRate.is_active,
           notes: newRate.notes || null,
           created_by: currentUser,
@@ -148,38 +141,90 @@ const FxRatesConfig = () => {
 
       if (error) throw error;
 
-      Swal.fire("Éxito", "Cotización agregada correctamente", "success");
+      // 🔄 REEMPLAZO 4: Usar toast para éxito al crear
+      toast.success("Éxito", {
+        description: "Cotización agregada correctamente.",
+      });
       setIsDialogOpen(false);
       setNewRate({ source: "", rate: "", is_active: true, notes: "" });
       fetchFxRates();
     } catch (error) {
-      Swal.fire("Error", "No se pudo agregar la cotización", "error");
+      // 🔄 REEMPLAZO 5: Usar toast para error al crear
+      toast.error("Error", {
+        description: "No se pudo agregar la cotización.",
+      });
     }
   };
+
+
+  const handleCreateRate = async () => {
+    // Validaciones
+    if (!newRate.source.trim() || !newRate.rate.trim()) {
+      // 🔄 REEMPLAZO 2: Usar toast para campos requeridos
+      toast.warning("Campos requeridos", {
+        description: "Completa todos los campos.",
+      });
+      return;
+    }
+
+    const rateValue = parseFloat(newRate.rate);
+    if (isNaN(rateValue) || rateValue <= 0) {
+      // 🔄 REEMPLAZO 3: Usar toast para valor inválido
+      toast.error("Valor inválido", {
+        description: "Debe ser un número positivo.",
+      });
+      return;
+    }
+    
+    // 🚫 Chequeo previo para evitar duplicados activos
+    const activeExists = rates.some(
+      (r) => r.source.toLowerCase() === newRate.source.toLowerCase() && r.is_active
+    );
+
+    if (activeExists && newRate.is_active) {
+      // 🔄 REEMPLAZO 4: Abrir AlertDialog para confirmación crítica
+      setConfirmationDialog(true);
+      return;
+    }
+
+    // Si no hay activa o no se marca como activa, crear directamente
+    confirmAndCreateRate();
+  };
+
 
   const handleAddNewFromEdit = async () => {
     try {
       if (!editingRate?.source.trim() || !editingRate?.rate) {
-        Swal.fire("Campos requeridos", "Completa todos los campos", "warning");
+        // 🔄 REEMPLAZO 6: Usar toast para campos requeridos
+        toast.warning("Campos requeridos", {
+          description: "Completa todos los campos.",
+        });
         return;
       }
 
       const rateValue = parseFloat(editingRate.rate);
       if (isNaN(rateValue) || rateValue <= 0) {
-        Swal.fire("Valor inválido", "Debe ser un número positivo", "error");
+        // 🔄 REEMPLAZO 7: Usar toast para valor inválido
+        toast.error("Valor inválido", {
+          description: "Debe ser un número positivo.",
+        });
         return;
       }
-
-      await supabase
+      
+      // Desactivar otras activas (de esa fuente)
+      if(editingRate.is_active){
+        await supabase
         .from("fx_rates")
         .update({ is_active: false })
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .eq("source", editingRate.source); // Desactivar solo para la fuente específica
+      }
 
       const { error } = await supabase.from("fx_rates").insert([
         {
           source: editingRate.source,
           rate: rateValue,
-          is_active: true,
+          is_active: editingRate.is_active,
           notes: editingRate.notes || null,
           created_by: currentUser,
         },
@@ -187,16 +232,18 @@ const FxRatesConfig = () => {
 
       if (error) throw error;
 
-      Swal.fire(
-        "Actualizado",
-        "Se creó una nueva cotización activa",
-        "success"
-      );
+      // 🔄 REEMPLAZO 8: Usar toast para éxito al actualizar/crear nueva
+      toast.success("Actualizado", {
+        description: `Se creó una nueva cotización para ${editingRate.source}.`,
+      });
       setIsEditDialogOpen(false);
       setEditingRate(null);
       fetchFxRates();
     } catch {
-      Swal.fire("Error", "No se pudo crear la nueva cotización", "error");
+      // 🔄 REEMPLAZO 9: Usar toast para error
+      toast.error("Error", {
+        description: "No se pudo crear la nueva cotización.",
+      });
     }
   };
 
@@ -204,9 +251,21 @@ const FxRatesConfig = () => {
   const sources = [...new Set(rates.map((r) => r.source))];
 
   const filterByDate = (rate) => {
+    if (!dateRange || (!dateRange.from && !dateRange.to)) return true;
+    
     const date = new Date(rate.created_at);
-    if (!dateRange.from || !dateRange.to) return true;
-    return date >= dateRange.from && date <= dateRange.to;
+    
+    const start = dateRange.from ? new Date(dateRange.from) : null;
+    if (start) start.setHours(0, 0, 0, 0); // Inicio del día
+    
+    const end = dateRange.to ? new Date(dateRange.to) : null;
+    if (end) end.setHours(23, 59, 59, 999); // Fin del día
+    
+    if (start && end) return date >= start && date <= end;
+    if (start) return date >= start;
+    if (end) return date <= end;
+    
+    return true;
   };
 
   return (
@@ -260,7 +319,10 @@ const FxRatesConfig = () => {
             </Button>
 
             <Button
-              onClick={() => setIsDialogOpen(true)}
+              onClick={() => {
+                setNewRate({ source: "", rate: "", is_active: true, notes: "" });
+                setIsDialogOpen(true);
+              }}
               className="flex items-center gap-1"
             >
               <IconPlus className="h-4 w-4" />
@@ -270,111 +332,117 @@ const FxRatesConfig = () => {
         </div>
 
         {/* Cards por cada tipo de fuente */}
-        {sources.map((source) => {
-          const currentRate =
-            rates.find((r) => r.source === source && r.is_active) ||
-            rates.find((r) => r.source === source);
+        {loading && rates.length === 0 ? (
+          <ConfigLoading />
+        ) : (
+          sources.map((source) => {
+            const currentRate =
+              rates.find((r) => r.source === source && r.is_active) ||
+              rates.find((r) => r.source === source);
 
-          // Activa siempre primero
-          const sourceRates = rates
-            .filter((r) => r.source === source)
-            .sort((a, b) => (a.is_active ? -1 : 1))
-            .filter(filterByDate);
+            // Activa siempre primero
+            const sourceRates = rates
+              .filter((r) => r.source === source)
+              .sort((a, b) => (a.is_active ? -1 : 1))
+              .filter(filterByDate);
 
-          return (
-            <Card
-              key={source}
-              className="border border-green-200 shadow-sm relative"
-            >
-              {/* Badge de Activa */}
+            if (sourceRates.length === 0) return null;
 
-              <CardHeader className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                  <IconSettingsDollar className="text-green-600" />
-                  Cotización {source.toUpperCase()}
-                  {currentRate?.is_active && (
-                    <Badge className="bg-green-500 text-white shadow-md">
-                      Activa
-                    </Badge>
-                  )}
-                </CardTitle>
+            return (
+              <Card
+                key={source}
+                className="border border-green-200 shadow-sm relative"
+              >
+                <CardHeader className="flex items-center justify-between">
+                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                    <IconSettingsDollar className="text-green-600" />
+                    Cotización {source.toUpperCase()}
+                    {currentRate?.is_active && (
+                      <Badge className="bg-green-500 text-white shadow-md">
+                        Activa
+                      </Badge>
+                    )}
+                  </CardTitle>
 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setEditingRate({ ...currentRate, notes: "" });
-                    setIsEditDialogOpen(true);
-                    setSelectedSource(source);
-                  }}
-                  title="Actualizar cotización"
-                >
-                  <IconEdit className="h-4 w-4" />
-                </Button>
-              </CardHeader>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingRate({
+                        ...currentRate,
+                        rate: currentRate?.rate.toString() || "",
+                        notes: currentRate?.notes || "",
+                      });
+                      setIsEditDialogOpen(true);
+                      setSelectedSource(source);
+                    }}
+                    title="Actualizar cotización"
+                  >
+                    <IconEdit className="h-4 w-4" />
+                  </Button>
+                </CardHeader>
 
-              <CardContent>
-                {loading ? (
-                  <ConfigLoading />
-                ) : currentRate ? (
-                  <>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                      <div>
-                        <h2 className="text-3xl font-bold text-green-700">
-                          ${Number(currentRate.rate).toLocaleString("es-AR")}
-                        </h2>
-                        <p className="text-sm text-muted-foreground">
-                          Última actualización:{" "}
-                          {formatDate(currentRate.created_at)}
-                        </p>
-                        {currentRate.notes && (
-                          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
-                            <IconMessage size={14} />
-                            {currentRate.notes}
+                <CardContent>
+                  {currentRate ? (
+                    <>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                        <div>
+                          <h2 className="text-3xl font-bold text-green-700">
+                            ${Number(currentRate.rate).toLocaleString("es-AR")}
+                          </h2>
+                          <p className="text-sm text-muted-foreground">
+                            Última actualización:{" "}
+                            {formatDate(currentRate.created_at)}
                           </p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <Badge variant="outline">{currentRate.source}</Badge>
-                        <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                          <IconUser size={12} />
-                          {currentRate.created_by || "Desconocido"}
+                          {currentRate.notes && (
+                            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                              <IconMessage size={14} />
+                              {currentRate.notes}
+                            </p>
+                          )}
                         </div>
-                      </div>
-                    </div>
-
-                    <div className="divide-y divide-muted/30">
-                      {sourceRates.map((r) => (
-                        <div key={r.id} className="py-2">
-                          <div>
-                            <p className="font-medium">
-                              ${Number(r.rate).toLocaleString("es-AR")}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatDate(r.created_at)}
-                            </p>
-                            {r.notes && (
-                              <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                                <IconMessage size={12} /> {r.notes}
-                              </p>
-                            )}
-                            {r.created_by && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                                <IconUser size={12} /> {r.created_by}
-                              </p>
-                            )}
+                        <div className="flex flex-col items-end">
+                          <Badge variant="outline">{currentRate.source}</Badge>
+                          <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                            <IconUser size={12} />
+                            {currentRate.created_by || "Desconocido"}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <ConfigLoading />
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+                      </div>
+
+                      <div className="divide-y divide-muted/30 max-h-60 overflow-y-auto">
+                        {sourceRates.map((r) => (
+                          <div key={r.id} className="py-2">
+                            <div>
+                              <p className="font-medium">
+                                ${Number(r.rate).toLocaleString("es-AR")}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDate(r.created_at)}
+                              </p>
+                              {r.notes && (
+                                <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                                  <IconMessage size={12} /> {r.notes}
+                                </p>
+                              )}
+                              {r.created_by && (
+                                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                  <IconUser size={12} /> {r.created_by}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No hay datos para mostrar.</p>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
       </div>
 
       {/* Modal nueva cotización */}
@@ -385,8 +453,9 @@ const FxRatesConfig = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid gap-2">
-              <Label>Fuente</Label>
+              <Label htmlFor="new-source">Fuente</Label>
               <Input
+                id="new-source"
                 placeholder="Ej: oficial, blue, mep..."
                 value={newRate.source}
                 onChange={(e) =>
@@ -395,8 +464,9 @@ const FxRatesConfig = () => {
               />
             </div>
             <div className="grid gap-2">
-              <Label>Valor en ARS</Label>
+              <Label htmlFor="new-rate">Valor en ARS</Label>
               <Input
+                id="new-rate"
                 type="number"
                 placeholder="Ej: 1045.50"
                 value={newRate.rate}
@@ -406,8 +476,9 @@ const FxRatesConfig = () => {
               />
             </div>
             <div className="grid gap-2">
-              <Label>Comentario (opcional)</Label>
+              <Label htmlFor="new-notes">Comentario (opcional)</Label>
               <Textarea
+                id="new-notes"
                 placeholder="Ej: ajuste semanal, carga manual..."
                 value={newRate.notes}
                 onChange={(e) =>
@@ -417,12 +488,13 @@ const FxRatesConfig = () => {
             </div>
             <div className="flex items-center space-x-2">
               <Checkbox
+                id="new-is-active"
                 checked={newRate.is_active}
                 onCheckedChange={(checked) =>
                   setNewRate({ ...newRate, is_active: checked })
                 }
               />
-              <Label>Establecer como activa</Label>
+              <Label htmlFor="new-is-active">Establecer como activa</Label>
             </div>
           </div>
           <DialogFooter>
@@ -430,8 +502,37 @@ const FxRatesConfig = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* 🆕 COMPONENTE: AlertDialog para confirmar reemplazo de activa */}
+      <AlertDialog
+        open={confirmationDialog}
+        onOpenChange={setConfirmationDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ya existe una cotización activa</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ya existe una cotización **activa** para la fuente **{newRate.source.toUpperCase()}**. 
+              Si continúas, la cotización anterior será **desactivada** y la nueva se establecerá como la cotización vigente.
+              ¿Deseas continuar y reemplazarla?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmationDialog(false);
+                confirmAndCreateRate(); // Ejecutar la creación y reemplazo
+              }}
+            >
+              Sí, reemplazar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* FIN AlertDialog */}
 
-      {/* Modal editar cotización */}
+
       {/* Modal editar cotización */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
@@ -442,8 +543,9 @@ const FxRatesConfig = () => {
           {editingRate && (
             <div className="space-y-4">
               <div className="grid gap-2">
-                <Label>Valor en ARS</Label>
+                <Label htmlFor="edit-rate">Valor en ARS</Label>
                 <Input
+                  id="edit-rate"
                   type="number"
                   value={editingRate.rate}
                   onChange={(e) =>
@@ -453,8 +555,9 @@ const FxRatesConfig = () => {
               </div>
 
               <div className="grid gap-2">
-                <Label>Comentario</Label>
+                <Label htmlFor="edit-notes">Comentario</Label>
                 <Textarea
+                  id="edit-notes"
                   value={editingRate.notes || ""}
                   onChange={(e) =>
                     setEditingRate({ ...editingRate, notes: e.target.value })
