@@ -142,7 +142,7 @@ export default function ProductDetailDialog({
 
               <div className="flex flex-col gap-1">
                 <p>
-                  <span className="font-semibold">Precio base:</span>{" "}
+                  <span className="font-semibold">Precio en USD:</span>{" "}
                   {formatCurrencyUSD(
                     firstVariant?.usd_price || product.usdPrice
                   )}

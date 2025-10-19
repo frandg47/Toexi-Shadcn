@@ -5,6 +5,8 @@ import { supabase } from "../lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import DialogVariants from "../components/DialogVariants";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Table,
@@ -35,6 +37,7 @@ import {
   IconTrash,
   IconPlus,
   IconInfoCircle,
+  IconVersions,
 } from "@tabler/icons-react";
 import DialogProduct from "../components/DialogProduct";
 
@@ -94,6 +97,10 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [fxRate, setFxRate] = useState(DEFAULT_FX_RATE);
   const [paymentMethods, setPaymentMethods] = useState([]);
+
+  const [openVariants, setOpenVariants] = useState(false);
+  const [selectedVariantProduct, setSelectedVariantProduct] = useState(null);
+
   const [paymentInstallments, setPaymentInstallments] = useState([]);
   const [productDialog, setProductDialog] = useState({
     open: false,
@@ -180,7 +187,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       );
 
       const getCommissionForProduct = (p) => {
-        if (p.commission_pct != null || p.commission_fixed != null) {
+        if (p.commission_pct !== null || p.commission_fixed !== null) {
           return {
             pct: p.commission_pct,
             fixed: p.commission_fixed,
@@ -196,7 +203,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
         );
 
         if (applicable.length === 0)
-          return { pct: null, fixed: null, ruleName: "Propia", priority: null };
+          return { pct: null, fixed: null, ruleName: "No tiene", priority: null };
 
         const bestRule = applicable.reduce((a, b) =>
           a.priority < b.priority ? a : b
@@ -206,8 +213,8 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
           pct: bestRule.commission_pct,
           fixed: bestRule.commission_fixed,
           ruleName: bestRule.brand_id
-            ? `Marca (prioridad ${bestRule.priority})`
-            : `Categoría (prioridad ${bestRule.priority})`,
+            ? `Por Marca`
+            : `Por Categoría`,
           priority: bestRule.priority,
         };
       };
@@ -232,6 +239,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
           commissionPct: commission.pct ?? null,
           commissionFixed: commission.fixed ?? null,
           commissionRuleName: commission.ruleName,
+          priority: commission.priority,
           coverImageUrl:
             p.cover_image_url || variants[0]?.image_url || PLACEHOLDER_IMAGE,
           allowBackorder: p.allow_backorder,
@@ -461,6 +469,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>{p.commissionRuleName}</p>
+                          <span>Prioridad: {p.priority}</span>
                         </TooltipContent>
                       </Tooltip>
                     </TableCell>
@@ -471,7 +480,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
-                                size="icon"
+                                size="sm"
                                 variant="outline"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -486,11 +495,26 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                             </TooltipTrigger>
                             <TooltipContent>Editar</TooltipContent>
                           </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedVariantProduct(p); // ← guardamos el producto actual
+                                  setOpenVariants(true);
+                                }}
+                              >
+                                <IconVersions className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Variantes</TooltipContent>
+                          </Tooltip>
 
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
-                                size="icon"
+                                size="sm"
                                 variant="destructive"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -514,12 +538,23 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       </div>
 
       {!isSellerView && (
-        <DialogProduct
-          open={productDialog.open}
-          onClose={() => setProductDialog({ open: false, product: null })}
-          product={productDialog.product}
-          onSave={handleRefresh}
-        />
+        <>
+          <DialogProduct
+            open={productDialog.open}
+            onClose={() => setProductDialog({ open: false, product: null })}
+            product={productDialog.product}
+            onSave={handleRefresh}
+          />
+          <DialogVariants
+            open={openVariants}
+            onClose={() => {
+              setOpenVariants(false);
+              setSelectedVariantProduct(null);
+            }}
+            productId={selectedVariantProduct?.id}
+            onSave={handleRefresh}
+          />
+        </>
       )}
 
       {selectedProduct && (

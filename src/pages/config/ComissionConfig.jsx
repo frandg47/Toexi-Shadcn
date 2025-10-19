@@ -306,7 +306,7 @@ const ComissionConfig = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <div>
+            <div className="grid gap-2">
               <Label>Marca</Label>
               <select
                 value={formData.brand_id}
@@ -319,7 +319,7 @@ const ComissionConfig = () => {
                   })
                 }
                 className="w-full rounded-md border border-input bg-background px-3 py-2"
-                disabled={!!formData.category_id} // 🔹 Desactiva si hay categoría seleccionada
+                // disabled={!!formData.category_id} // 🔹 Desactiva si hay categoría seleccionada
               >
                 <option value="">Todas</option>
                 {brands.map((b) => (
@@ -330,7 +330,7 @@ const ComissionConfig = () => {
               </select>
             </div>
 
-            <div>
+            <div className="grid gap-2">
               <Label>Categoría</Label>
               <select
                 value={formData.category_id}
@@ -343,7 +343,7 @@ const ComissionConfig = () => {
                   })
                 }
                 className="w-full rounded-md border border-input bg-background px-3 py-2"
-                disabled={!!formData.brand_id} // 🔹 Desactiva si hay marca seleccionada
+                // disabled={!!formData.brand_id} // 🔹 Desactiva si hay marca seleccionada
               >
                 <option value="">Todas</option>
                 {categories.map((c) => (
@@ -355,7 +355,7 @@ const ComissionConfig = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <div>
+              <div className="grid gap-2">
                 <Label>% Comisión</Label>
                 <Input
                   type="number"
@@ -364,10 +364,11 @@ const ComissionConfig = () => {
                     setFormData({ ...formData, commission_pct: e.target.value })
                   }
                   placeholder="Ej: 5"
+                  disabled={!!formData.commission_fixed} // 🔹 Desactiva si hay comisión fija
                 />
               </div>
 
-              <div>
+              <div className="grid gap-2">
                 <Label>Comisión fija ($)</Label>
                 <Input
                   type="number"
@@ -379,11 +380,12 @@ const ComissionConfig = () => {
                     })
                   }
                   placeholder="Ej: 100"
+                  disabled={!!formData.commission_pct} // 🔹 Desactiva si hay % de comisión
                 />
               </div>
             </div>
 
-            <div>
+            <div className="grid gap-2">
               <Label>Prioridad</Label>
               <Input
                 type="number"

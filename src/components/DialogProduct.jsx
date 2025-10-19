@@ -16,7 +16,8 @@ import Swal from "sweetalert2";
 
 export default function DialogProduct({ open, onClose, product, onSave }) {
   const isEditing = !!product;
-
+  console.log("producto a editar:", product);
+  console.log("rule", product?.commissionRuleName);
   const [form, setForm] = useState({
     name: "",
     brand_id: "",
@@ -41,11 +42,11 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
         category_id: product.category_id || "",
         usd_price: product.usd_price || product.usdPrice || "",
         commission_pct:
-        product.commission_origin === "propia"
+        product.commissionRuleName === "Propia"
           ? product.commission_pct || product.commissionPct || ""
           : "",
         commission_fixed:
-        product.commission_origin === "propia"
+        product.commissionRuleName === "Propia"
           ? product.commission_fixed || product.commissionFixed || ""
           : "",
         cover_image_url: product.cover_image_url || product.coverImageUrl || "",
