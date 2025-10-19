@@ -221,7 +221,7 @@ export default function ProductDetailDialog({
                             : "hover:border-primary/70"
                         }`}
                       >
-                        <div className="flex flex-col items-center text-center gap-1">
+                        <div className="flex flex-col items-center text-center p-3 gap-1">
                           {v.color && (
                             <p className="text-sm font-semibold">{v.color}</p>
                           )}

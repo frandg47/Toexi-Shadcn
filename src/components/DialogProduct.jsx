@@ -40,9 +40,14 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
         brand_id: product.brand_id || "",
         category_id: product.category_id || "",
         usd_price: product.usd_price || product.usdPrice || "",
-        commission_pct: product.commission_pct || product.commissionPct || "",
+        commission_pct:
+        product.commission_origin === "propia"
+          ? product.commission_pct || product.commissionPct || ""
+          : "",
         commission_fixed:
-          product.commission_fixed || product.commissionFixed || "",
+        product.commission_origin === "propia"
+          ? product.commission_fixed || product.commissionFixed || ""
+          : "",
         cover_image_url: product.cover_image_url || product.coverImageUrl || "",
         allow_backorder:
           product.allow_backorder ?? product.allowBackorder ?? false,
@@ -221,6 +226,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
                 name="commission_pct"
                 type="number"
                 step="0.01"
+                disabled={!!form.commission_fixed}
                 value={form.commission_pct || ""}
                 onChange={handleChange}
               />
@@ -233,6 +239,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
               name="commission_fixed"
               type="number"
               step="0.01"
+              disabled={!!form.commission_pct}
               value={form.commission_fixed || ""}
               onChange={handleChange}
             />
