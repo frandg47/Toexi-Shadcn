@@ -224,7 +224,12 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
         );
 
         if (applicable.length === 0)
-          return { pct: null, fixed: null, ruleName: "No tiene", priority: null };
+          return {
+            pct: null,
+            fixed: null,
+            ruleName: "No tiene",
+            priority: null,
+          };
 
         const bestRule = applicable.reduce((a, b) =>
           a.priority < b.priority ? a : b
@@ -233,9 +238,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
         return {
           pct: bestRule.commission_pct,
           fixed: bestRule.commission_fixed,
-          ruleName: bestRule.brand_id
-            ? `Por Marca`
-            : `Por Categoría`,
+          ruleName: bestRule.brand_id ? `Por Marca` : `Por Categoría`,
           priority: bestRule.priority,
         };
       };
@@ -281,7 +284,8 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       console.error(err);
       // 🔄 REEMPLAZO 3: Reemplazar Swal por toast
       toast.error("Error al cargar los productos", {
-        description: err.message || "Ocurrió un error desconocido al cargar datos.",
+        description:
+          err.message || "Ocurrió un error desconocido al cargar datos.",
       });
       // ❌ ELIMINADO: Swal.fire("Error", "No se pudieron cargar los productos", "error");
     } finally {
@@ -304,16 +308,16 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   // 🔄 REEMPLAZO 5: Función que se ejecuta al confirmar la eliminación
   const handleConfirmDelete = async () => {
     if (!deleteDialog.product) return;
-    
+
     // Aquí iría la lógica real de eliminación (e.g., await supabase.from('products').delete().eq('id', deleteDialog.product.id))
 
     // Simulando el comportamiento original de solo mostrar una alerta
     toast.info("Funcionalidad aún en desarrollo", {
-        description: `El producto ${deleteDialog.product.name} no fue eliminado.`,
+      description: `El producto ${deleteDialog.product.name} no fue eliminado.`,
     });
-    
+
     // ❌ ELIMINADO: Swal.fire("Info", "Funcionalidad aún en desarrollo", "info");
-    
+
     // Cerrar el diálogo
     setDeleteDialog({ open: false, product: null });
   };
@@ -337,25 +341,20 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   return (
     <TooltipProvider>
       <div className="space-y-4 rounded-lg border bg-card p-4 shadow-sm">
-        {/* Cotización */}
-        <div className="flex items-center gap-3 rounded-md border border-green-500 bg-gray-200/20 p-3 text-xl">
-          <IconHomeDollar className="h-6 w-6 text-green-500" />
-          Cotización actual del USD: {formatCurrencyARS(fxRate)}
-        </div>
-
-        {/* Filtros */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-2 items-center">
+        {/* 🔹 Filtros */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Input
               placeholder="Buscar por producto o marca..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="sm:w-64"
+              className="w-full sm:w-64"
             />
+
             <select
               value={selectedBrand}
               onChange={(e) => setSelectedBrand(e.target.value)}
-              className="border rounded-md p-2 text-sm"
+              className="border rounded-md p-2 text-sm w-full sm:w-auto"
             >
               <option value="">Todas las marcas</option>
               {brands.map((b) => (
@@ -364,10 +363,11 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                 </option>
               ))}
             </select>
+
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="border rounded-md p-2 text-sm"
+              className="border rounded-md p-2 text-sm w-full sm:w-auto"
             >
               <option value="">Todas las categorías</option>
               {categories.map((c) => (
@@ -378,33 +378,40 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
             </select>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* 🔹 Botones de acciones principales */}
+          <div className="flex flex-wrap gap-2 justify-end">
             <Button
               variant="outline"
               onClick={handleRefresh}
               disabled={refreshing}
+              className="flex items-center gap-1"
             >
               <IconRefresh
                 className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
               />
-              Refrescar
+              <span className="hidden sm:inline">Refrescar</span>
             </Button>
+
             {!isSellerView && (
               <Button
                 onClick={() => setProductDialog({ open: true, product: null })}
+                className="flex items-center gap-1"
               >
-                <IconPlus className="h-4 w-4" /> Agregar
+                <IconPlus className="h-4 w-4" />
+                <span className="hidden sm:inline">Agregar</span>
               </Button>
             )}
           </div>
         </div>
 
-        {/* Tabla */}
-        <div className="overflow-x-auto">
-          <Table>
+        {/* 🔹 Tabla */}
+        <div className="overflow-x-auto rounded-md border">
+          <Table className="min-w-full text-sm">
             <TableHeader>
               <TableRow>
-                {TABLE_COLUMNS.map((c) => (
+                {TABLE_COLUMNS.filter(
+                  (c) => !(isSellerView && c.id === "actions")
+                ).map((c) => (
                   <TableHead key={c.id}>{c.label}</TableHead>
                 ))}
               </TableRow>
@@ -413,9 +420,15 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={TABLE_COLUMNS.length}>
+                  <TableCell
+                    colSpan={
+                      TABLE_COLUMNS.filter(
+                        (c) => !(isSellerView && c.id === "actions")
+                      ).length
+                    }
+                  >
                     <div className="grid gap-2">
-                      {[...Array(3)].map((_, i) => (
+                      {[...Array(10)].map((_, i) => (
                         <Skeleton key={i} className="h-10 w-full" />
                       ))}
                     </div>
@@ -424,7 +437,11 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
               ) : filteredProducts.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={TABLE_COLUMNS.length}
+                    colSpan={
+                      TABLE_COLUMNS.filter(
+                        (c) => !(isSellerView && c.id === "actions")
+                      ).length
+                    }
                     className="py-10 text-center text-muted-foreground"
                   >
                     No hay productos que coincidan con el filtro.
@@ -458,34 +475,24 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                     </TableCell>
 
                     <TableCell>
-                      {" "}
                       {p.stock === 0 && p.allowBackorder ? (
                         <div className="flex flex-col leading-tight">
-                          {" "}
                           <span className="font-medium text-amber-600">
-                            {" "}
-                            Pedido{" "}
-                          </span>{" "}
+                            Pedido
+                          </span>
                           <span className="text-sm text-muted-foreground">
-                            {" "}
-                            {p.leadTimeLabel || "Sin plazo"}{" "}
-                          </span>{" "}
+                            {p.leadTimeLabel || "Sin plazo"}
+                          </span>
                         </div>
                       ) : (
                         p.stock
-                      )}{" "}
+                      )}
                     </TableCell>
 
                     <TableCell>{formatCurrencyUSD(p.usdPrice)}</TableCell>
                     <TableCell>
                       {formatCurrencyARS(p.usdPrice * fxRate)}
                     </TableCell>
-
-                    {/* <TableCell>
-                      <span className="text-muted-foreground text-sm">
-                        Ver en detalle
-                      </span>
-                    </TableCell> */}
 
                     <TableCell>
                       <Tooltip>
@@ -508,20 +515,19 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                       </Tooltip>
                     </TableCell>
 
+                    {/* 🔹 Solo mostrar Acciones si no es vista de vendedor */}
                     {!isSellerView && (
                       <TableCell>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-1 justify-center">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
                                 size="sm"
                                 variant="outline"
+                                className="p-2"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setProductDialog({
-                                    open: true,
-                                    product: p,
-                                  });
+                                  setProductDialog({ open: true, product: p });
                                 }}
                               >
                                 <IconEdit className="h-4 w-4" />
@@ -529,13 +535,16 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                             </TooltipTrigger>
                             <TooltipContent>Editar</TooltipContent>
                           </Tooltip>
+
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
+                                size="sm"
                                 variant="outline"
+                                className="p-2"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setSelectedVariantProduct(p); // ← guardamos el producto actual
+                                  setSelectedVariantProduct(p);
                                   setOpenVariants(true);
                                 }}
                               >
@@ -550,10 +559,10 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                               <Button
                                 size="sm"
                                 variant="destructive"
+                                className="p-2"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  // 🔄 REEMPLAZO 6: Usar la nueva función de diálogo
-                                  handleOpenDeleteDialog(p); 
+                                  handleOpenDeleteDialog(p);
                                 }}
                               >
                                 <IconTrash className="h-4 w-4" />
@@ -572,6 +581,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
         </div>
       </div>
 
+      {/* 🔹 Diálogos */}
       {!isSellerView && (
         <>
           <DialogProduct
@@ -590,7 +600,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
             onSave={handleRefresh}
           />
 
-          {/* 🔄 REEMPLAZO 7: AlertDialog para la confirmación de eliminación */}
           <AlertDialog
             open={deleteDialog.open}
             onOpenChange={(open) => setDeleteDialog({ open, product: null })}
@@ -601,8 +610,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                   ¿Eliminar {deleteDialog.product?.name}?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Esta acción no se puede deshacer. ¿Estás seguro de que quieres
-                  eliminar este producto?
+                  Esta acción no se puede deshacer.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -616,7 +624,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          {/* FIN REEMPLAZO 7 */}
         </>
       )}
 

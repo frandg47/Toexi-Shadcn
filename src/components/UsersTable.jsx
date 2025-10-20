@@ -292,7 +292,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
               <TableRow>
                 <TableCell colSpan={columnCount}>
                   <div className="grid gap-2">
-                    {[...Array(3)].map((_, index) => (
+                    {[...Array(10)].map((_, index) => (
                       <Skeleton key={index} className="h-10 w-full" />
                     ))}
                   </div>

@@ -1,22 +1,40 @@
 import { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { IconCirclePlusFilled, IconChevronDown } from "@tabler/icons-react";
+import { IconCirclePlusFilled, IconChevronDown, IconInfoCircle } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export function NavMain({ items }) {
+  const navigate = useNavigate();
+
+  const showDevelopmentToast = (feature) => {
+    toast("Funcionalidad en desarrollo", {
+      description: `El módulo de ${feature} estará disponible próximamente.`,
+      icon: <IconInfoCircle className="h-5 w-5 text-blue-500" />,
+      duration: 3000,
+    });
+  };
+
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
-        {/* Botón Nueva venta (opcional) */}
+        {/* Botón Nueva venta */}
         <SidebarMenu>
           <SidebarMenuItem>
-            <Button variant="outline" className="w-full justify-start">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start"
+              onClick={() => {
+                showDevelopmentToast("Nueva venta");
+                navigate("/dashboard");
+              }}
+            >
               <IconCirclePlusFilled className="mr-2 h-5 w-5" />
               Nueva venta
             </Button>
@@ -32,11 +50,17 @@ export function NavMain({ items }) {
               <SidebarMenuItem key={item.title}>
                 <NavLink
                   to={item.url}
-                  end={item.url === "/dashboard"}
+                  end={true}
+                  onClick={(e) => {
+                    if (item.onClick) {
+                      e.preventDefault();
+                      item.onClick();
+                    }
+                  }}
                   className={({ isActive }) =>
                     `flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors
                      ${
-                       isActive
+                       isActive && !item.onClick
                          ? "bg-primary text-primary-foreground shadow-sm"
                          : "hover:bg-muted hover:text-foreground"
                      }`

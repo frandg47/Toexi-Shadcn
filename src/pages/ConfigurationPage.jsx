@@ -2,12 +2,14 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { SiteHeader } from "@/components/site-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { toast } from "sonner";
 import {
   IconCurrencyDollar,
   IconSettingsDollar,
   IconCreditCard,
   IconBox,
   IconChartBar,
+  IconInfoCircle,
 } from "@tabler/icons-react";
 
 const ConfigurationPage = ({ titulo }) => {
@@ -54,7 +56,17 @@ const ConfigurationPage = ({ titulo }) => {
         {CARDS_CONFIG.map((card) => (
           <Card
             key={card.id}
-            onClick={() => navigate(card.path)}
+            onClick={() => {
+              if (card.id === "sales") {
+                toast("Funcionalidad en desarrollo", {
+                  description: "Esta sección estará disponible próximamente.",
+                  icon: <IconInfoCircle className="h-5 w-5 text-blue-500" />,
+                  duration: 3000,
+                });
+                return;
+              }
+              navigate(card.path);
+            }}
             className="cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02]"
           >
             <CardHeader className="flex flex-row items-center justify-between">

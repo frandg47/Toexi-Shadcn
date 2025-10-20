@@ -10,8 +10,10 @@ import {
   IconUsersGroup,
   IconMenu4,
   IconBrandApple,
+  IconInfoCircle,
 } from "@tabler/icons-react";
 
+import { toast } from "sonner";
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
@@ -27,6 +29,14 @@ import {
 } from "@/components/ui/sidebar";
 
 import { useAuth } from "@/context/AuthContextProvider"; // 👈 Importá el hook
+
+const showDevelopmentToast = (feature) => {
+  toast("Funcionalidad en desarrollo", {
+    description: `El módulo de ${feature} estará disponible próximamente.`,
+    icon: <IconInfoCircle className="h-5 w-5 text-blue-500" />,
+    duration: 3000,
+  });
+};
 
 const navMain = [
   { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
@@ -47,8 +57,18 @@ const navMain = [
       },
     ],
   },
-  { title: "Pedidos", url: "/dashboard/orders", icon: IconShoppingCart },
-  { title: "Clientes", url: "/dashboard/clients", icon: IconUsers },
+  { 
+    title: "Pedidos", 
+    url: "/dashboard", 
+    icon: IconShoppingCart,
+    onClick: () => showDevelopmentToast("Pedidos")
+  },
+  { 
+    title: "Clientes", 
+    url: "/dashboard", 
+    icon: IconUsers,
+    onClick: () => showDevelopmentToast("Clientes")
+  },
   { title: "Equipo", url: "/dashboard/team", icon: IconUsersGroup },
 ];
 

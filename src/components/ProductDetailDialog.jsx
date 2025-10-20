@@ -222,38 +222,44 @@ export default function ProductDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-6">
+      <DialogContent className="max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto p-4 sm:p-6 rounded-xl">
+        {/* 🔹 Encabezado */}
         <DialogHeader className="space-y-2 text-center">
-          <DialogTitle className="text-2xl font-bold tracking-tight">
+          <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight break-words">
             {product.name}
           </DialogTitle>
-          <DialogDescription className="text-base text-muted-foreground">
+          <DialogDescription className="text-sm sm:text-base text-muted-foreground">
             {product.brandName} — {product.categoryName}
           </DialogDescription>
         </DialogHeader>
-        <DialogHeader className="space-y-2 text-center">
 
-          {/* 🔹 Botón de exportar PDF */}
-          <div className="flex justify-center mt-2">
-            <Button variant="outline" size="sm" onClick={handleExportPDF}>
-              <IconFileTypePdf className="w-4 h-4 mr-2 text-red-600" />
-              Exportar PDF
-            </Button>
-          </div>
-        </DialogHeader>
+        {/* 🔹 Botón Exportar PDF */}
+        <div className="flex justify-center mt-3 mb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPDF}
+            className="w-full sm:w-auto flex items-center gap-2"
+          >
+            <IconFileTypePdf className="w-4 h-4 text-red-600" />
+            <span>Exportar PDF</span>
+          </Button>
+        </div>
 
-        {/* Imagen y datos básicos */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+        {/* 🔹 Imagen + Datos básicos */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
+          {/* Imagen */}
           <div className="flex justify-center items-center bg-muted/20 rounded-lg p-4">
             <img
               src={product.coverImageUrl}
               alt={product.name}
-              className="w-72 h-72 object-contain rounded-md"
+              className="max-w-full h-auto w-64 sm:w-72 object-contain rounded-md"
             />
           </div>
 
-          <div className="flex flex-col justify-between">
-            <div className="space-y-3 text-sm leading-relaxed">
+          {/* Datos principales */}
+          <div className="flex flex-col justify-between text-sm sm:text-base leading-relaxed">
+            <div className="space-y-3">
               <p>
                 <span className="font-semibold text-foreground">Marca:</span>{" "}
                 {product.brandName}
@@ -274,12 +280,12 @@ export default function ProductDetailDialog({
                   <span className="font-semibold text-foreground">
                     Colores disponibles:
                   </span>
-                  <div className="flex flex-wrap gap-2 mt-1">
+                  <div className="flex flex-wrap gap-2 mt-2">
                     {colors.map((color, i) => (
                       <Badge
                         key={i}
                         variant="outline"
-                        className="flex items-center gap-1 text-xs"
+                        className="flex items-center gap-1 text-xs sm:text-sm"
                       >
                         <IconColorSwatch className="h-3 w-3 text-muted-foreground" />
                         {color}
@@ -289,6 +295,7 @@ export default function ProductDetailDialog({
                 </div>
               )}
 
+              {/* Precios y stock */}
               <div className="flex flex-col gap-1">
                 <p>
                   <span className="font-semibold">Precio en USD:</span>{" "}
@@ -302,7 +309,7 @@ export default function ProductDetailDialog({
                     (firstVariant?.usd_price || product.usdPrice) * fxRate
                   )}
                 </p>
-                <p>
+                <p className="flex items-center gap-2">
                   <span className="font-semibold">Stock:</span>{" "}
                   <Badge
                     variant={
@@ -315,7 +322,7 @@ export default function ProductDetailDialog({
               </div>
 
               {product.allowBackorder && (
-                <div className="mt-2 p-2 border-l-4 border-amber-500 bg-amber-50 rounded text-sm text-amber-700">
+                <div className="mt-3 p-3 border-l-4 border-amber-500 bg-amber-50 rounded text-xs sm:text-sm text-amber-700">
                   🔸 Este producto admite pedidos.{" "}
                   {product.leadTimeLabel
                     ? `Plazo estimado: ${product.leadTimeLabel}`
@@ -328,23 +335,24 @@ export default function ProductDetailDialog({
 
         <Separator className="my-5" />
 
-        {/* Variantes */}
+        {/* 🔹 Variantes */}
         {grouped.length > 0 && (
           <div>
-            <h3 className="mb-4 text-lg font-semibold flex items-center gap-2">
+            <h3 className="mb-4 text-lg sm:text-xl font-semibold flex items-center gap-2">
               <IconBox className="w-5 h-5 text-primary" />
               Variantes disponibles
             </h3>
 
+            {/* Tabs responsivos */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="flex flex-wrap gap-2 bg-muted/30 rounded-lg p-1">
+              <TabsList className="flex flex-wrap gap-2 bg-muted/30 rounded-lg p-2 overflow-x-auto">
                 {grouped.map((g) => (
                   <TabsTrigger
                     key={g.key}
                     value={g.key}
-                    className={`px-3 py-1.5 rounded-md border transition-all text-sm ${
+                    className={`px-3 py-1.5 rounded-md border transition-all text-xs sm:text-sm whitespace-nowrap ${
                       activeTab === g.key
-                        ? "bg-primary border-primary shadow-sm"
+                        ? "bg-primary text-white border-primary shadow-sm"
                         : "hover:bg-muted"
                     }`}
                   >
@@ -353,13 +361,14 @@ export default function ProductDetailDialog({
                 ))}
               </TabsList>
 
+              {/* Contenido de cada grupo */}
               {grouped.map((g) => (
                 <TabsContent
                   key={g.key}
                   value={g.key}
                   className="mt-5 space-y-6"
                 >
-                  {/* Variantes (solo colores) */}
+                  {/* 🔹 Grilla de variantes */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {g.variants.map((v) => (
                       <div
@@ -397,8 +406,8 @@ export default function ProductDetailDialog({
                     ))}
                   </div>
 
-                  {/* 💳 Métodos de pago (una sola vez por grupo) */}
-                  <div className="text-xs text-muted-foreground space-y-2">
+                  {/* 🔹 Métodos de pago */}
+                  <div className="text-xs sm:text-sm text-muted-foreground space-y-2 mt-2">
                     <h3 className="font-semibold text-lg flex items-center gap-2 text-foreground">
                       <IconCreditCard className="w-5 h-5 text-purple-600" />
                       Métodos de pago
@@ -431,7 +440,7 @@ export default function ProductDetailDialog({
                                 return (
                                   <div
                                     key={i.id}
-                                    className="flex justify-between text-muted-foreground"
+                                    className="flex flex-col sm:flex-row sm:justify-between gap-1 text-muted-foreground"
                                   >
                                     <span>
                                       {i.installments} cuotas de{" "}
@@ -468,8 +477,8 @@ export default function ProductDetailDialog({
 
         <Separator className="my-5" />
 
-        {/* Cotización actual */}
-        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+        {/* 🔹 Cotización actual */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 text-sm sm:text-base text-muted-foreground">
           <IconCurrencyDollar className="w-4 h-4 text-green-500" />
           <span>Cotización actual:</span>{" "}
           <span className="font-semibold text-foreground">
