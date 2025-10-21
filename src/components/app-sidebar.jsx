@@ -57,24 +57,29 @@ const navMain = [
       },
     ],
   },
-  { 
-    title: "Pedidos", 
-    url: "/dashboard", 
+  {
+    title: "Pedidos",
+    url: "/dashboard",
     icon: IconShoppingCart,
-    onClick: () => showDevelopmentToast("Pedidos")
+    onClick: () => showDevelopmentToast("Pedidos"),
   },
-  { 
-    title: "Clientes", 
-    url: "/dashboard", 
+  {
+    title: "Clientes",
+    url: "/dashboard",
     icon: IconUsers,
-    onClick: () => showDevelopmentToast("Clientes")
+    onClick: () => showDevelopmentToast("Clientes"),
   },
   { title: "Equipo", url: "/dashboard/team", icon: IconUsersGroup },
 ];
 
 const navSecondary = [
   { title: "Configuración", url: "/dashboard/settings", icon: IconSettings },
-  { title: "Ayuda", url: "/dashboard/help", icon: IconHelp },
+  {
+    title: "Ayuda",
+    url: "/dashboard",
+    icon: IconHelp,
+    onClick: () => showDevelopmentToast("Ayuda"),
+  },
 ];
 
 export default function AppSidebar(props) {

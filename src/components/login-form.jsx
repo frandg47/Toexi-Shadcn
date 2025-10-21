@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
+import { Separator } from "@/components/ui/separator";
 // ❌ ELIMINADO: import Swal from "sweetalert2";
 
 // ✅ AGREGADO: Sonner para notificaciones
@@ -57,7 +58,7 @@ export default function LoginForm({ className, ...props }) {
       const delay = overrides.timer || 0;
       setTimeout(() => {
         navigate(result.redirectPath, { replace: true });
-      }, delay + 50); 
+      }, delay + 50);
     }
   };
   // FIN REEMPLAZO 1
@@ -76,9 +77,7 @@ export default function LoginForm({ className, ...props }) {
     // Si el login fue exitoso y no hay una redirección inmediata, establecemos un temporizador corto
     // (similar a la lógica de Swal.fire con timer).
     const override =
-      result.ok && !result.redirectPath
-        ? { timer: 1600 }
-        : undefined;
+      result.ok && !result.redirectPath ? { timer: 1600 } : undefined;
 
     showResultAlert(result, override);
   };
@@ -86,20 +85,20 @@ export default function LoginForm({ className, ...props }) {
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="overflow-hidden p-0 shadow-md">
-        <CardContent className="grid p-0 md:grid-cols-2">
+        <CardContent className="grid p-0  md:grid-cols-2">
           {/* 🔹 FORMULARIO */}
           <form
             onSubmit={handleSubmit(onSubmit)}
-            className="flex flex-col justify-center p-6 md:p-8 space-y-6"
+            className="flex flex-col justify-center md:p-8 md:py-16 space-y-6"
           >
             <div className="flex flex-col items-center text-center">
               <h1 className="text-2xl font-bold">Bienvenido</h1>
               <p className="text-balance text-muted-foreground">
-                Inicia sesión en tu cuenta de Toexi-Tech.
+                Inicia sesión con tu cuenta de Google.
               </p>
             </div>
-
-            {/* Email */}
+            {/* 
+            {/* Email }
             <div className="grid gap-3">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -122,7 +121,7 @@ export default function LoginForm({ className, ...props }) {
               )}
             </div>
 
-            {/* Password */}
+            {/* Password 
             <div className="grid gap-3">
               <div className="flex items-center">
                 <Label htmlFor="password">Contraseña</Label>
@@ -152,7 +151,7 @@ export default function LoginForm({ className, ...props }) {
               )}
             </div>
 
-            {/* Botón */}
+            {/* Botón 
             <Button
               type="submit"
               className="w-full"
@@ -161,12 +160,12 @@ export default function LoginForm({ className, ...props }) {
               {loading || isSubmitting ? "Ingresando..." : "Ingresar"}
             </Button>
 
-            {/* Divider */}
+            {/* Divider 
             <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-border">
               <span className="relative z-10 bg-card px-2 text-muted-foreground">
                 O continúa con
               </span>
-            </div>
+            </div> */}
 
             {/* Google */}
             <Button
@@ -189,6 +188,12 @@ export default function LoginForm({ className, ...props }) {
               Ingresar con Google
               <span className="sr-only">Login with Google</span>
             </Button>
+               <Separator className="w-full" />
+
+          <p className="text-xs text-muted-foreground text-center">
+            Tu información se mantiene segura.  
+            Solo utilizamos tu cuenta para autenticarte.
+          </p>
           </form>
 
           {/* 🔹 Imagen lateral */}
@@ -199,6 +204,8 @@ export default function LoginForm({ className, ...props }) {
               className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
             />
           </div>
+          
+       
         </CardContent>
       </Card>
 
