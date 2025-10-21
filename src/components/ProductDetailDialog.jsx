@@ -350,9 +350,9 @@ export default function ProductDetailDialog({
                   <TabsTrigger
                     key={g.key}
                     value={g.key}
-                    className={`px-3 py-1.5 rounded-md border transition-all text-xs sm:text-sm whitespace-nowrap ${
+                    className={`py-2 px-4 rounded-md border transition-all text-xs sm:text-sm  ${
                       activeTab === g.key
-                        ? "bg-primary text-white border-primary shadow-sm"
+                        ? "bg-primary border-primary  shadow-sm"
                         : "hover:bg-muted"
                     }`}
                   >
