@@ -6,6 +6,7 @@ import DashboardLayout from "./components/layout/DashboardLayout";
 import SellerLayout from "./components/layout/SellerLayout";
 
 import Dashboard from "./pages/Dashboard";
+import FallbackRedirect from "@/components/FallbackRedirect";
 import Products from "./pages/Products";
 import CatalogPage from "./pages/CatalogPage";
 import Clients from "./pages/Clients";
@@ -132,7 +133,7 @@ export default function App() {
           </Route>
 
           {/* 🚪 RUTA POR DEFECTO */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<FallbackRedirect />} />
         </Routes>
       </AuthContextProvider>
     </>
