@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 // ❌ ELIMINADO: import Swal from "sweetalert2";
 // ✅ AGREGADO: Sonner para notificaciones
-import { toast } from "sonner"; 
+import { toast } from "sonner";
 
 import { supabase } from "../lib/supabaseClient";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
 
 const TABLE_COLUMNS = [
   { id: "avatar", label: "Avatar" },
@@ -102,7 +101,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
-  
+
   // 🆕 ESTADO: Para manejar el AlertDialog de eliminación
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
@@ -163,7 +162,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
         console.error(error);
         // 🔄 REEMPLAZO 3: Usar toast para el error de actualización
         toast.error("No se pudo actualizar el estado", {
-            description: error.message,
+          description: error.message,
         });
       } finally {
         setRefreshing(false);
@@ -176,39 +175,33 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
   const handleOpenDeleteDialog = (user) => {
     setDeleteDialog({ open: true, user });
   };
-  
-  // 🆕 FUNCIÓN: Ejecuta la eliminación después de la confirmación del AlertDialog
-  const handleConfirmDelete = useCallback(
-    async () => {
-      const user = deleteDialog.user;
-      if (!user) return;
-      
-      try {
-        setRefreshing(true);
-        const { error } = await supabase
-          .from("users")
-          .delete()
-          .eq("id", user.id);
 
-        if (error) throw error;
-        await fetchUsers();
-        // 🔄 REEMPLAZO 4: Usar toast para la confirmación de eliminación
-        toast.success("Usuario eliminado", {
-          description: `${user.email} fue eliminado del sistema.`,
-        });
-      } catch (error) {
-        console.error(error);
-        // 🔄 REEMPLAZO 5: Usar toast para el error de eliminación
-        toast.error("No se pudo eliminar", {
-          description: error.message,
-        });
-      } finally {
-        setRefreshing(false);
-        setDeleteDialog({ open: false, user: null });
-      }
-    },
-    [fetchUsers, deleteDialog.user]
-  );
+  // 🆕 FUNCIÓN: Ejecuta la eliminación después de la confirmación del AlertDialog
+  const handleConfirmDelete = useCallback(async () => {
+    const user = deleteDialog.user;
+    if (!user) return;
+
+    try {
+      setRefreshing(true);
+      const { error } = await supabase.from("users").delete().eq("id", user.id);
+
+      if (error) throw error;
+      await fetchUsers();
+      // 🔄 REEMPLAZO 4: Usar toast para la confirmación de eliminación
+      toast.success("Usuario eliminado", {
+        description: `${user.email} fue eliminado del sistema.`,
+      });
+    } catch (error) {
+      console.error(error);
+      // 🔄 REEMPLAZO 5: Usar toast para el error de eliminación
+      toast.error("No se pudo eliminar", {
+        description: error.message,
+      });
+    } finally {
+      setRefreshing(false);
+      setDeleteDialog({ open: false, user: null });
+    }
+  }, [fetchUsers, deleteDialog.user]);
 
   const toggleColumn = useCallback((columnName) => {
     setVisibleColumns((current) =>
@@ -234,13 +227,17 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {/* 🔹 Header de filtros y acciones */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        {/* 🔍 Buscador */}
         <Input
           placeholder="Buscar por nombre..."
           onChange={(e) => setNameFilter(e.target.value)}
-          className="w-80 max-w-sm"
+          className="w-full sm:w-80 max-w-sm"
         />
-        <div className="flex gap-2 flex-wrap items-center">
+
+        {/* 🔘 Botones (en mobile quedan abajo en fila) */}
+        <div className="flex justify-center sm:justify-end flex-wrap gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">Columnas</Button>
@@ -257,6 +254,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
           <Button
             variant="outline"
             onClick={() => fetchUsers(false)}
@@ -267,6 +265,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
             />
             Refrescar
           </Button>
+
           {onAdd}
         </div>
       </div>
@@ -275,13 +274,21 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
         <Table>
           <TableHeader>
             <TableRow>
-              {visibleColumns.includes("avatar") && <TableHead>Avatar</TableHead>}
+              {visibleColumns.includes("avatar") && (
+                <TableHead>Avatar</TableHead>
+              )}
               {visibleColumns.includes("name") && <TableHead>Nombre</TableHead>}
               {visibleColumns.includes("email") && <TableHead>Email</TableHead>}
-              {visibleColumns.includes("phone") && <TableHead>Teléfono</TableHead>}
+              {visibleColumns.includes("phone") && (
+                <TableHead>Teléfono</TableHead>
+              )}
               {visibleColumns.includes("role") && <TableHead>Rol</TableHead>}
-              {visibleColumns.includes("is_active") && <TableHead>Activa</TableHead>}
-              {visibleColumns.includes("created_at") && <TableHead>Creada</TableHead>}
+              {visibleColumns.includes("is_active") && (
+                <TableHead>Activa</TableHead>
+              )}
+              {visibleColumns.includes("created_at") && (
+                <TableHead>Creada</TableHead>
+              )}
               {visibleColumns.includes("actions") && (
                 <TableHead className="w-[160px] text-right">Acciones</TableHead>
               )}
@@ -389,7 +396,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
                           variant="destructive"
                           size="sm"
                           // 🔄 REEMPLAZO 6: Usar la función para abrir el diálogo
-                          onClick={() => handleOpenDeleteDialog(user)} 
+                          onClick={() => handleOpenDeleteDialog(user)}
                           disabled={refreshing}
                         >
                           <IconTrash className="h-4 w-4" />
@@ -408,7 +415,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
           userId={editingUserId}
           onSuccess={() => fetchUsers(false)}
         />
-        
+
         {/* 🆕 COMPONENTE: AlertDialog para confirmar la eliminación */}
         <AlertDialog
           open={deleteDialog.open}
@@ -421,8 +428,9 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
             <AlertDialogHeader>
               <AlertDialogTitle>Eliminar usuario</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta acción quitará a **{deleteDialog.user?.email}** del listado. 
-                ¿Confirmas que deseas continuar? Esta acción no se puede deshacer.
+                Esta acción quitará a **{deleteDialog.user?.email}** del
+                listado. ¿Confirmas que deseas continuar? Esta acción no se
+                puede deshacer.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
