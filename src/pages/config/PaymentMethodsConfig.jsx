@@ -104,7 +104,9 @@ export default function PaymentMethodsConfig() {
     } else {
       // 🔄 REEMPLAZO 4: Usar toast para éxito
       toast.success("Éxito", {
-        description: `Método "${name}" ${editId ? "actualizado" : "creado"} correctamente.`,
+        description: `Método "${name}" ${
+          editId ? "actualizado" : "creado"
+        } correctamente.`,
       });
       setMethodModal({ open: false, editId: null, name: "", percent: 0 });
       fetchMethods();
@@ -117,7 +119,11 @@ export default function PaymentMethodsConfig() {
     // Por simplicidad, se usará un diálogo interno o la confirmación de la librería de UI preferida.
     // Aquí, para mantener la lógica de confirmación, se usará una promesa simple con `window.confirm` para un ejemplo de reemplazo rápido, aunque en un entorno Shadcn/ui se preferiría un Dialog o un componente de confirmación customizado de Sonner.
 
-    if (!window.confirm(`¿Estás seguro de que quieres eliminar el método "${name}"? Se eliminarán también sus cuotas asociadas.`)) {
+    if (
+      !window.confirm(
+        `¿Estás seguro de que quieres eliminar el método "${name}"? Se eliminarán también sus cuotas asociadas.`
+      )
+    ) {
       return;
     }
 
@@ -125,7 +131,7 @@ export default function PaymentMethodsConfig() {
       .from("payment_methods")
       .delete()
       .eq("id", id);
-      
+
     if (error) {
       // 🔄 REEMPLAZO 6: Usar toast para error al eliminar
       toast.error("Error al eliminar", {
@@ -182,7 +188,9 @@ export default function PaymentMethodsConfig() {
     } else {
       // 🔄 REEMPLAZO 10: Usar toast para éxito
       toast.success("Éxito", {
-        description: `Cuota de ${installments} ${editId ? "actualizada" : "creada"} correctamente.`,
+        description: `Cuota de ${installments} ${
+          editId ? "actualizada" : "creada"
+        } correctamente.`,
       });
       setInstallmentModal({
         open: false,
@@ -199,15 +207,19 @@ export default function PaymentMethodsConfig() {
   // 🔹 Eliminar cuota
   const handleDeleteInstallment = async (id, installments) => {
     // 🔄 REEMPLAZO 11: Usar un toast.custom para confirmación o simplificar a una advertencia con un diálogo
-    if (!window.confirm(`¿Estás seguro de que quieres eliminar la cuota de ${installments}? Esta acción no se puede deshacer.`)) {
+    if (
+      !window.confirm(
+        `¿Estás seguro de que quieres eliminar la cuota de ${installments}? Esta acción no se puede deshacer.`
+      )
+    ) {
       return;
     }
-    
+
     const { error } = await supabase
       .from("payment_installments")
       .delete()
       .eq("id", id);
-      
+
     if (error) {
       // 🔄 REEMPLAZO 12: Usar toast para error al eliminar cuota
       toast.error("Error al eliminar", {
@@ -283,8 +295,8 @@ export default function PaymentMethodsConfig() {
                   </b>
                 ) : (
                   <b className="text-green-700">
-                    {/* Multiplier < 1 means a discount */}
-                    -{((1 - method.multiplier) * 100).toFixed(2)}%
+                    {/* Multiplier < 1 means a discount */}-
+                    {((1 - method.multiplier) * 100).toFixed(2)}%
                   </b>
                 )}
               </p>
@@ -338,7 +350,9 @@ export default function PaymentMethodsConfig() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleDeleteInstallment(i.id, i.installments)}
+                          onClick={() =>
+                            handleDeleteInstallment(i.id, i.installments)
+                          }
                         >
                           <IconTrash className="h-4 w-4" />
                         </Button>
@@ -373,12 +387,12 @@ export default function PaymentMethodsConfig() {
         ))}
 
         {loading && (
-            // Mostrar esqueletos si está cargando
-            <>
-                <Skeleton className="h-[250px] w-full" />
-                <Skeleton className="h-[250px] w-full" />
-                <Skeleton className="h-[250px] w-full" />
-            </>
+          // Mostrar esqueletos si está cargando
+          <>
+            <Skeleton className="h-[250px] w-full" />
+            <Skeleton className="h-[250px] w-full" />
+            <Skeleton className="h-[250px] w-full" />
+          </>
         )}
 
         {!methods.length && !loading && (
@@ -395,12 +409,20 @@ export default function PaymentMethodsConfig() {
           setMethodModal({ open: false, editId: null, name: "", percent: 0 })
         }
       >
-        <DialogContent className="max-w-md">
+        <DialogContent
+          className="
+      w-[90vw] max-w-md sm:w-full 
+      rounded-lg sm:rounded-xl
+      p-4 sm:p-6
+      max-h-[90vh] overflow-y-auto
+    "
+        >
           <DialogHeader>
             <DialogTitle>
               {methodModal.editId ? "Editar método" : "Nuevo método"}
             </DialogTitle>
           </DialogHeader>
+
           <div className="space-y-4 py-2">
             <div className="grid gap-2">
               <Label>Nombre</Label>
@@ -423,7 +445,8 @@ export default function PaymentMethodsConfig() {
               />
             </div>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="flex flex-col sm:flex-row sm:justify-end gap-2">
             <Button
               variant="outline"
               onClick={() =>
@@ -458,12 +481,20 @@ export default function PaymentMethodsConfig() {
           })
         }
       >
-        <DialogContent className="max-w-md">
+        <DialogContent
+          className="
+      w-[90vw] max-w-md sm:w-full 
+      rounded-lg sm:rounded-xl
+      p-4 sm:p-6
+      max-h-[90vh] overflow-y-auto
+    "
+        >
           <DialogHeader>
             <DialogTitle>
               {installmentModal.editId ? "Editar cuota" : "Nueva cuota"}
             </DialogTitle>
           </DialogHeader>
+
           <div className="space-y-4 py-2">
             <div className="grid gap-2">
               <Label>Cantidad de cuotas</Label>
@@ -505,7 +536,8 @@ export default function PaymentMethodsConfig() {
               />
             </div>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="flex flex-col sm:flex-row sm:justify-end gap-2">
             <Button
               variant="outline"
               onClick={() =>
