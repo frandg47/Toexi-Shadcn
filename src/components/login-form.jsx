@@ -83,20 +83,36 @@ export default function LoginForm({ className, ...props }) {
   };
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card className="overflow-hidden p-0 shadow-md">
-        <CardContent className="grid p-0  md:grid-cols-2">
+    // 🌿 FONDO VERDE GENERAL (solo visible en mobile)
+    <div
+      className={cn(
+        "min-h-screen flex flex-col items-center justify-center p-4 gap-6"
+      )}
+      {...props}
+    >
+      {/* 💎 CARD TRANSPARENTE CON BLUR SOLO EN MOBILE */}
+      <Card
+        className={cn(
+          "overflow-hidden shadow-md text-gray-600 w-full max-w-md border border-white/40",
+          // Fondo translúcido con blur solo en mobile
+          "bg-white/30 backdrop-blur-3xl",
+          // En escritorio: fondo sólido y sin blur
+          "md:bg-white md:backdrop-blur-0 md:border-gray-200 md:p-0"
+        )}
+      >
+        <CardContent className="grid md:p-0 md:grid-cols-2">
           {/* 🔹 FORMULARIO */}
           <form
             onSubmit={handleSubmit(onSubmit)}
             className="flex flex-col justify-center md:p-8 md:py-16 space-y-6"
           >
             <div className="flex flex-col items-center text-center">
-              <h1 className="text-2xl font-bold">Bienvenido</h1>
+              <h1 className="text-2xl font-bold">Bienvenido <span className="text-green-600 md:hidden">Toexi Tech</span></h1>
               <p className="text-balance text-muted-foreground">
                 Inicia sesión con tu cuenta de Google.
               </p>
             </div>
+
             {/* 
             {/* Email }
             <div className="grid gap-3">
@@ -188,12 +204,12 @@ export default function LoginForm({ className, ...props }) {
               Ingresar con Google
               <span className="sr-only">Login with Google</span>
             </Button>
-               <Separator className="w-full" />
+            <Separator className="w-full" />
 
-          <p className="text-xs text-muted-foreground text-center">
-            Tu información se mantiene segura.  
-            Solo utilizamos tu cuenta para autenticarte.
-          </p>
+            <p className="text-xs text-muted-foreground text-center">
+              Tu información se mantiene segura. Solo utilizamos tu cuenta para
+              autenticarte.
+            </p>
           </form>
 
           {/* 🔹 Imagen lateral */}
@@ -204,8 +220,6 @@ export default function LoginForm({ className, ...props }) {
               className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
             />
           </div>
-          
-       
         </CardContent>
       </Card>
 
