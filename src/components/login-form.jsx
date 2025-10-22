@@ -64,8 +64,6 @@ export default function LoginForm({ className, ...props }) {
   // FIN REEMPLAZO 1
 
   const onSubmit = async (values) => {
-    // Nota: El uso de `await` con `showResultAlert` ya no es estrictamente necesario,
-    // ya que toast es asíncrono pero no bloqueante como lo era `Swal.fire`.
     const result = await loginWithPassword(values.email, values.password);
     showResultAlert(result);
   };
@@ -73,12 +71,8 @@ export default function LoginForm({ className, ...props }) {
   const handleGoogleLogin = async () => {
     const result = await loginWithGoogle();
     if (!result) return;
-
-    // Si el login fue exitoso y no hay una redirección inmediata, establecemos un temporizador corto
-    // (similar a la lógica de Swal.fire con timer).
     const override =
       result.ok && !result.redirectPath ? { timer: 1600 } : undefined;
-
     showResultAlert(result, override);
   };
 
@@ -86,29 +80,32 @@ export default function LoginForm({ className, ...props }) {
     // 🌿 FONDO VERDE GENERAL (solo visible en mobile)
     <div
       className={cn(
-        "min-h-screen flex flex-col items-center justify-center p-4 gap-6"
+        " flex flex-col items-center justify-center p-4 gap-6",
+        "",
+        className
       )}
       {...props}
     >
       {/* 💎 CARD TRANSPARENTE CON BLUR SOLO EN MOBILE */}
       <Card
         className={cn(
-          "overflow-hidden shadow-md text-gray-600 w-full max-w-md border border-white/40",
+          // 🧱 estructura base
+          "px-0 overflow-hidden shadow-lg text-gray-800 w-full max-w-lg sm:max-w-xl lg:max-w-4xl border border-white/40 transition-all",
           // Fondo translúcido con blur solo en mobile
-          "bg-white/30 backdrop-blur-3xl",
+          "bg-white/70 backdrop-blur-3xl",
           // En escritorio: fondo sólido y sin blur
           "md:bg-white md:backdrop-blur-0 md:border-gray-200 md:p-0"
         )}
       >
-        <CardContent className="grid md:p-0 md:grid-cols-2">
+        <CardContent className="grid md:grid-cols-2 px-0">
           {/* 🔹 FORMULARIO */}
           <form
             onSubmit={handleSubmit(onSubmit)}
-            className="flex flex-col justify-center md:p-8 md:py-16 space-y-6"
+            className="flex flex-col justify-center p-6 sm:p-8 lg:p-12 space-y-6"
           >
             <div className="flex flex-col items-center text-center">
-              <h1 className="text-2xl font-bold">Bienvenido <span className="text-green-600 md:hidden">Toexi Tech</span></h1>
-              <p className="text-balance text-muted-foreground">
+              <h1 className="text-3xl font-bold md:text-4xl">Bienvenido</h1>
+              <p className="text-balance text-muted-foreground text-sm md:text-base">
                 Inicia sesión con tu cuenta de Google.
               </p>
             </div>
@@ -194,7 +191,7 @@ export default function LoginForm({ className, ...props }) {
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
-                className="mr-2 h-5 w-5"
+                className="mr-2 h-5 w-5 text-red-600"
               >
                 <path
                   d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
@@ -206,7 +203,7 @@ export default function LoginForm({ className, ...props }) {
             </Button>
             <Separator className="w-full" />
 
-            <p className="text-xs text-muted-foreground text-center">
+            <p className="text-xs text-muted-foreground text-center md:text-sm">
               Tu información se mantiene segura. Solo utilizamos tu cuenta para
               autenticarte.
             </p>
