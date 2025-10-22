@@ -1,16 +1,7 @@
+// src/components/app-sidebar.jsx
 import React from "react";
-import {
-  IconDashboard,
-  IconPhone,
-  IconCategory2,
-  IconShoppingCart,
-  IconUsers,
-  IconSettings,
-  IconHelp,
-  IconDatabase,
-  IconReport,
-} from "@tabler/icons-react";
-import { Link } from "react-router-dom";
+import { IconInfoCircle } from "@tabler/icons-react";
+import { toast } from "sonner";
 
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
@@ -25,49 +16,61 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { useAuth } from "@/context/AuthContextProvider";
 
-const navData = {
-  user: {
-    name: "Admin Tienda",
-    email: "admin@tiendacelulares.com",
-    avatar: "/avatars/admin.jpg",
-  },
-  navMain: [
-    { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
-    { title: "Productos", url: "/dashboard/products", icon: IconPhone },
-    { title: "Categorías", url: "/dashboard/categories", icon: IconCategory2 },
-    { title: "Pedidos", url: "/dashboard/orders", icon: IconShoppingCart },
-    { title: "Clientes", url: "/dashboard/clients", icon: IconUsers },
-    { title: "Usuarios", url: "/dashboard/users", icon: IconUsers },
-  ],
-  navSecondary: [
-    { title: "Configuración", url: "/dashboard/settings", icon: IconSettings },
-    { title: "Ayuda", url: "/dashboard/help", icon: IconHelp },
-  ],
-};
+export default function AppSidebar({
+  navMain = [],
+  navSecondary = [],
+  title = "Toexi Tech",
+  actionButtonLabel,
+  onActionClick,
+}) {
+  const { user, profile } = useAuth();
 
-export default function AppSidebar(props) {
+  const displayUser =
+    user || profile
+      ? {
+          name:
+            profile?.name ||
+            user?.user_metadata?.full_name ||
+            user?.user_metadata?.name ||
+            "Usuario",
+          email: profile?.email || user?.email || "",
+          avatar:
+            user?.user_metadata?.avatar_url ||
+            user?.user_metadata?.picture ||
+            "/avatars/default.jpg",
+          role: profile?.role || "",
+        }
+      : {
+          name: "Cargando…",
+          email: "",
+          avatar: "/avatars/default.jpg",
+        };
+
   return (
-    <Sidebar collapsible="offcanvas" {...props}>
+    <Sidebar collapsible="offcanvas">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link to="/dashboard" className="text-base font-semibold">
-                Tienda Celulares
-              </Link>
+              <span className="text-xl font-bold">{title}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
 
       <SidebarContent>
-        <NavMain items={navData.navMain} />
-        <NavSecondary items={navData.navSecondary} className="mt-auto" />
+        <NavMain
+          items={navMain}
+          actionButtonLabel={actionButtonLabel}
+          onActionClick={onActionClick}
+        />
+        <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
 
       <SidebarFooter>
-        <NavUser user={navData.user} />
+        <NavUser user={displayUser} />
       </SidebarFooter>
     </Sidebar>
   );
