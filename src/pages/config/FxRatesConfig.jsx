@@ -97,13 +97,31 @@ const FxRatesConfig = () => {
   const getDefaultMonthRange = () => {
     const start = new Date();
     start.setDate(1);
-    const end = new Date(start);
-    end.setMonth(start.getMonth() + 1);
-    end.setDate(0);
+    const end = new Date();
+    // end.setMonth(start.getMonth() + 1);
+    // end.setDate(0);
     return { from: start, to: end };
   };
 
   const [dateRange, setDateRange] = useState(getDefaultMonthRange());
+
+  // useEffect(() => {
+  //   const channel = supabase
+  //     .channel("fx_rates_changes")
+  //     .on(
+  //       "postgres_changes",
+  //       { event: "*", schema: "public", table: "fx_rates" },
+  //       (payload) => {
+  //         console.log("Cambio detectado:", payload);
+  //         fetchFxRates(); // 🔄 actualiza todo
+  //       }
+  //     )
+  //     .subscribe();
+
+  //   return () => {
+  //     supabase.removeChannel(channel);
+  //   };
+  // }, [fetchFxRates]);
 
   const fetchFxRates = useCallback(async () => {
     setLoading(true);
@@ -116,6 +134,7 @@ const FxRatesConfig = () => {
 
       if (error) throw error;
       setRates(data || []);
+      console.log("datos", data);
     } catch {
       // 🔄 REEMPLAZO 1: Usar toast para error de carga
       toast.error("Error", {
@@ -124,7 +143,6 @@ const FxRatesConfig = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
-      console.log("datos", rates);
     }
   }, []);
 
@@ -169,6 +187,7 @@ const FxRatesConfig = () => {
       });
       setIsDialogOpen(false);
       setNewRate({ source: "", rate: "", is_active: true, notes: "" });
+      setDateRange(getDefaultMonthRange());
       fetchFxRates();
     } catch (error) {
       // 🔄 REEMPLAZO 5: Usar toast para error al crear
@@ -387,9 +406,10 @@ const FxRatesConfig = () => {
                       // 🔹 Generar dataset agrupado por fecha
                       Object.values(
                         rates.filter(filterByDate).reduce((acc, rate) => {
-                          const dateKey = new Date(
-                            rate.created_at
-                          ).toLocaleDateString("sv-SE"); // formato "YYYY-MM-DD"
+                          const dateKey = new Date(rate.created_at)
+                            .toISOString()
+                            .split("T")[0]; // ✅ fecha exacta en UTC sin desfase
+                          // formato "YYYY-MM-DD"
                           // agrupar por día
                           if (!acc[dateKey]) acc[dateKey] = { date: dateKey };
                           acc[dateKey][rate.source] = Number(rate.rate);

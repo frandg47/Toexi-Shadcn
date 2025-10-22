@@ -6,11 +6,15 @@ import {
   SidebarMenu,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { IconCirclePlusFilled, IconChevronDown, IconInfoCircle } from "@tabler/icons-react";
+import {
+  IconCirclePlusFilled,
+  IconChevronDown,
+  IconInfoCircle,
+} from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-export function NavMain({ items }) {
+export function NavMain({ items, actionButtonLabel, onActionClick }) {
   const navigate = useNavigate();
 
   const showDevelopmentToast = (feature) => {
@@ -27,16 +31,16 @@ export function NavMain({ items }) {
         {/* Botón Nueva venta */}
         <SidebarMenu>
           <SidebarMenuItem>
-            <Button 
-              variant="outline" 
-              className="w-full justify-start"
+            <Button
+              variant="outline"
+              className="w-full justify-start bg-gray-900 text-white hover:bg-gray-800 hover:text-white"
               onClick={() => {
-                showDevelopmentToast("Nueva venta");
-                navigate("/dashboard");
+                if (onActionClick) onActionClick();
+                else showDevelopmentToast(actionButtonLabel);
               }}
             >
               <IconCirclePlusFilled className="mr-2 h-5 w-5" />
-              Nueva venta
+              {actionButtonLabel}
             </Button>
           </SidebarMenuItem>
         </SidebarMenu>

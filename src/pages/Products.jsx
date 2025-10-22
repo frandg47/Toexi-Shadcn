@@ -9,17 +9,7 @@ const Products = ({ titulo }) => {
 
   return (
     <>
-      {/* 🔹 Si es admin/superadmin → usa SiteHeader dentro del Dashboard */}
-      {!isSellerView ? (
-        <SiteHeader titulo={titulo || "Productos"} />
-      ) : (
-        /* 🔹 Si es vendedor → usa header propio, sin SidebarTrigger */
-        <header className="flex items-center justify-between bg-white shadow px-6 py-3 border-b">
-          <h1 className="text-lg font-semibold text-gray-800">
-            Catálogo de productos
-          </h1>
-        </header>
-      )}
+      <SiteHeader titulo={titulo || "Productos"} />
 
       {/* 🔹 Contenido principal */}
       <div className="@container/main flex flex-1 py-4 flex-col gap-2">
