@@ -222,44 +222,44 @@ export default function ProductDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto p-4 sm:p-6 rounded-xl">
+      <DialogContent className="max-w-4xl w-[95vw] max-h-[95vh] overflow-y-auto p-2 sm:p-6 rounded-lg sm:rounded-xl">
         {/* 🔹 Encabezado */}
         <DialogHeader className="space-y-2 text-center">
-          <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight break-words">
+          <DialogTitle className="text-lg sm:text-2xl font-bold tracking-tight break-words">
             {product.name}
           </DialogTitle>
-          <DialogDescription className="text-sm sm:text-base text-muted-foreground">
+          <DialogDescription className="text-xs sm:text-base text-muted-foreground">
             {product.brandName} — {product.categoryName}
           </DialogDescription>
         </DialogHeader>
 
         {/* 🔹 Botón Exportar PDF */}
-        <div className="flex justify-center mt-3 mb-4">
+        <div className="flex justify-center mt-2 sm:mt-3 mb-2 sm:mb-4">
           <Button
             variant="outline"
             size="sm"
             onClick={handleExportPDF}
-            className="w-full sm:w-auto flex items-center gap-2"
+            className="w-full sm:w-auto flex items-center gap-2 text-xs sm:text-sm py-2"
           >
-            <IconFileTypePdf className="w-4 h-4 text-red-600" />
+            <IconFileTypePdf className="w-3 h-3 sm:w-4 sm:h-4 text-red-600" />
             <span>Exportar PDF</span>
           </Button>
         </div>
 
         {/* 🔹 Imagen + Datos básicos */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 mt-2">
           {/* Imagen */}
-          <div className="flex justify-center items-center bg-muted/20 rounded-lg p-4">
+          <div className="flex justify-center items-center bg-muted/20 rounded-lg p-2 sm:p-4">
             <img
               src={product.coverImageUrl}
               alt={product.name}
-              className="max-w-full h-auto w-64 sm:w-72 object-contain rounded-md"
+              className="max-w-full h-auto w-48 sm:w-72 object-contain rounded-md"
             />
           </div>
 
           {/* Datos principales */}
-          <div className="flex flex-col justify-between text-sm sm:text-base leading-relaxed">
-            <div className="space-y-3">
+          <div className="flex flex-col justify-between text-xs sm:text-base leading-relaxed">
+            <div className="space-y-2 sm:space-y-3">
               <p>
                 <span className="font-semibold text-foreground">Marca:</span>{" "}
                 {product.brandName}
@@ -345,14 +345,14 @@ export default function ProductDetailDialog({
 
             {/* Tabs responsivos */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="flex flex-wrap gap-2 bg-muted/30 rounded-lg p-2 overflow-x-auto">
+              <TabsList className="flex flex-wrap gap-1 sm:gap-2 bg-muted/30 rounded-lg p-1 sm:p-2 overflow-x-auto max-w-full">
                 {grouped.map((g) => (
                   <TabsTrigger
                     key={g.key}
                     value={g.key}
-                    className={`py-2 px-4 rounded-md border transition-all text-xs sm:text-sm  ${
+                    className={`py-1 sm:py-2 px-2 sm:px-4 rounded-md border transition-all text-[10px] sm:text-sm whitespace-nowrap ${
                       activeTab === g.key
-                        ? "bg-primary border-primary  shadow-sm"
+                        ? "bg-primary border-primary shadow-sm"
                         : "hover:bg-muted"
                     }`}
                   >
@@ -366,28 +366,28 @@ export default function ProductDetailDialog({
                 <TabsContent
                   key={g.key}
                   value={g.key}
-                  className="mt-5 space-y-6"
+                  className="mt-3 sm:mt-5 space-y-4 sm:space-y-6"
                 >
                   {/* 🔹 Grilla de variantes */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
                     {g.variants.map((v) => (
                       <div
                         key={v.id}
-                        className={`relative rounded-xl border bg-card p-4 shadow-sm hover:shadow-md transition-all ${
+                        className={`relative rounded-lg sm:rounded-xl border bg-card p-2 sm:p-4 shadow-sm hover:shadow-md transition-all ${
                           v.stock === 0
                             ? "opacity-60 border-destructive/60"
                             : "hover:border-primary/70"
                         }`}
                       >
-                        <div className="flex flex-col items-center text-center p-3 gap-1">
+                        <div className="flex flex-col items-center text-center p-1 sm:p-3 gap-0.5 sm:gap-1">
                           {v.color && (
-                            <p className="text-sm font-semibold">{v.color}</p>
+                            <p className="text-xs sm:text-sm font-semibold">{v.color}</p>
                           )}
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-xs sm:text-sm text-muted-foreground">
                             {formatCurrencyUSD(v.usd_price)}
                           </p>
                           <p
-                            className={`text-xs font-medium ${
+                            className={`text-[10px] sm:text-xs font-medium ${
                               v.stock === 0
                                 ? "text-destructive"
                                 : "text-green-600"
@@ -398,7 +398,7 @@ export default function ProductDetailDialog({
                         </div>
 
                         {v.stock === 0 && (
-                          <span className="absolute top-2 right-2 text-[10px] bg-destructive px-2 py-0.5 rounded-md uppercase shadow-sm">
+                          <span className="absolute top-1 sm:top-2 right-1 sm:right-2 text-[8px] sm:text-[10px] bg-destructive px-1 sm:px-2 py-0.5 rounded text-white uppercase shadow-sm">
                             SIN STOCK
                           </span>
                         )}
