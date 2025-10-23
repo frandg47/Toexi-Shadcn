@@ -361,14 +361,14 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
 
             {/* 🔸 Reemplazo select de Marcas */}
             <Select
-              value={selectedBrand}
-              onValueChange={(v) => setSelectedBrand(v)}
+              value={selectedBrand || "all"}
+              onValueChange={(v) => setSelectedBrand(v === "all" ? "" : v)}
             >
               <SelectTrigger className="w-full sm:w-auto min-w-[180px]">
                 <SelectValue placeholder="Todas las marcas" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas las marcas</SelectItem>
+                <SelectItem value="all">Todas las marcas</SelectItem>
                 {brands.map((b) => (
                   <SelectItem key={b.id} value={b.id.toString()}>
                     {b.name}
@@ -379,14 +379,14 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
 
             {/* 🔸 Reemplazo select de Categorías */}
             <Select
-              value={selectedCategory}
-              onValueChange={(v) => setSelectedCategory(v)}
+              value={selectedCategory || "all"}
+              onValueChange={(v) => setSelectedCategory(v === "all" ? "" : v)}
             >
               <SelectTrigger className="w-full sm:w-auto min-w-[180px]">
                 <SelectValue placeholder="Todas las categorías" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas las categorías</SelectItem>
+                <SelectItem value="all">Todas las categorías</SelectItem>
                 {categories.map((c) => (
                   <SelectItem key={c.id} value={c.id.toString()}>
                     {c.name}

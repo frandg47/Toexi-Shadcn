@@ -335,13 +335,13 @@ const ComissionConfig = () => {
             <div className="grid gap-2">
               <Label htmlFor="brand_id">Marca</Label>
               <Select
-                value={formData.brand_id}
+                value={formData.brand_id || "all"}
                 onValueChange={(value) =>
                   setFormData({
                     ...formData,
-                    brand_id: value,
+                    brand_id: value === "all" ? "" : value,
                     // Si elijo marca, limpio categoría (y viceversa)
-                    category_id: value ? "" : formData.category_id,
+                    category_id: value === "all" ? formData.category_id : "",
                   })
                 }
               >
@@ -349,7 +349,7 @@ const ComissionConfig = () => {
                   <SelectValue placeholder="Seleccionar marca" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value="all">Todas</SelectItem>
                   {brands.map((b) => (
                     <SelectItem key={b.id} value={b.id.toString()}>
                       {b.name}
@@ -362,13 +362,13 @@ const ComissionConfig = () => {
             <div className="grid gap-2">
               <Label htmlFor="category_id">Categoría</Label>
               <Select
-                value={formData.category_id}
+                value={formData.category_id || "all"}
                 onValueChange={(value) =>
                   setFormData({
                     ...formData,
-                    category_id: value,
+                    category_id: value === "all" ? "" : value,
                     // Si elijo categoría, limpio marca (y viceversa)
-                    brand_id: value ? "" : formData.brand_id,
+                    brand_id: value === "all" ? formData.brand_id : "",
                   })
                 }
               >
@@ -376,7 +376,7 @@ const ComissionConfig = () => {
                   <SelectValue placeholder="Seleccionar categoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value="all">Todas</SelectItem>
                   {categories.map((c) => (
                     <SelectItem key={c.id} value={c.id.toString()}>
                       {c.name}
