@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import Loader from "@/components/ui/loading";
 import { useAuthStore } from "@/store/AuthStore";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -50,7 +51,8 @@ export default function AuthCallback() {
       } catch (error) {
         console.error("Error en AuthCallback:", error);
         toast.error("Error inesperado", {
-          description: "Ocurrió un problema al verificar la sesión.",
+          description:
+            error.message || "Ocurrió un problema al verificar la sesión.",
           duration: 5000,
         });
         redirectPath = "/login";
