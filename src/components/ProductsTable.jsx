@@ -313,21 +313,42 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
     setDeleteDialog({ open: true, product });
   };
 
-  // 🔄 REEMPLAZO 5: Función que se ejecuta al confirmar la eliminación
+  // Función que ejecuta la eliminación del producto
   const handleConfirmDelete = async () => {
     if (!deleteDialog.product) return;
+    
+    try {
+      // Primero eliminamos las variantes del producto
+      const { error: variantsError } = await supabase
+        .from('product_variants')
+        .delete()
+        .eq('product_id', deleteDialog.product.id);
 
-    // Aquí iría la lógica real de eliminación (e.g., await supabase.from('products').delete().eq('id', deleteDialog.product.id))
+      if (variantsError) throw variantsError;
 
-    // Simulando el comportamiento original de solo mostrar una alerta
-    toast.info("Funcionalidad aún en desarrollo", {
-      description: `El producto ${deleteDialog.product.name} no fue eliminado.`,
-    });
+      // Luego eliminamos el producto
+      const { error: productError } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', deleteDialog.product.id);
 
-    // ❌ ELIMINADO: Swal.fire("Info", "Funcionalidad aún en desarrollo", "info");
+      if (productError) throw productError;
 
-    // Cerrar el diálogo
-    setDeleteDialog({ open: false, product: null });
+      toast.success("Producto eliminado", {
+        description: `${deleteDialog.product.name} fue eliminado correctamente.`,
+      });
+
+      // Refrescar la tabla
+      fetchProducts();
+    } catch (error) {
+      console.error('Error al eliminar:', error);
+      toast.error("Error al eliminar", {
+        description: "No se pudo eliminar el producto. Por favor, intenta nuevamente.",
+      });
+    } finally {
+      // Cerrar el diálogo
+      setDeleteDialog({ open: false, product: null });
+    }
   };
   // FIN REEMPLAZO 5
 
