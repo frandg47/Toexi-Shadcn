@@ -129,21 +129,33 @@ export const useAuthStore = create((set, get) => ({
   syncUser: async () => {
     set({ loading: true });
     try {
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
+      // 🕒 Obtener sesión con reintentos (corrige el problema en móviles)
+      let sessionUser = null;
+      let retries = 0;
 
-      if (sessionError) {
-        set({ user: null, profile: null, loading: false });
-        return buildResponse({
-          icon: "error",
-          title: "Sesión inválida",
-          text: sessionError.message || "No se pudo recuperar la sesión actual.",
-          redirectPath: "/login",
-        });
+      while (retries < 6 && !sessionUser) {
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+
+        if (sessionError) {
+          set({ user: null, profile: null, loading: false });
+          return buildResponse({
+            icon: "error",
+            title: "Sesión inválida",
+            text:
+              sessionError.message || "No se pudo recuperar la sesión actual.",
+            redirectPath: "/login",
+          });
+        }
+
+        sessionUser = sessionData?.session?.user;
+        if (!sessionUser) {
+          await new Promise((r) => setTimeout(r, 400)); // espera 400 ms
+          retries++;
+        }
       }
 
-      const sessionUser = sessionData?.session?.user;
-
+      // ❌ Si no hay sesión después de 6 intentos (~2,4 s)
       if (!sessionUser) {
         set({ user: null, profile: null, loading: false });
         return buildResponse({
@@ -154,12 +166,10 @@ export const useAuthStore = create((set, get) => ({
         });
       }
 
-      // 🧩 Selección sin 'state'
+      // 🧩 Buscar perfil en la tabla users
       let { data: profile, error: profileError } = await supabase
         .from("users")
-        .select(
-          "id, id_auth, name, last_name, email, role, is_active"
-        )
+        .select("id, id_auth, name, last_name, email, role, is_active")
         .eq("id_auth", sessionUser.id)
         .maybeSingle();
 
@@ -177,6 +187,7 @@ export const useAuthStore = create((set, get) => ({
 
       let createdProfile = false;
 
+      // 🧱 Crear perfil si no existe
       if (!profile) {
         const insertPayload = {
           id_auth: sessionUser.id,
@@ -218,6 +229,7 @@ export const useAuthStore = create((set, get) => ({
         .join(" ")
         .trim();
 
+      // 🚫 Usuario inactivo
       if (!normalizedProfile.is_active) {
         await supabase.auth.signOut();
         set({ user: null, profile: normalizedProfile, loading: false });
@@ -233,6 +245,7 @@ export const useAuthStore = create((set, get) => ({
         });
       }
 
+      // ✅ Usuario activo
       const redirectPath = determineRedirect(normalizedProfile.role);
       const ok = redirectPath !== "/unauthorized";
 
