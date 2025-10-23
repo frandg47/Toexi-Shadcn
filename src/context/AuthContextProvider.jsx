@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
 } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { toast } from "sonner";
@@ -26,6 +27,9 @@ export const AuthContextProvider = ({ children }) => {
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState(null);
   const [profile, setProfile] = useState(null);
+
+  // 🧠 Flag persistente para no repetir toast
+  const hasShownInactiveToast = useRef(false);
 
   // 🔹 Cargar o crear usuario
   const loadUser = useCallback(async (sessionUser) => {
@@ -101,10 +105,14 @@ export const AuthContextProvider = ({ children }) => {
 
     // 🧩 Usuario inactivo
     if (!data.is_active) {
-      toast.warning("Cuenta inactiva", {
-        description: "Tu cuenta aún no ha sido activada por un administrador.",
-        duration: 5000,
-      });
+      if (!hasShownInactiveToast.current) {
+        hasShownInactiveToast.current = true;
+        toast.warning("Cuenta inactiva", {
+          description:
+            "Tu cuenta aún no ha sido activada por un administrador.",
+          duration: 5000,
+        });
+      }
 
       await supabase.auth.signOut();
       setUser(null);
@@ -124,7 +132,7 @@ export const AuthContextProvider = ({ children }) => {
     setIsActive(Boolean(data.is_active));
     setError(null);
     setStatus("ready");
-  }, []); // ← sin dependencias
+  }, [profile]);
 
   // 🔹 Refrescar perfil manualmente
   const refreshProfile = useCallback(async () => {
@@ -135,11 +143,16 @@ export const AuthContextProvider = ({ children }) => {
   // 🔹 Inicialización + listener de sesión
   useEffect(() => {
     let isSubscribed = true;
+    let lastUserId = null;
 
     const initialize = async () => {
       const { data: sessionData } = await supabase.auth.getSession();
+      const currentUser = sessionData?.session?.user ?? null;
       if (!isSubscribed) return;
-      await loadUser(sessionData?.session?.user ?? null);
+      if (currentUser?.id !== lastUserId) {
+        lastUserId = currentUser?.id;
+        await loadUser(currentUser);
+      }
     };
 
     initialize();
@@ -148,7 +161,11 @@ export const AuthContextProvider = ({ children }) => {
       (event, session) => {
         if (!isSubscribed) return;
         if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") return;
-        loadUser(session?.user ?? null);
+        const currentUser = session?.user ?? null;
+        if (currentUser?.id !== lastUserId) {
+          lastUserId = currentUser?.id;
+          loadUser(currentUser);
+        }
       }
     );
 
