@@ -13,52 +13,48 @@ export default function AuthCallback() {
   const hasRun = useRef(false);
 
   useEffect(() => {
-    // Evita que el efecto se ejecute dos veces en Strict Mode
     if (hasRun.current) return;
     hasRun.current = true;
 
     const verifySession = async () => {
-      let redirectPath = "/login"; // Ruta por defecto para manejar errores
+      let redirectPath = "/login";
 
       try {
+        // 🕒 Esperar hasta que Supabase tenga la sesión activa
+        let retries = 0;
+        let sessionUser = null;
+        while (retries < 3 && !sessionUser) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          sessionUser = sessionData?.session?.user;
+          if (!sessionUser) {
+            await new Promise((r) => setTimeout(r, 300));
+            retries++;
+          }
+        }
+
+        // Ahora sí, ejecutar syncUser
         const result = await syncUser();
-        
-        // Determinar el mensaje de notificación basado en el resultado
-        const title =
-          result?.title ??
-          (result?.ok ? "Sesión verificada" : "No se pudo validar tu sesión");
-        const text = result?.text ?? "";
-        
-        // Determinar la función de toast
-        const toastFunction = result?.icon === "error" || !result?.ok 
-            ? toast.error 
-            : result?.icon === "warning" || result?.icon === "info" 
+        const toastFunction =
+          result?.icon === "error" || !result?.ok
+            ? toast.error
+            : result?.icon === "warning" || result?.icon === "info"
             ? toast.warning
             : toast.success;
 
-        // Mostrar la notificación con Sonner (no bloqueante)
-        toastFunction(title, {
-            description: text,
-            duration: 3500, // Duración para que el usuario pueda leer
+        toastFunction(result?.title ?? "Sesión verificada", {
+          description: result?.text ?? "",
+          duration: 3500,
         });
 
-        // Establecer la ruta de redirección
-        redirectPath = result?.redirectPath ?? "/"; 
-        
+        redirectPath = result?.redirectPath ?? "/";
       } catch (error) {
         console.error("Error en AuthCallback:", error);
-        
-        // Mostrar notificación de error inesperado
         toast.error("Error inesperado", {
           description: "Ocurrió un problema al verificar la sesión.",
           duration: 5000,
         });
-        
-        // Mantener la ruta de redirección por defecto ('/login') en caso de error
         redirectPath = "/login";
-
       } finally {
-        // Navegar inmediatamente, sin esperar el toast
         navigate(redirectPath, { replace: true });
       }
     };
