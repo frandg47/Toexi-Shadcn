@@ -12,15 +12,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-// ❌ ELIMINADO: import Swal from "sweetalert2";
-
-// ✅ AGREGADO: Import de Sonner para notificaciones
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 export default function DialogProduct({ open, onClose, product, onSave }) {
   const isEditing = !!product;
-  console.log("producto a editar:", product);
-  console.log("rule", product?.commissionRuleName);
+
   const [form, setForm] = useState({
     name: "",
     brand_id: "",
@@ -37,6 +40,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
 
+  // 🔹 Cargar datos al editar
   useEffect(() => {
     if (product) {
       setForm({
@@ -59,7 +63,6 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
         active: product.active ?? true,
       });
     } else {
-      // si es nuevo producto
       setForm({
         name: "",
         brand_id: "",
@@ -75,6 +78,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
     }
   }, [product]);
 
+  // 🔹 Cargar opciones de marca y categoría
   useEffect(() => {
     const fetchOptions = async () => {
       const [{ data: br }, { data: cat }] = await Promise.all([
@@ -107,19 +111,14 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
         .eq("id", product.id);
       if (error) throw new Error("Error al actualizar el producto.");
     } else {
-      const { error } = await supabase
-        .from("products")
-        .insert([payload]);
+      const { error } = await supabase.from("products").insert([payload]);
       if (error) throw new Error("Error al crear el producto.");
     }
   };
 
   const handleSubmit = async () => {
     if (!form.name || !form.usd_price) {
-      // ⚠️ Reemplazo 1: SweetAlert Warning por toast.warning
-      toast.warning(
-        "Campos requeridos: Completa al menos nombre y precio"
-      );
+      toast.warning("Campos requeridos: Completa al menos nombre y precio");
       return;
     }
 
@@ -145,55 +144,25 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
     const successMessage = isEditing
       ? "Producto actualizado correctamente"
       : "Producto creado correctamente";
-    
-    // 🔁 Reemplazo 2: Flujo con loading, éxito y error usando toast.promise
+
     try {
       await toast.promise(saveProduct(payload), {
         loading: "Guardando producto...",
         success: successMessage,
-        error: (err) => {
-          // Si saveProduct lanza un error, se maneja aquí.
-          // Se usa el mensaje del error lanzado, o un default.
-          return err.message || "No se pudo guardar el producto";
-        },
+        error: (err) => err.message || "No se pudo guardar el producto",
       });
-
-      // Si el promise fue exitoso, cerramos el diálogo y actualizamos la lista
       onClose();
       onSave();
-
     } catch (e) {
-      // La promesa falló, el toast ya mostró el error. No hacemos nada más aquí.
-      // Si el error es manejado dentro del toast.promise, este catch
-      // es opcional, pero lo dejamos por si hay otros errores no capturados.
-      console.error("Error en el guardado (capturado por promise):", e);
+      console.error("Error al guardar producto:", e);
     }
-
-    // ❌ ELIMINADO: La lógica de error y éxito de Swal se encapsuló en toast.promise
-    /*
-    let error;
-    // ... lógica de guardado con error
-    if (error) {
-      Swal.fire("Error", "No se pudo guardar el producto", "error");
-      return;
-    }
-    Swal.fire(
-      "Éxito",
-      isEditing
-        ? "Producto actualizado correctamente"
-        : "Producto creado correctamente",
-      "success"
-    );
-    onClose();
-    onSave();
-    */
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg sm:max-w-xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="text-lg font-semibold">
+          <DialogTitle className="text-lg sm:text-xl font-semibold text-center sm:text-left">
             {isEditing ? "Editar producto" : "Nuevo producto"}
           </DialogTitle>
         </DialogHeader>
@@ -202,43 +171,56 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
           {/* 🧾 Nombre */}
           <div className="flex flex-col gap-2">
             <Label>Nombre</Label>
-            <Input name="name" value={form.name} onChange={handleChange} />
+            <Input
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              placeholder="Ej: iPhone 15 Pro 256GB"
+            />
           </div>
 
           {/* 🏷️ Marca y categoría */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
               <Label>Marca</Label>
-              <select
-                name="brand_id"
-                value={form.brand_id || ""}
-                onChange={handleChange}
-                className="w-full rounded-md border p-2"
+              <Select
+                value={form.brand_id?.toString() || ""}
+                onValueChange={(v) =>
+                  setForm((prev) => ({ ...prev, brand_id: v }))
+                }
               >
-                <option value="">Seleccionar...</option>
-                {brands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {brands.map((b) => (
+                    <SelectItem key={b.id} value={b.id.toString()}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex flex-col gap-2">
               <Label>Categoría</Label>
-              <select
-                name="category_id"
-                value={form.category_id || ""}
-                onChange={handleChange}
-                className="w-full rounded-md border p-2"
+              <Select
+                value={form.category_id?.toString() || ""}
+                onValueChange={(v) =>
+                  setForm((prev) => ({ ...prev, category_id: v }))
+                }
               >
-                <option value="">Seleccionar...</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -288,6 +270,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
               placeholder="https://..."
               value={form.cover_image_url || ""}
               onChange={handleChange}
+              className="min-h-[70px]"
             />
           </div>
 
@@ -326,11 +309,15 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
           )}
         </div>
 
-        <DialogFooter className="mt-3">
-          <Button variant="outline" onClick={onClose}>
+        <DialogFooter className="mt-3 flex flex-col sm:flex-row gap-2 sm:gap-0">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="w-full sm:w-auto"
+          >
             Cancelar
           </Button>
-          <Button onClick={handleSubmit}>
+          <Button onClick={handleSubmit} className="w-full sm:w-auto">
             {isEditing ? "Guardar cambios" : "Crear producto"}
           </Button>
         </DialogFooter>

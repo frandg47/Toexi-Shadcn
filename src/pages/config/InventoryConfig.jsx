@@ -10,6 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -279,31 +286,39 @@ const InventoryConfig = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
 
-          <select
-            className="border rounded-md p-2 text-sm"
+          <Select
             value={selectedBrand}
-            onChange={(e) => setSelectedBrand(e.target.value)}
+            onValueChange={setSelectedBrand}
           >
-            <option value="">Todas las marcas</option>
-            {brands.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Todas las marcas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todas las marcas</SelectItem>
+              {brands.map((b) => (
+                <SelectItem key={b.id} value={b.id.toString()}>
+                  {b.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          <select
-            className="border rounded-md p-2 text-sm"
+          <Select
             value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
+            onValueChange={setSelectedCategory}
           >
-            <option value="">Todas las categorías</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Todas las categorías" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todas las categorías</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id.toString()}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex gap-2">
@@ -394,10 +409,9 @@ const InventoryConfig = () => {
           <div className="space-y-4">
             <div className="grid gap-2">
               <Label>Tipo de movimiento</Label>
-              <select
+              <Select
                 value={adjustment.type}
-                onChange={(e) => {
-                  const newType = e.target.value;
+                onValueChange={(newType) => {
                   setAdjustment((prev) => ({
                     ...prev,
                     type: newType,
@@ -408,12 +422,16 @@ const InventoryConfig = () => {
                         : "",
                   }));
                 }}
-                className="border rounded-md p-2"
               >
-                <option value="entrada">Entrada (Sumar)</option>
-                <option value="salida">Salida (Restar)</option>
-                <option value="ajuste">Ajuste (Stock final)</option>
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="entrada">Entrada (Sumar)</SelectItem>
+                  <SelectItem value="salida">Salida (Restar)</SelectItem>
+                  <SelectItem value="ajuste">Ajuste (Stock final)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <p className="text-sm text-muted-foreground">
@@ -464,23 +482,27 @@ const InventoryConfig = () => {
           <div className="space-y-4">
             <div className="grid gap-2">
               <Label>Producto</Label>
-              <select
+              <Select
                 value={newInventory.product_id}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   setNewInventory({
                     ...newInventory,
-                    product_id: e.target.value,
+                    product_id: value,
                   })
                 }
-                className="border rounded-md p-2"
               >
-                <option value="">Seleccionar producto...</option>
-                {availableProducts.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.brands?.name})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar producto..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Seleccionar producto...</SelectItem>
+                  {availableProducts.map((p) => (
+                    <SelectItem key={p.id} value={p.id.toString()}>
+                      {p.name} ({p.brands?.name})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid gap-2">

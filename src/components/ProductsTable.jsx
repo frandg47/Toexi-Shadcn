@@ -21,6 +21,14 @@ import {
 } from "@/components/ui/table";
 import ProductDetailDialog from "../components/ProductDetailDialog";
 import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
+
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -351,31 +359,41 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
               className="w-full sm:w-64"
             />
 
-            <select
+            {/* 🔸 Reemplazo select de Marcas */}
+            <Select
               value={selectedBrand}
-              onChange={(e) => setSelectedBrand(e.target.value)}
-              className="border rounded-md p-2 text-sm w-full sm:w-auto"
+              onValueChange={(v) => setSelectedBrand(v)}
             >
-              <option value="">Todas las marcas</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full sm:w-auto min-w-[180px]">
+                <SelectValue placeholder="Todas las marcas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas las marcas</SelectItem>
+                {brands.map((b) => (
+                  <SelectItem key={b.id} value={b.id.toString()}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-            <select
+            {/* 🔸 Reemplazo select de Categorías */}
+            <Select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="border rounded-md p-2 text-sm w-full sm:w-auto"
+              onValueChange={(v) => setSelectedCategory(v)}
             >
-              <option value="">Todas las categorías</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full sm:w-auto min-w-[180px]">
+                <SelectValue placeholder="Todas las categorías" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas las categorías</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id.toString()}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* 🔹 Botones de acciones principales */}
