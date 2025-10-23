@@ -9,14 +9,7 @@ import FormEditUser from "./FormEditUser";
 export default function DialogEditUser({ open, onClose, userId, onSuccess }) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent
-        className="
-          w-[90vw] max-w-md sm:w-full
-          rounded-lg sm:rounded-xl
-          p-4 sm:p-6
-          max-h-[90vh] overflow-y-auto
-        "
-      >
+      <DialogContent className="max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto p-4 sm:p-6 rounded-xl">
         <DialogHeader className="mb-2">
           <DialogTitle className="text-lg sm:text-xl font-semibold text-center sm:text-left">
             Editar Usuario
