@@ -21,6 +21,14 @@ import {
 } from "@/components/ui/table";
 import ProductDetailDialog from "../components/ProductDetailDialog";
 import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
+
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -55,6 +63,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { de } from "date-fns/locale/de";
 
 const TABLE_COLUMNS = [
   { id: "image", label: "Imagen" },
@@ -156,6 +165,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
              cover_image_url,
              allow_backorder,
              lead_time_label,
+             deposit_amount,
              active,
              brands (id, name),
              categories (id, name),
@@ -268,6 +278,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
             p.cover_image_url || variants[0]?.image_url || PLACEHOLDER_IMAGE,
           allowBackorder: p.allow_backorder,
           leadTimeLabel: p.lead_time_label,
+          depositAmount: p.deposit_amount,
           active: p.active,
           variants,
         };
@@ -305,21 +316,42 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
     setDeleteDialog({ open: true, product });
   };
 
-  // 🔄 REEMPLAZO 5: Función que se ejecuta al confirmar la eliminación
+  // Función que ejecuta la eliminación del producto
   const handleConfirmDelete = async () => {
     if (!deleteDialog.product) return;
+    
+    try {
+      // Primero eliminamos las variantes del producto
+      const { error: variantsError } = await supabase
+        .from('product_variants')
+        .delete()
+        .eq('product_id', deleteDialog.product.id);
 
-    // Aquí iría la lógica real de eliminación (e.g., await supabase.from('products').delete().eq('id', deleteDialog.product.id))
+      if (variantsError) throw variantsError;
 
-    // Simulando el comportamiento original de solo mostrar una alerta
-    toast.info("Funcionalidad aún en desarrollo", {
-      description: `El producto ${deleteDialog.product.name} no fue eliminado.`,
-    });
+      // Luego eliminamos el producto
+      const { error: productError } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', deleteDialog.product.id);
 
-    // ❌ ELIMINADO: Swal.fire("Info", "Funcionalidad aún en desarrollo", "info");
+      if (productError) throw productError;
 
-    // Cerrar el diálogo
-    setDeleteDialog({ open: false, product: null });
+      toast.success("Producto eliminado", {
+        description: `${deleteDialog.product.name} fue eliminado correctamente.`,
+      });
+
+      // Refrescar la tabla
+      fetchProducts();
+    } catch (error) {
+      console.error('Error al eliminar:', error);
+      toast.error("Error al eliminar", {
+        description: "No se pudo eliminar el producto. Por favor, intenta nuevamente.",
+      });
+    } finally {
+      // Cerrar el diálogo
+      setDeleteDialog({ open: false, product: null });
+    }
   };
   // FIN REEMPLAZO 5
 
@@ -351,31 +383,41 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
               className="w-full sm:w-64"
             />
 
-            <select
-              value={selectedBrand}
-              onChange={(e) => setSelectedBrand(e.target.value)}
-              className="border rounded-md p-2 text-sm w-full sm:w-auto"
+            {/* 🔸 Reemplazo select de Marcas */}
+            <Select
+              value={selectedBrand || "all"}
+              onValueChange={(v) => setSelectedBrand(v === "all" ? "" : v)}
             >
-              <option value="">Todas las marcas</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full sm:w-auto min-w-[180px]">
+                <SelectValue placeholder="Todas las marcas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las marcas</SelectItem>
+                {brands.map((b) => (
+                  <SelectItem key={b.id} value={b.id.toString()}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="border rounded-md p-2 text-sm w-full sm:w-auto"
+            {/* 🔸 Reemplazo select de Categorías */}
+            <Select
+              value={selectedCategory || "all"}
+              onValueChange={(v) => setSelectedCategory(v === "all" ? "" : v)}
             >
-              <option value="">Todas las categorías</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full sm:w-auto min-w-[180px]">
+                <SelectValue placeholder="Todas las categorías" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las categorías</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id.toString()}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* 🔹 Botones de acciones principales */}

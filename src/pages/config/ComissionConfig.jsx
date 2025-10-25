@@ -14,6 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -327,50 +334,56 @@ const ComissionConfig = () => {
           <div className="space-y-3 py-2">
             <div className="grid gap-2">
               <Label htmlFor="brand_id">Marca</Label>
-              <select
-                id="brand_id"
-                value={formData.brand_id}
-                onChange={(e) =>
+              <Select
+                value={formData.brand_id || "all"}
+                onValueChange={(value) =>
                   setFormData({
                     ...formData,
-                    brand_id: e.target.value,
+                    brand_id: value === "all" ? "" : value,
                     // Si elijo marca, limpio categoría (y viceversa)
-                    category_id: e.target.value ? "" : formData.category_id,
+                    category_id: value === "all" ? formData.category_id : "",
                   })
                 }
-                className="w-full rounded-md border border-input bg-background px-3 py-2"
               >
-                <option value="">Todas</option>
-                {brands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar marca" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {brands.map((b) => (
+                    <SelectItem key={b.id} value={b.id.toString()}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="category_id">Categoría</Label>
-              <select
-                id="category_id"
-                value={formData.category_id}
-                onChange={(e) =>
+              <Select
+                value={formData.category_id || "all"}
+                onValueChange={(value) =>
                   setFormData({
                     ...formData,
-                    category_id: e.target.value,
+                    category_id: value === "all" ? "" : value,
                     // Si elijo categoría, limpio marca (y viceversa)
-                    brand_id: e.target.value ? "" : formData.brand_id,
+                    brand_id: value === "all" ? formData.brand_id : "",
                   })
                 }
-                className="w-full rounded-md border border-input bg-background px-3 py-2"
               >
-                <option value="">Todas</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-2">

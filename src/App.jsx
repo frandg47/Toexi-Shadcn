@@ -30,11 +30,8 @@ function ProtectedRoute({ children, allowedRoles }) {
   const location = useLocation();
   const { user, role, isActive, status } = useAuth();
 
-  // 🔍 Debug temporal (podés quitarlo después)
-  console.log("ROLE DETECTADO:", role, "Allowed:", allowedRoles);
-
-  // ⏳ Mostrar loader mientras se carga la sesión o el rol
-  if (status === "loading" || !role) {
+  // 🔍 Mostrar loader solo mientras se verifica sesión por primera vez
+  if (status === "loading") {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <ConcentricLoader />
@@ -42,7 +39,7 @@ function ProtectedRoute({ children, allowedRoles }) {
     );
   }
 
-  // 🔐 Si no hay usuario autenticado
+  // 🔐 Si no hay usuario autenticado (una vez que terminó de cargar)
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
@@ -52,8 +49,8 @@ function ProtectedRoute({ children, allowedRoles }) {
     return <Navigate to="/login?disabled=1" replace />;
   }
 
-  // 🎭 Normalizar rol (por si viene con mayúsculas)
-  const normalizedRole = role.toLowerCase();
+  // 🎭 Normalizar rol
+  const normalizedRole = role?.toLowerCase();
 
   // 🚷 Si el rol no tiene permiso
   if (
@@ -61,15 +58,16 @@ function ProtectedRoute({ children, allowedRoles }) {
     allowedRoles.length > 0 &&
     !allowedRoles.includes(normalizedRole)
   ) {
-    // Si es vendedor y entra a dashboard → redirigir a su panel
+    // Si es vendedor e intenta entrar al dashboard → redirigir a su panel
     if (normalizedRole === "seller") {
       return <Navigate to="/seller/products" replace />;
     }
 
+    // Caso contrario → página de no autorizado
     return <Navigate to="/unauthorized" replace />;
   }
 
-  // ✅ Si pasa todas las validaciones, renderizar el contenido
+  // ✅ Si todo está bien, renderizar el contenido
   return children;
 }
 

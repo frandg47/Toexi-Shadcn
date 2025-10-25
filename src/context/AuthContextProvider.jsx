@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
 } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { toast } from "sonner";
@@ -27,104 +28,122 @@ export const AuthContextProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [profile, setProfile] = useState(null);
 
+  // 🧠 Flag persistente para no repetir toast
+  const hasShownInactiveToast = useRef(false);
+
   // 🔹 Cargar o crear usuario
-  const loadUser = useCallback(async (sessionUser) => {
-    if (!sessionUser) {
-      setUser(null);
-      setRole(null);
-      setIsActive(false);
-      setProfile(null);
-      setError(null);
-      setStatus("ready");
-      return;
-    }
+  const loadUser = useCallback(
+    async (sessionUser) => {
+      if (!sessionUser) {
+        for (let i = 0; i < 5; i++) {
+          await new Promise((r) => setTimeout(r, 300)); // espera 300 ms
+          const { data: retry } = await supabase.auth.getSession();
+          sessionUser = retry?.session?.user;
+          if (sessionUser) break;
+        }
+      }
+      if (!sessionUser) {
+        setUser(null);
+        setRole(null);
+        setIsActive(false);
+        setProfile(null);
+        setError(null);
+        setStatus("ready");
+        return;
+      }
 
-    setUser(sessionUser);
-    setStatus("loading");
+      setUser(sessionUser);
+      setStatus("loading");
 
-    const { data, error: queryError } = await supabase
-      .from("users")
-      .select("id, name, last_name, role, is_active, email")
-      .eq("id_auth", sessionUser.id)
-      .maybeSingle();
-
-    if (queryError) {
-      console.error("Error al consultar usuario:", queryError.message);
-      setError(queryError.message);
-      setStatus("ready");
-      return;
-    }
-
-    // 🧱 Si no existe → crear
-    if (!data) {
-      const { data: existing } = await supabase
+      const { data, error: queryError } = await supabase
         .from("users")
-        .select("id")
+        .select("id, name, last_name, role, is_active, email")
         .eq("id_auth", sessionUser.id)
         .maybeSingle();
 
-      if (!existing) {
-        const { error: insertError } = await supabase.from("users").insert([
-          {
-            id_auth: sessionUser.id,
-            name:
-              sessionUser.user_metadata?.full_name ||
-              sessionUser.user_metadata?.name ||
-              "",
-            last_name: sessionUser.user_metadata?.last_name || "",
-            email: sessionUser.email,
-            role: "seller",
-            is_active: false,
-          },
-        ]);
+      if (queryError) {
+        console.error("Error al consultar usuario:", queryError.message);
+        setError(queryError.message);
+        setStatus("ready");
+        return;
+      }
 
-        if (insertError && insertError.code !== "23505") {
-          console.error("Error al insertar usuario:", insertError.message);
-          setError(insertError.message);
-        } else if (!insertError) {
-          toast.info("Cuenta pendiente de activación", {
+      // 🧱 Si no existe → crear
+      if (!data) {
+        const { data: existing } = await supabase
+          .from("users")
+          .select("id")
+          .eq("id_auth", sessionUser.id)
+          .maybeSingle();
+
+        if (!existing) {
+          const { error: insertError } = await supabase.from("users").insert([
+            {
+              id_auth: sessionUser.id,
+              name:
+                sessionUser.user_metadata?.full_name ||
+                sessionUser.user_metadata?.name ||
+                "",
+              last_name: sessionUser.user_metadata?.last_name || "",
+              email: sessionUser.email,
+              role: "seller",
+              is_active: false,
+            },
+          ]);
+
+          if (insertError && insertError.code !== "23505") {
+            console.error("Error al insertar usuario:", insertError.message);
+            setError(insertError.message);
+          } else if (!insertError) {
+            toast.info("Cuenta pendiente de activación", {
+              description:
+                "Tu cuenta fue creada correctamente, pero un administrador deberá activarla antes de ingresar.",
+              duration: 5000,
+            });
+          }
+        }
+
+        await supabase.auth.signOut();
+        setUser(null);
+        setRole(null);
+        setIsActive(false);
+        setProfile(null);
+        setStatus("ready");
+        return;
+      }
+
+      // 🧩 Usuario inactivo
+      if (!data.is_active) {
+        if (!hasShownInactiveToast.current) {
+          hasShownInactiveToast.current = true;
+          toast.warning("Cuenta inactiva", {
             description:
-              "Tu cuenta fue creada correctamente, pero un administrador deberá activarla antes de ingresar.",
+              "Tu cuenta aún no ha sido activada por un administrador.",
             duration: 5000,
           });
         }
+
+        await supabase.auth.signOut();
+        setUser(null);
+        setRole(null);
+        setIsActive(false);
+        setProfile(data);
+        setStatus("ready");
+        return;
       }
 
-      await supabase.auth.signOut();
-      setUser(null);
-      setRole(null);
-      setIsActive(false);
-      setProfile(null);
+      // ✅ Usuario activo y válido
+      if (JSON.stringify(profile) !== JSON.stringify(data)) {
+        setProfile(data);
+      }
+
+      setRole(data.role);
+      setIsActive(Boolean(data.is_active));
+      setError(null);
       setStatus("ready");
-      return;
-    }
-
-    // 🧩 Usuario inactivo
-    if (!data.is_active) {
-      toast.warning("Cuenta inactiva", {
-        description: "Tu cuenta aún no ha sido activada por un administrador.",
-        duration: 5000,
-      });
-
-      await supabase.auth.signOut();
-      setUser(null);
-      setRole(null);
-      setIsActive(false);
-      setProfile(data);
-      setStatus("ready");
-      return;
-    }
-
-    // ✅ Usuario activo y válido
-    if (JSON.stringify(profile) !== JSON.stringify(data)) {
-      setProfile(data);
-    }
-
-    setRole(data.role);
-    setIsActive(Boolean(data.is_active));
-    setError(null);
-    setStatus("ready");
-  }, []); // ← sin dependencias
+    },
+    [profile]
+  );
 
   // 🔹 Refrescar perfil manualmente
   const refreshProfile = useCallback(async () => {
@@ -135,11 +154,16 @@ export const AuthContextProvider = ({ children }) => {
   // 🔹 Inicialización + listener de sesión
   useEffect(() => {
     let isSubscribed = true;
+    let lastUserId = null;
 
     const initialize = async () => {
       const { data: sessionData } = await supabase.auth.getSession();
+      const currentUser = sessionData?.session?.user ?? null;
       if (!isSubscribed) return;
-      await loadUser(sessionData?.session?.user ?? null);
+      if (currentUser?.id !== lastUserId) {
+        lastUserId = currentUser?.id;
+        await loadUser(currentUser);
+      }
     };
 
     initialize();
@@ -148,7 +172,11 @@ export const AuthContextProvider = ({ children }) => {
       (event, session) => {
         if (!isSubscribed) return;
         if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") return;
-        loadUser(session?.user ?? null);
+        const currentUser = session?.user ?? null;
+        if (currentUser?.id !== lastUserId) {
+          lastUserId = currentUser?.id;
+          loadUser(currentUser);
+        }
       }
     );
 

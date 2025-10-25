@@ -43,6 +43,7 @@ export default function ProductDetailDialog({
   paymentInstallments = [],
 }) {
   if (!product) return null;
+  console.log("producto en detalle:", product);
 
   // 🔹 Variantes reales
   const realVariants = useMemo(
@@ -135,10 +136,11 @@ export default function ProductDetailDialog({
     doc.text(`Cotización actual: ${formatCurrencyARS(fxRate)}`, 14, currentY);
     if (product.allowBackorder) {
       doc.setTextColor(200, 120, 0);
-      doc.text("Producto con pedido anticipado", 14, currentY + 6);
+      doc.text("Producto con posibilidad de encargo en caso de no haber stock" + (product.leadTimeLabel ? ` (Disponible a partir de ${product.leadTimeLabel})` : ""), 14, currentY + 6);
+      doc.text("Seña para reservar: " + (product.depositAmount ? formatCurrencyARS(product.depositAmount) : "—"), 14, currentY + 12);
     }
 
-    currentY += 12;
+    currentY += 24;
 
     // 🔹 Tabla de variantes
     const variantRows = realVariants.map((v) => [
@@ -222,7 +224,7 @@ export default function ProductDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto p-4 sm:p-6 rounded-xl">
+      <DialogContent className="max-w-4xl w-[90vw] max-h-[85vh] sm:max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-xl">
         {/* 🔹 Encabezado */}
         <DialogHeader className="space-y-2 text-center">
           <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight break-words">
@@ -325,7 +327,11 @@ export default function ProductDetailDialog({
                 <div className="mt-3 p-3 border-l-4 border-amber-500 bg-amber-50 rounded text-xs sm:text-sm text-amber-700">
                   🔸 Este producto admite pedidos.{" "}
                   {product.leadTimeLabel
-                    ? `Plazo estimado: ${product.leadTimeLabel}`
+                    ? `Plazo estimado: ${product.leadTimeLabel}. Seña para reservar: ${
+                        product.depositAmount
+                          ? formatCurrencyARS(product.depositAmount)
+                          : "—"
+                      }`
                     : "Sin plazo definido."}
                 </div>
               )}
@@ -345,7 +351,7 @@ export default function ProductDetailDialog({
 
             {/* Tabs responsivos */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="flex flex-wrap gap-2 bg-muted/30 rounded-lg p-2 overflow-x-auto">
+              <TabsList className="flex flex-wrap gap-2 bg-muted/30 rounded-lg overflow-x-auto">
                 {grouped.map((g) => (
                   <TabsTrigger
                     key={g.key}
