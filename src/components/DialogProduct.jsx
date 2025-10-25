@@ -107,18 +107,16 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
         .eq("id", product.id);
       if (error) throw new Error("Error al actualizar el producto.");
     } else {
-      const { error } = await supabase
-        .from("products")
-        .insert([payload]);
+      const { error } = await supabase.from("products").insert([payload]);
       if (error) throw new Error("Error al crear el producto.");
     }
   };
 
   const handleSubmit = async () => {
-    if (!form.name || !form.usd_price) {
+    if (!form.name || !form.brand_id || !form.category_id) {
       // ⚠️ Reemplazo 1: SweetAlert Warning por toast.warning
       toast.warning(
-        "Campos requeridos: Completa al menos nombre y precio"
+        "Campos requeridos: Completa al menos nombre, marca y categoría"
       );
       return;
     }
@@ -139,13 +137,18 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
       lead_time_label: form.allow_backorder
         ? form.lead_time_label || null
         : null,
+      deposit_amount: form.allow_backorder
+        ? form.deposit_amount
+          ? parseFloat(form.deposit_amount)
+          : null
+        : null,
       active: form.active,
     };
 
     const successMessage = isEditing
       ? "Producto actualizado correctamente"
       : "Producto creado correctamente";
-    
+
     // 🔁 Reemplazo 2: Flujo con loading, éxito y error usando toast.promise
     try {
       await toast.promise(saveProduct(payload), {
@@ -161,7 +164,6 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
       // Si el promise fue exitoso, cerramos el diálogo y actualizamos la lista
       onClose();
       onSave();
-
     } catch (e) {
       // La promesa falló, el toast ya mostró el error. No hacemos nada más aquí.
       // Si el error es manejado dentro del toast.promise, este catch
@@ -244,13 +246,24 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
 
           {/* 💵 Precios y comisiones */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
+            {/* <div className="flex flex-col gap-2">
               <Label>Precio (USD)</Label>
               <Input
                 name="usd_price"
                 type="number"
                 step="0.01"
                 value={form.usd_price}
+                onChange={handleChange}
+              />
+            </div> */}
+            <div className="flex flex-col gap-2">
+              <Label>Comisión fija (USD)</Label>
+              <Input
+                name="commission_fixed"
+                type="number"
+                step="0.01"
+                disabled={!!form.commission_pct}
+                value={form.commission_fixed || ""}
                 onChange={handleChange}
               />
             </div>
@@ -266,18 +279,6 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
                 onChange={handleChange}
               />
             </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label>Comisión fija (USD)</Label>
-            <Input
-              name="commission_fixed"
-              type="number"
-              step="0.01"
-              disabled={!!form.commission_pct}
-              value={form.commission_fixed || ""}
-              onChange={handleChange}
-            />
           </div>
 
           {/* 🖼️ Imagen */}
@@ -314,14 +315,25 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
 
           {/* ⏱️ Tiempo de entrega (solo si backorder activo) */}
           {form.allow_backorder && (
-            <div className="flex flex-col gap-2 mt-2">
-              <Label>Tiempo de entrega</Label>
-              <Input
-                name="lead_time_label"
-                placeholder='Ej: "Pedido en 3-4 días"'
-                value={form.lead_time_label || ""}
-                onChange={handleChange}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex flex-col gap-2 mt-2">
+                <Label>Tiempo de entrega</Label>
+                <Input
+                  name="lead_time_label"
+                  placeholder='Ej: "3-4 días"'
+                  value={form.lead_time_label || ""}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="flex flex-col gap-2 mt-2">
+                <Label>Monto de seña</Label>
+                <Input
+                  name="deposit_amount"
+                  placeholder="Ej: 15.000"
+                  value={form.deposit_amount || ""}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
           )}
         </div>
