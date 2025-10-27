@@ -134,7 +134,7 @@ const FormRegisterNewUser = ({ onSuccess }) => {
           Agregar
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[520px] w-[95%] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl w-[90vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nuevo integrante</DialogTitle>
         </DialogHeader>

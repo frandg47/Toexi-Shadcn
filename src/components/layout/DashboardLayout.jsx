@@ -49,7 +49,7 @@ const navMain = [
   {
     title: "Clientes",
     icon: IconUsers,
-    onClick: () => showDevelopmentToast("Clientes"),
+    url: "/dashboard/customers",
   },
   { title: "Equipo", url: "/dashboard/team", icon: IconUsersGroup },
 ];

@@ -9,7 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import FallbackRedirect from "@/components/FallbackRedirect";
 import Products from "./pages/Products";
 import CatalogPage from "./pages/CatalogPage";
-import Clients from "./pages/Clients";
+import CustomersPage from "./pages/CustomersPage";
 import TeamPage from "./pages/TeamPage";
 import LoginPage from "./pages/LoginPage";
 import Orders from "./pages/Orders";
@@ -98,7 +98,7 @@ export default function App() {
             <Route path="catalog" element={<CatalogPage />} />
             <Route path="catalog/brands" element={<CatalogPage />} />
             <Route path="catalog/categories" element={<CatalogPage />} />
-            <Route path="clients" element={<Clients />} />
+            <Route path="customers" element={<CustomersPage />} />
             <Route path="team" element={<TeamPage />} />
             <Route path="orders" element={<Orders />} />
 
