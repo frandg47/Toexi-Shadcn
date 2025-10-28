@@ -1,7 +1,9 @@
 // src/components/layout/SellerLayout.jsx
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { useState } from "react";
 import AppSidebar from "@/components/app-sidebar";
 import { Outlet } from "react-router-dom";
+import SheetNewLead from "../SheetNewLead";
 import Header from "../Header";
 import {
   IconHome,
@@ -13,6 +15,7 @@ import {
   IconQrcode,
 } from "@tabler/icons-react";
 import { toast } from "sonner";
+import { useAuth } from "../../context/AuthContextProvider";
 
 const showDevelopmentToast = (feature) =>
   toast("Funcionalidad en desarrollo", {
@@ -30,9 +33,11 @@ const navMain = [
   // { title: "Estadísticas", url: "/seller/stats", icon: IconChartBar,
   //   onClick: () => showDevelopmentToast("Estadísticas")
   //  },
-  // { title: "Clientes", url: "/seller/clients", icon: IconUsers,
-  //   onClick: () => showDevelopmentToast("Clientes")
-  // },
+  {
+    title: "Clientes",
+    url: "/seller/clients",
+    icon: IconUsers,
+  },
   {
     title: "Mi QR",
     url: "/seller/qr",
@@ -57,6 +62,17 @@ const navSecondary = [
 ];
 
 export default function SellerLayout() {
+  const [openLeadDialog, setOpenLeadDialog] = useState(false);
+  const { user, role, isActive, status } = useAuth();
+  console.log(
+    "object SellerLayout -> user, role, isActive, status",
+    user,
+    role,
+    isActive,
+    status
+  );
+  console.log("id", user?.id);
+
   return (
     <SidebarProvider>
       <AppSidebar
@@ -64,11 +80,7 @@ export default function SellerLayout() {
         navMain={navMain}
         navSecondary={navSecondary}
         actionButtonLabel="Nuevo pedido"
-        onActionClick={() =>
-          toast("Funcionalidad en desarrollo", {
-            description: "Módulo de pedidos",
-          })
-        }
+        onActionClick={() => setOpenLeadDialog(true)}
       />
 
       <SidebarInset>
@@ -77,6 +89,12 @@ export default function SellerLayout() {
           <Outlet />
         </main>
       </SidebarInset>
+
+      <SheetNewLead
+        open={openLeadDialog}
+        onOpenChange={setOpenLeadDialog}
+        sellerId={user?.id}
+      />
     </SidebarProvider>
   );
 }
