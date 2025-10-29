@@ -31,9 +31,9 @@ export default function DialogCatalog({
         <DialogHeader>
           <DialogTitle>{label}</DialogTitle>
         </DialogHeader>
-        <DialogDescription>
+        {/* <DialogDescription>
               Ingrese una nueva {label.toLowerCase()} para agregarlo al catálogo.
-            </DialogDescription>
+            </DialogDescription> */}
         <Input
           placeholder={`Nombre de ${label.toLowerCase()}`}
           value={value}

@@ -77,7 +77,10 @@ export const useAuthStore = create((set, get) => ({
     set({ loading: true });
     let response;
     try {
-      const redirectTo = "https://sgtoexitech.vercel.app/auth/callback";
+      const redirectTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/auth/callback`
+          : undefined;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",

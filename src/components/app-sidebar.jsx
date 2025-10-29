@@ -1,8 +1,3 @@
-// src/components/app-sidebar.jsx
-import React from "react";
-import { IconInfoCircle } from "@tabler/icons-react";
-import { toast } from "sonner";
-
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
@@ -27,9 +22,12 @@ export default function AppSidebar({
 }) {
   const { user, profile } = useAuth();
 
+  console.log("object AppSidebar -> user, profile", user, profile);
+
   const displayUser =
     user || profile
       ? {
+          id: profile?.id || "",
           name:
             profile?.name ||
             user?.user_metadata?.full_name ||
