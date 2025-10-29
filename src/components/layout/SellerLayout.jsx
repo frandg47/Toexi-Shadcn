@@ -9,6 +9,7 @@ import {
   IconHome,
   IconShoppingCart,
   IconChartBar,
+  IconList,
   IconUsers,
   IconSettings,
   IconCalculator,
@@ -30,12 +31,19 @@ const navMain = [
     icon: IconShoppingCart,
     onClick: () => showDevelopmentToast("Clientes"),
   },
+  {
+    title: "Mis pedidos",
+    // url: "/seller/orders",
+    icon: IconList,
+    onClick: () => showDevelopmentToast("Mis pedidos"),
+  },
   // { title: "Estadísticas", url: "/seller/stats", icon: IconChartBar,
   //   onClick: () => showDevelopmentToast("Estadísticas")
   //  },
   {
     title: "Clientes",
-    url: "/seller/clients",
+    // url: "/seller/clients",
+    onClick: () => showDevelopmentToast("Clientes"),
     icon: IconUsers,
   },
   {
@@ -80,7 +88,8 @@ export default function SellerLayout() {
         navMain={navMain}
         navSecondary={navSecondary}
         actionButtonLabel="Nuevo pedido"
-        onActionClick={() => setOpenLeadDialog(true)}
+        // onActionClick={() => setOpenLeadDialog(true)}
+        onActionClick={() => showDevelopmentToast("Crear pedido")}
       />
 
       <SidebarInset>

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Button } from "@/components/ui/button";
-import { IconFileTypePdf } from "@tabler/icons-react";
+import { IconCoin, IconFileTypePdf, IconInfoCircle } from "@tabler/icons-react";
 import {
   Dialog,
   DialogContent,
@@ -136,8 +136,22 @@ export default function ProductDetailDialog({
     doc.text(`Cotización actual: ${formatCurrencyARS(fxRate)}`, 14, currentY);
     if (product.allowBackorder) {
       doc.setTextColor(200, 120, 0);
-      doc.text("Producto con posibilidad de encargo en caso de no haber stock" + (product.leadTimeLabel ? ` (Disponible a partir de ${product.leadTimeLabel})` : ""), 14, currentY + 6);
-      doc.text("Seña para reservar: " + (product.depositAmount ? formatCurrencyARS(product.depositAmount) : "—"), 14, currentY + 12);
+      doc.text(
+        "Producto con posibilidad de encargo en caso de no haber stock" +
+          (product.leadTimeLabel
+            ? ` (Disponible a partir de ${product.leadTimeLabel})`
+            : ""),
+        14,
+        currentY + 6
+      );
+      doc.text(
+        "Seña para reservar: " +
+          (product.depositAmount
+            ? formatCurrencyARS(product.depositAmount)
+            : "—"),
+        14,
+        currentY + 12
+      );
     }
 
     currentY += 24;
@@ -324,15 +338,20 @@ export default function ProductDetailDialog({
               </div>
 
               {product.allowBackorder && (
-                <div className="mt-3 p-3 border-l-4 border-amber-500 bg-amber-50 rounded text-xs sm:text-sm text-amber-700">
-                  🔸 Este producto admite pedidos.{" "}
-                  {product.leadTimeLabel
-                    ? `Plazo estimado: ${product.leadTimeLabel}. Seña para reservar: ${
-                        product.depositAmount
-                          ? formatCurrencyARS(product.depositAmount)
-                          : "—"
-                      }`
-                    : "Sin plazo definido."}
+                <div className="space-y-2 mt-3">
+                  <div className="flex items-center gap-2 p-3 border-l-4 border-amber-500 bg-amber-50 rounded text-xs sm:text-sm text-amber-700">
+                    <IconInfoCircle className="h-4 w-4 text-amber-500" /> Este producto admite pedidos.{" "}
+                    {product.leadTimeLabel
+                      ? `Plazo estimado: ${product.leadTimeLabel}.`
+                      : "Sin plazo definido."}
+                  </div>
+
+                  {product.depositAmount && (
+                    <div className="flex items-center gap-2 p-3 border-l-4 border-blue-500 bg-blue-50 rounded text-xs sm:text-sm text-blue-700">
+                      <IconCoin className="h-4 w-4 text-blue-500" /> Seña para reservar:{" "}
+                      {formatCurrencyARS(product.depositAmount)}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -484,7 +484,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                       Stock:{" "}
                       {p.stock === 0 && p.allowBackorder ? (
                         <span className="text-amber-600 font-medium">
-                          Pedido
+                          Pedido {p.leadTimeLabel}
                         </span>
                       ) : (
                         p.stock

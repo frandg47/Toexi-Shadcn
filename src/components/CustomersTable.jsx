@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import DialogAddCustomer from "./DialogAddCustomer";
-import { IconPlus } from "@tabler/icons-react";
+import { IconPhone, IconPlus } from "@tabler/icons-react";
 import DialogEditCustomer from "./DialogEditCustomer";
 
 import {
@@ -31,6 +31,7 @@ import {
   IconUser,
   IconHome,
   IconMapPin,
+  IconIdBadge2,
 } from "@tabler/icons-react";
 import {
   AlertDialog,
@@ -218,14 +219,15 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
               {/* 🧾 Datos */}
               <div className="space-y-1 text-sm text-muted-foreground mb-3">
                 {c.dni && (
-                  <p>
-                    <span className="font-medium text-foreground">DNI:</span>{" "}
+                  <p className="flex items-center gap-1">
+                    <IconIdBadge2 size={14} />
+                    {/* <span className="font-medium text-foreground">DNI:</span>{" "} */}
                     {c.dni}
                   </p>
                 )}
                 {c.phone && (
                   <p className="flex items-center gap-1">
-                    <IconUser size={14} /> {c.phone}
+                    <IconPhone size={14} /> {c.phone}
                   </p>
                 )}
                 {c.email && (

@@ -46,11 +46,13 @@ const navMain = [
     title: "Pedidos",
     icon: IconShoppingCart,
     onClick: () => showDevelopmentToast("Pedidos"),
+    // url: "/dashboard/orders",
   },
   {
     title: "Clientes",
     icon: IconUsers,
-    url: "/dashboard/customers",
+    // url: "/dashboard/customers",
+    onClick: () => showDevelopmentToast("Clientes"),
   },
   { title: "Equipo", url: "/dashboard/team", icon: IconUsersGroup },
 ];
@@ -80,7 +82,7 @@ export default function DashboardLayout() {
       />
 
       <SidebarInset>
-        <MobileHeader title="Toexi Tech" />
+        {/* <MobileHeader title="Toexi Tech" /> */}
         <Header />
         <main className="p-6 mx-auto max-w-6xl w-full">
           <Outlet />
