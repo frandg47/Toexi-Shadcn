@@ -92,20 +92,25 @@ export default function LoginForm({ className, ...props }) {
           // 🧱 estructura base
           "px-0 overflow-hidden shadow-lg text-gray-800 w-full max-w-lg sm:max-w-xl lg:max-w-4xl border border-white/40 transition-all",
           // Fondo translúcido con blur solo en mobile
-          "bg-white/70 backdrop-blur-3xl",
+          "bg-emerald-400 backdrop-blur-3xl",
           // En escritorio: fondo sólido y sin blur
           "md:bg-white md:backdrop-blur-0 md:border-gray-200 md:p-0"
         )}
       >
-        <CardContent className="grid md:grid-cols-2 px-0">
+        <CardContent className="grid md:grid-cols-2 px-0 bg-emerald-400 md:bg-transparent">
           {/* 🔹 FORMULARIO */}
           <form
             onSubmit={handleSubmit(onSubmit)}
             className="flex flex-col justify-center p-6 sm:p-8 lg:p-12 space-y-6"
           >
             <div className="flex flex-col items-center text-center">
-              <h1 className="text-3xl font-bold md:text-4xl">Bienvenido</h1>
-              <p className="text-balance text-muted-foreground text-sm md:text-base">
+              <h1 className="text-3xl md:text-4xl font-bold">
+                {" "}
+                <span className="inline-block -skew-x-12 bg-emerald-600 text-white px-3 py-1 italic">
+                  Toexi Tech
+                </span>
+              </h1>
+              <p className="mt-5 text-balance text-white md:text-foreground text-sm md:text-base">
                 Inicia sesión con tu cuenta de Google.
               </p>
             </div>
@@ -203,7 +208,7 @@ export default function LoginForm({ className, ...props }) {
             </Button>
             <Separator className="w-full" />
 
-            <p className="text-xs text-muted-foreground text-center md:text-sm">
+            <p className="text-xs text-white md:text-foreground text-center md:text-sm">
               Tu información se mantiene segura. Solo utilizamos tu cuenta para
               autenticarte.
             </p>
