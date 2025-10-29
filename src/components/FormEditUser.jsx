@@ -138,21 +138,23 @@ export default function FormEditUser({ userId, onClose, onSuccess }) {
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="role">Rol</Label>
-          <Select
-            value={user.role || ""}
-            onValueChange={(value) => setUser({ ...user, role: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccionar rol" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="superadmin">Administrador</SelectItem>
-              <SelectItem value="seller">Vendedor</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {user.role === "superadmin" && (
+          <div className="space-y-2">
+            <Label htmlFor="role">Rol</Label>
+            <Select
+              value={user.role || ""}
+              onValueChange={(value) => setUser({ ...user, role: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar rol" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="superadmin">Administrador</SelectItem>
+                <SelectItem value="seller">Vendedor</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="adress">Dirección</Label>
@@ -163,19 +165,19 @@ export default function FormEditUser({ userId, onClose, onSuccess }) {
           />
         </div>
 
-        {/* ✅ Campo de estado actualizado */}
-        <div className="flex items-center space-x-2 sm:col-span-2">
-          <Switch
-            id="is_active"
-            checked={user.is_active}
-            onCheckedChange={(checked) =>
-              setUser({ ...user, is_active: checked })
-            }
-          />
-          <Label htmlFor="is_active">Usuario activo</Label>
-        </div>
+        {user.role === "superadmin" && (
+          <div className="flex items-center space-x-2 sm:col-span-2">
+            <Switch
+              id="is_active"
+              checked={user.is_active}
+              onCheckedChange={(checked) =>
+                setUser({ ...user, is_active: checked })
+              }
+            />
+            <Label htmlFor="is_active">Usuario activo</Label>
+          </div>
+        )}
       </div>
-
       <div className="flex justify-end space-x-4 pt-4">
         <Button
           type="button"

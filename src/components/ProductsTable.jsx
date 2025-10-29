@@ -63,14 +63,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+// import { de } from "date-fns/locale/de";
 
 const TABLE_COLUMNS = [
   { id: "image", label: "Imagen" },
   { id: "name", label: "Producto" },
   { id: "brand", label: "Marca" },
   { id: "stock", label: "Stock" },
-  { id: "usd_price", label: "Precio USD" },
-  { id: "cash_price", label: "Efec/Transf" },
+  // { id: "usd_price", label: "Precio USD" },
+  // { id: "cash_price", label: "Efec/Transf" },
   // { id: "payment_methods", label: "Métodos de pago" },
   { id: "commission", label: "Comisión" },
   { id: "actions", label: "Acciones" },
@@ -164,6 +165,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
              cover_image_url,
              allow_backorder,
              lead_time_label,
+             deposit_amount,
              active,
              brands (id, name),
              categories (id, name),
@@ -276,6 +278,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
             p.cover_image_url || variants[0]?.image_url || PLACEHOLDER_IMAGE,
           allowBackorder: p.allow_backorder,
           leadTimeLabel: p.lead_time_label,
+          depositAmount: p.deposit_amount,
           active: p.active,
           variants,
         };
@@ -316,21 +319,21 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   // Función que ejecuta la eliminación del producto
   const handleConfirmDelete = async () => {
     if (!deleteDialog.product) return;
-    
+
     try {
       // Primero eliminamos las variantes del producto
       const { error: variantsError } = await supabase
-        .from('product_variants')
+        .from("product_variants")
         .delete()
-        .eq('product_id', deleteDialog.product.id);
+        .eq("product_id", deleteDialog.product.id);
 
       if (variantsError) throw variantsError;
 
       // Luego eliminamos el producto
       const { error: productError } = await supabase
-        .from('products')
+        .from("products")
         .delete()
-        .eq('id', deleteDialog.product.id);
+        .eq("id", deleteDialog.product.id);
 
       if (productError) throw productError;
 
@@ -341,9 +344,10 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       // Refrescar la tabla
       fetchProducts();
     } catch (error) {
-      console.error('Error al eliminar:', error);
+      console.error("Error al eliminar:", error);
       toast.error("Error al eliminar", {
-        description: "No se pudo eliminar el producto. Por favor, intenta nuevamente.",
+        description:
+          "No se pudo eliminar el producto. Por favor, intenta nuevamente.",
       });
     } finally {
       // Cerrar el diálogo
@@ -370,7 +374,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   return (
     <TooltipProvider>
       <div className="space-y-4 rounded-lg border bg-card p-4 shadow-sm">
-        {/* 🔹 Filtros */}
+        {/* 🔹 Filtros y acciones (SIN CAMBIOS) */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Input
@@ -380,7 +384,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
               className="w-full sm:w-64"
             />
 
-            {/* 🔸 Reemplazo select de Marcas */}
             <Select
               value={selectedBrand || "all"}
               onValueChange={(v) => setSelectedBrand(v === "all" ? "" : v)}
@@ -398,7 +401,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
               </SelectContent>
             </Select>
 
-            {/* 🔸 Reemplazo select de Categorías */}
             <Select
               value={selectedCategory || "all"}
               onValueChange={(v) => setSelectedCategory(v === "all" ? "" : v)}
@@ -417,7 +419,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
             </Select>
           </div>
 
-          {/* 🔹 Botones de acciones principales */}
           <div className="flex flex-wrap gap-2 justify-end">
             <Button
               variant="outline"
@@ -443,13 +444,130 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
           </div>
         </div>
 
-        {/* 🔹 Tabla */}
-        <div className="overflow-x-auto rounded-md border">
+        {/* 🔹 NUEVO: Vista tipo CARD para móviles */}
+        <div className="block md:hidden">
+          {loading ? (
+            <div className="grid gap-2">
+              {[...Array(10)].map((_, i) => (
+                <Skeleton key={i} className="h-24 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <p className="py-10 text-center text-muted-foreground text-sm">
+              No hay productos que coincidan con el filtro.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {filteredProducts.map((p) => (
+                <div
+                  key={p.id}
+                  className="group flex flex-col justify-between rounded-xl border bg-card p-3 shadow-sm transition hover:shadow-md"
+                  onClick={() => setSelectedProduct(p)}
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={p.coverImageUrl} alt={p.name} />
+                      <AvatarFallback>
+                        {getProductInitials(p.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <h3 className="font-medium leading-tight">{p.name}</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {p.brandName} • {p.categoryName}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      Stock:{" "}
+                      {p.stock === 0 && p.allowBackorder ? (
+                        <span className="text-amber-600 font-medium">
+                          Pedido {p.leadTimeLabel}
+                        </span>
+                      ) : (
+                        p.stock
+                      )}
+                    </span>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">
+                            Comisión:
+                          </span>
+                          <span className=" font-medium">
+                            {p.commissionPct
+                              ? formatPercentage(p.commissionPct)
+                              : p.commissionFixed
+                              ? formatCurrencyUSD(p.commissionFixed)
+                              : "-"}
+                          </span>
+                          <IconInfoCircle className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{p.commissionRuleName}</p>
+                        {/* <span>Prioridad: {p.priority}</span> */}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+
+                  {/* 🔹 Acciones dentro de la card (solo admin) */}
+                  {!isSellerView && (
+                    <div className="mt-3 flex justify-end gap-2">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="p-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setProductDialog({ open: true, product: p });
+                        }}
+                      >
+                        <IconEdit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="p-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedVariantProduct(p);
+                          setOpenVariants(true);
+                        }}
+                      >
+                        <IconVersions className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        className="p-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenDeleteDialog(p);
+                        }}
+                      >
+                        <IconTrash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 🔹 Tabla original SOLO visible en escritorio */}
+        <div className="hidden md:block overflow-x-auto rounded-md border">
           <Table className="min-w-full text-sm">
             <TableHeader>
               <TableRow>
                 {TABLE_COLUMNS.filter(
-                  (c) => !(isSellerView && c.id === "actions")
+                  (c) =>
+                    !(isSellerView && c.id === "actions") &&
+                    c.id !== "usd_price" // ❌ se elimina la columna de precio
                 ).map((c) => (
                   <TableHead key={c.id}>{c.label}</TableHead>
                 ))}
@@ -459,13 +577,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={
-                      TABLE_COLUMNS.filter(
-                        (c) => !(isSellerView && c.id === "actions")
-                      ).length
-                    }
-                  >
+                  <TableCell colSpan={TABLE_COLUMNS.length}>
                     <div className="grid gap-2">
                       {[...Array(10)].map((_, i) => (
                         <Skeleton key={i} className="h-10 w-full" />
@@ -476,11 +588,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
               ) : filteredProducts.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={
-                      TABLE_COLUMNS.filter(
-                        (c) => !(isSellerView && c.id === "actions")
-                      ).length
-                    }
+                    colSpan={TABLE_COLUMNS.length}
                     className="py-10 text-center text-muted-foreground"
                   >
                     No hay productos que coincidan con el filtro.
@@ -528,11 +636,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                       )}
                     </TableCell>
 
-                    <TableCell>{formatCurrencyUSD(p.usdPrice)}</TableCell>
-                    <TableCell>
-                      {formatCurrencyARS(p.usdPrice * fxRate)}
-                    </TableCell>
-
+                    {/* ❌ Se elimina el precio USD y ARS */}
                     <TableCell>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -554,61 +658,43 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                       </Tooltip>
                     </TableCell>
 
-                    {/* 🔹 Solo mostrar Acciones si no es vista de vendedor */}
                     {!isSellerView && (
                       <TableCell>
                         <div className="flex flex-wrap gap-1 justify-center">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="p-2"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setProductDialog({ open: true, product: p });
-                                }}
-                              >
-                                <IconEdit className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Editar</TooltipContent>
-                          </Tooltip>
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="p-2"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedVariantProduct(p);
-                                  setOpenVariants(true);
-                                }}
-                              >
-                                <IconVersions className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Variantes</TooltipContent>
-                          </Tooltip>
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="p-2"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenDeleteDialog(p);
-                                }}
-                              >
-                                <IconTrash className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Eliminar</TooltipContent>
-                          </Tooltip>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="p-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProductDialog({ open: true, product: p });
+                            }}
+                          >
+                            <IconEdit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="p-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedVariantProduct(p);
+                              setOpenVariants(true);
+                            }}
+                          >
+                            <IconVersions className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="p-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenDeleteDialog(p);
+                            }}
+                          >
+                            <IconTrash className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     )}
@@ -620,7 +706,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
         </div>
       </div>
 
-      {/* 🔹 Diálogos */}
+      {/* 🔹 Resto de los diálogos SIN CAMBIOS */}
       {!isSellerView && (
         <>
           <DialogProduct

@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { PieChart, Pie, Cell, Legend, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  Tooltip as ChartTooltip,
+  ResponsiveContainer,
+} from "recharts";
 import {
   Card,
   CardHeader,
@@ -13,7 +20,18 @@ import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 
 export default function SectionCardsProducts() {
-  const COLORS = ["#2563eb", "#22c55e", "#eab308", "#ef4444", "#8b5cf6"];
+  const COLORS = [
+    "#FFB74D", // naranja medio claro
+    "#FFA726", // naranja brillante estándar
+    "#FB8C00", // naranja intenso
+    "#F57C00", // naranja oscuro
+    "#EF6C00", // naranja tostado
+    "#E65100", // naranja quemado
+    "#D84315", // naranja rojizo
+    "#FFE0B2", // naranja muy claro (suave, para áreas grandes)
+    "#BF360C", // naranja profundo
+    "#A23E12", // terracota oscuro (buen contraste con blanco)
+  ];
 
   const [fxRate, setFxRate] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
@@ -185,7 +203,7 @@ export default function SectionCardsProducts() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold">
                 <IconDatabase className="text-blue-500" />
-                Total de productos
+                Productos
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -196,7 +214,7 @@ export default function SectionCardsProducts() {
                 Unidades ofrecidas en tienda
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
-                Incluye variantes de los productos
+                Incluye todas las variantes de los productos
               </div>
             </CardContent>
           </Card>
@@ -206,7 +224,7 @@ export default function SectionCardsProducts() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold">
                 <IconDatabase className="text-amber-500" />
-                Total de stock
+                Stock
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -217,7 +235,7 @@ export default function SectionCardsProducts() {
                 Unidades disponibles en tienda
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
-                Suma total de todas las variantes
+                Suma total de todas las distintas variantes
               </div>
             </CardContent>
           </Card>

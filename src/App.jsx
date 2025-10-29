@@ -9,10 +9,10 @@ import Dashboard from "./pages/Dashboard";
 import FallbackRedirect from "@/components/FallbackRedirect";
 import Products from "./pages/Products";
 import CatalogPage from "./pages/CatalogPage";
-import Clients from "./pages/Clients";
+import CustomersPage from "./pages/CustomersPage";
 import TeamPage from "./pages/TeamPage";
 import LoginPage from "./pages/LoginPage";
-import Orders from "./pages/Orders";
+import OrdersPage from "./pages/OrdersPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import ConcentricLoader from "./components/ui/loading";
 import ConfigurationPage from "./pages/ConfigurationPage";
@@ -98,9 +98,9 @@ export default function App() {
             <Route path="catalog" element={<CatalogPage />} />
             <Route path="catalog/brands" element={<CatalogPage />} />
             <Route path="catalog/categories" element={<CatalogPage />} />
-            <Route path="clients" element={<Clients />} />
+            <Route path="customers" element={<CustomersPage />} />
             <Route path="team" element={<TeamPage />} />
-            <Route path="orders" element={<Orders />} />
+            <Route path="orders" element={<OrdersPage />} />
 
             {/* ⚙️ CONFIGURACIONES */}
             <Route
@@ -127,6 +127,8 @@ export default function App() {
             }
           >
             <Route path="products" element={<Products />} />
+            <Route path="clients" element={<CustomersPage />} />
+            <Route path="orders" element={<OrdersPage />} />
             {/* Agregá más rutas específicas del vendedor aquí */}
           </Route>
 
