@@ -4,11 +4,14 @@ import CustomersTable from "../components/CustomersTable";
 import DialogAddCustomer from "../components/DialogAddCustomer";
 import { Button } from "@/components/ui/button";
 import { IconPlus } from "@tabler/icons-react";
+import { useAuth } from "@/context/AuthContextProvider";
 
 const CustomersPage = ({ titulo }) => {
   const [refreshToken, setRefreshToken] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  const { role } = useAuth();
+  const isSellerView = role === "seller";
   const handleCustomerCreated = () => {
     setRefreshToken((current) => current + 1);
     setDialogOpen(false);
@@ -19,6 +22,7 @@ const CustomersPage = ({ titulo }) => {
       <SiteHeader titulo={titulo || "Clientes"} />
       <div className="mt-6">
         <CustomersTable
+          isSellerView={isSellerView}
           refreshToken={refreshToken}
           onAdd={
             <Button onClick={() => setDialogOpen(true)}>

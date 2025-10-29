@@ -16,6 +16,7 @@ import {
   IconBrandApple,
 } from "@tabler/icons-react";
 import { toast } from "sonner";
+import MobileHeader from "./MobileHeader";
 
 const showDevelopmentToast = (feature) =>
   toast("Funcionalidad en desarrollo", {
@@ -79,6 +80,7 @@ export default function DashboardLayout() {
       />
 
       <SidebarInset>
+        <MobileHeader title="Toexi Tech" />
         <Header />
         <main className="p-6 mx-auto max-w-6xl w-full">
           <Outlet />

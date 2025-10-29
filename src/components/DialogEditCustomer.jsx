@@ -4,7 +4,6 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabaseClient";
-
 import {
   Dialog,
   DialogContent,
@@ -16,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch"; // 🔹 AGREGADO
 
 // ✅ Esquema de validación
 const schema = yup.object({
@@ -46,8 +46,10 @@ export default function DialogEditCustomer({
   onClose,
   customerId,
   onSuccess,
+  isSellerView,
 }) {
   const [loading, setLoading] = useState(false);
+  const [isActive, setIsActive] = useState(true); // 🔹 AGREGADO: manejo local de estado activo
 
   const {
     register,
@@ -83,7 +85,9 @@ export default function DialogEditCustomer({
           .single();
 
         if (error) throw error;
+
         reset(data);
+        setIsActive(Boolean(data.is_active)); // 🔹 Sincroniza el switch
       } catch (error) {
         console.error(error);
         toast.error("Error al cargar datos del cliente", {
@@ -103,7 +107,7 @@ export default function DialogEditCustomer({
       const { id, ...cleanValues } = values;
       const { error } = await supabase
         .from("customers")
-        .update(cleanValues)
+        .update({ ...cleanValues, is_active: isActive }) // 🔹 Se actualiza junto con el resto
         .eq("id", customerId);
 
       if (error) throw error;
@@ -198,6 +202,16 @@ export default function DialogEditCustomer({
               <Label htmlFor="notes">Notas</Label>
               <Textarea id="notes" rows={2} {...register("notes")} />
             </div>
+
+            {!isSellerView && (
+              <div className="flex items-center gap-2 pt-3 mt-4">
+                <Label className="">Cliente activo</Label>
+                <Switch
+                  checked={isActive}
+                  onCheckedChange={(checked) => setIsActive(checked)}
+                />
+              </div>
+            )}
 
             <DialogFooter>
               <Button variant="outline" type="button" onClick={onClose}>

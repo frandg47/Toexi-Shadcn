@@ -14,7 +14,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
-import { IconX } from "@tabler/icons-react";
+import { IconX, IconUserPlus } from "@tabler/icons-react";
+import DialogAddCustomer from "../components/DialogAddCustomer";
 
 export default function SheetNewLead({ open, onOpenChange, sellerId }) {
   const [loading, setLoading] = useState(false);
@@ -34,6 +35,8 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedVariants, setSelectedVariants] = useState([]);
+
+  const [dialogCustomerOpen, setDialogCustomerOpen] = useState(false);
 
   const [form, setForm] = useState({
     appointmentDatetime: "",
@@ -110,6 +113,24 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
       return;
     }
 
+    if (!selectedCustomer) {
+      toast.error("Debes seleccionar un cliente");
+      return;
+    }
+
+    if (!form.appointmentDatetime) {
+      toast.error("Debes seleccionar una fecha y hora para la cita");
+      return;
+    }
+
+    const selectedDate = new Date(form.appointmentDatetime);
+    const now = new Date();
+
+    if (selectedDate <= now) {
+      toast.error("La fecha y hora deben ser posteriores a la actual");
+      return;
+    }
+
     setLoading(true);
 
     const variantList = selectedVariants.map((v) => ({
@@ -154,7 +175,10 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-visible">
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-md overflow-visible"
+      >
         <SheetHeader>
           <SheetTitle>Nuevo pedido</SheetTitle>
           <SheetDescription>
@@ -165,21 +189,32 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
         <div className="mt-4 space-y-4 px-4">
           {/* 🧍‍♂️ Cliente */}
           <div className="relative">
-            <Input
-              placeholder="Buscar cliente..."
-              value={
-                selectedCustomer
-                  ? `${selectedCustomer.name} ${selectedCustomer.last_name || ""}`
-                  : searchCustomer
-              }
-              onFocus={() => setFocusCustomer(true)}
-              onBlur={() => setTimeout(() => setFocusCustomer(false), 200)}
-              onChange={(e) => {
-                setSelectedCustomer(null);
-                setSearchCustomer(e.target.value);
-              }}
-            />
-
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Buscar cliente..."
+                value={
+                  selectedCustomer
+                    ? `${selectedCustomer.name} ${
+                        selectedCustomer.last_name || ""
+                      }`
+                    : searchCustomer
+                }
+                onFocus={() => setFocusCustomer(true)}
+                onBlur={() => setTimeout(() => setFocusCustomer(false), 200)}
+                onChange={(e) => {
+                  setSelectedCustomer(null);
+                  setSearchCustomer(e.target.value);
+                }}
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setDialogCustomerOpen(true)}
+                title="Nuevo cliente"
+              >
+                <IconUserPlus className="h-5 w-5" />
+              </Button>
+            </div>
             {focusCustomer && (
               <div className="absolute z-[9999] mt-1 w-full rounded-md border bg-background shadow">
                 <ScrollArea className="max-h-[250px] overflow-y-auto">
@@ -306,7 +341,8 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
                     variant="secondary"
                     className="flex items-center gap-1"
                   >
-                    {v.products?.name || ""} - {v.variant_name || ""} - {v.color || ""}
+                    {v.products?.name || ""} - {v.variant_name || ""} -{" "}
+                    {v.color || ""}
                     <IconX
                       className="h-3 w-3 cursor-pointer"
                       onClick={() => handleRemoveVariant(v.id)}
@@ -338,6 +374,16 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
           </Button>
         </SheetFooter>
       </SheetContent>
+      {/* 💬 Modal para crear cliente */}
+      <DialogAddCustomer
+        open={dialogCustomerOpen}
+        onClose={() => setDialogCustomerOpen(false)}
+        onSuccess={(newCustomer) => {
+          setSelectedCustomer(newCustomer);
+          setDialogCustomerOpen(false);
+          toast.success(`Cliente ${newCustomer.name} agregado correctamente`);
+        }}
+      />
     </Sheet>
   );
 }

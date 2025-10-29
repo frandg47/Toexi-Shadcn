@@ -1,7 +1,4 @@
-// src/components/app-sidebar.jsx
-import React from "react";
-import { IconInfoCircle } from "@tabler/icons-react";
-import { toast } from "sonner";
+
 
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";

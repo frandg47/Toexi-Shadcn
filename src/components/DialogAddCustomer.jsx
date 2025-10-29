@@ -68,21 +68,22 @@ export default function DialogAddCustomer({ open, onClose, onSuccess }) {
 
   const onSubmit = async (values) => {
     try {
-      const { error } = await supabase.from("customers").insert([
-        {
-          ...values,
-          is_active: true,
-        },
-      ]);
+      // Insertar y devolver el registro recién creado
+      const { data, error } = await supabase
+        .from("customers")
+        .insert([{ ...values, is_active: true }])
+        .select()
+        .single(); // 👈 esto devuelve un solo objeto, no un array
 
       if (error) throw error;
 
       toast.success("Cliente agregado", {
-        description: `${values.name} fue registrado correctamente.`,
+        description: `${data.name} fue registrado correctamente.`,
       });
 
+      if (onSuccess) onSuccess(data);
+
       onClose();
-      if (onSuccess) onSuccess();
     } catch (error) {
       console.error(error);
       toast.error("Error al crear el cliente", {

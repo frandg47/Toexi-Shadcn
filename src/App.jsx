@@ -127,6 +127,7 @@ export default function App() {
             }
           >
             <Route path="products" element={<Products />} />
+            <Route path="clients" element={<CustomersPage />} />
             {/* Agregá más rutas específicas del vendedor aquí */}
           </Route>
 
