@@ -199,7 +199,7 @@ export default function DialogVariants({ open, onClose, productId }) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl w-[90vw] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl w-[90vw] max-h-[85svh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
             Gestionar variantes
