@@ -33,17 +33,17 @@ const navMain = [
   },
   {
     title: "Mis pedidos",
-    // url: "/seller/orders",
+    url: "/seller/orders",
     icon: IconList,
-    onClick: () => showDevelopmentToast("Mis pedidos"),
+    // onClick: () => showDevelopmentToast("Mis pedidos"),
   },
   // { title: "Estadísticas", url: "/seller/stats", icon: IconChartBar,
   //   onClick: () => showDevelopmentToast("Estadísticas")
   //  },
   {
     title: "Clientes",
-    // url: "/seller/clients",
-    onClick: () => showDevelopmentToast("Clientes"),
+    url: "/seller/clients",
+    // onClick: () => showDevelopmentToast("Clientes"),
     icon: IconUsers,
   },
   {
@@ -88,8 +88,8 @@ export default function SellerLayout() {
         navMain={navMain}
         navSecondary={navSecondary}
         actionButtonLabel="Nuevo pedido"
-        // onActionClick={() => setOpenLeadDialog(true)}
-        onActionClick={() => showDevelopmentToast("Crear pedido")}
+        onActionClick={() => setOpenLeadDialog(true)}
+        // onActionClick={() => showDevelopmentToast("Crear pedido")}
       />
 
       <SidebarInset>

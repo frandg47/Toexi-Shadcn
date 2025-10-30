@@ -45,14 +45,14 @@ const navMain = [
   {
     title: "Pedidos",
     icon: IconShoppingCart,
-    onClick: () => showDevelopmentToast("Pedidos"),
-    // url: "/dashboard/orders",
+    // onClick: () => showDevelopmentToast("Pedidos"),
+    url: "/dashboard/orders",
   },
   {
     title: "Clientes",
     icon: IconUsers,
-    // url: "/dashboard/customers",
-    onClick: () => showDevelopmentToast("Clientes"),
+    url: "/dashboard/customers",
+    // onClick: () => showDevelopmentToast("Clientes"),
   },
   { title: "Equipo", url: "/dashboard/team", icon: IconUsersGroup },
 ];
