@@ -25,7 +25,8 @@ import PaymentMethodsConfig from "./pages/config/PaymentMethodsConfig";
 import InventoryConfig from "./pages/config/InventoryConfig";
 import SalesConfig from "./pages/config/SalesConfig";
 
-import InstallPromptListener from "./components/InstallPrompListener"
+import InstallPromptBanner from "./components/InstallPromptBanner";
+import IOSInstallBanner from "@/components/IOSInstallBanner";
 
 // 🔒 COMPONENTE DE RUTA PROTEGIDA
 function ProtectedRoute({ children, allowedRoles }) {
@@ -35,7 +36,7 @@ function ProtectedRoute({ children, allowedRoles }) {
   // 🔍 Mostrar loader solo mientras se verifica sesión por primera vez
   if (status === "loading") {
     return (
-      <div className="flex h-screen w-full items-center justify-center">
+      <div className="flex h-[100svh] w-full items-center justify-center">
         <ConcentricLoader />
       </div>
     );
@@ -77,7 +78,8 @@ function ProtectedRoute({ children, allowedRoles }) {
 export default function App() {
   return (
     <>
-      <InstallPromptListener />
+      <InstallPromptBanner />
+      <IOSInstallBanner />
       <Toaster position="top-center" />
       <AuthContextProvider>
         <Routes>
