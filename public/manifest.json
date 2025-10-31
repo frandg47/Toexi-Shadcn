@@ -1,6 +1,6 @@
 {
-  "name": "Sistema Toexi Tech",
-  "short_name": "SGTT",
+  "name": "Sistema de Gestion Toexi Tech",
+  "short_name": "Toexi",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

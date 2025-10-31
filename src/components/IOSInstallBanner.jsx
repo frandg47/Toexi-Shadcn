@@ -48,7 +48,7 @@ export default function IOSInstallBanner() {
             <p className="text-muted-foreground text-xs">
               Tocá el botón de menú{" "}
               <IconUpload className="inline-block h-4 w-4" />y elegí{" "}
-              <strong>“Agregar a inicio”</strong>
+              <strong>“Añadir a pantalla de inicio”</strong>
             </p>
           </div>
 
