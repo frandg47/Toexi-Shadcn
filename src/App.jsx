@@ -25,7 +25,7 @@ import PaymentMethodsConfig from "./pages/config/PaymentMethodsConfig";
 import InventoryConfig from "./pages/config/InventoryConfig";
 import SalesConfig from "./pages/config/SalesConfig";
 
-import InstallPromptListener from "./components/InstallPromptListener";
+import InstallPromptListener from "./components/InstallPrompListener"
 
 // 🔒 COMPONENTE DE RUTA PROTEGIDA
 function ProtectedRoute({ children, allowedRoles }) {
