@@ -47,8 +47,8 @@ export default function IOSInstallBanner() {
             <p className="font-semibold">Instalá esta app en tu iPhone</p>
             <p className="text-muted-foreground text-xs">
               Tocá el botón de menú{" "}
-              <IconUpload className="inline-block h-4 w-4" />y elegí{" "}
-              <strong>“Añadir a pantalla de inicio”</strong>
+              <IconUpload className="inline-block h-4 w-4" />{" "}y elegí{" "}
+              <strong>“Agregar a inicio”</strong> o <strong>“Añadir a pantalla de inicio”</strong>
             </p>
           </div>
 
