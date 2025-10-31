@@ -25,6 +25,8 @@ import PaymentMethodsConfig from "./pages/config/PaymentMethodsConfig";
 import InventoryConfig from "./pages/config/InventoryConfig";
 import SalesConfig from "./pages/config/SalesConfig";
 
+import InstallPromptListener from "./components/InstallPromptListener";
+
 // 🔒 COMPONENTE DE RUTA PROTEGIDA
 function ProtectedRoute({ children, allowedRoles }) {
   const location = useLocation();
@@ -75,6 +77,7 @@ function ProtectedRoute({ children, allowedRoles }) {
 export default function App() {
   return (
     <>
+      <InstallPromptListener />
       <Toaster position="top-center" />
       <AuthContextProvider>
         <Routes>
