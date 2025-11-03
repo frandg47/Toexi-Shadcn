@@ -169,7 +169,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-4 sm:p-6">
+      <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl font-semibold text-center sm:text-left">
             {isEditing ? "Editar producto" : "Nuevo producto"}
