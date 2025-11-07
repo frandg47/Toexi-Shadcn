@@ -1,4 +1,5 @@
 // src/components/layout/DashboardLayout.jsx
+import { useState } from "react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/app-sidebar";
 import { Outlet } from "react-router-dom";
@@ -15,6 +16,7 @@ import {
   IconMenu4,
   IconBrandApple,
 } from "@tabler/icons-react";
+import SheetNewSale from "@/components/SheetNewSale"; 
 import { toast } from "sonner";
 import MobileHeader from "./MobileHeader";
 
@@ -45,14 +47,12 @@ const navMain = [
   {
     title: "Pedidos",
     icon: IconShoppingCart,
-    // onClick: () => showDevelopmentToast("Pedidos"),
     url: "/dashboard/orders",
   },
   {
     title: "Clientes",
     icon: IconUsers,
     url: "/dashboard/customers",
-    // onClick: () => showDevelopmentToast("Clientes"),
   },
   { title: "Equipo", url: "/dashboard/team", icon: IconUsersGroup },
 ];
@@ -67,6 +67,7 @@ const navSecondary = [
 ];
 
 export default function DashboardLayout() {
+  const [saleOpen, setSaleOpen] = useState(false); 
   return (
     <SidebarProvider>
       <AppSidebar
@@ -74,20 +75,19 @@ export default function DashboardLayout() {
         navMain={navMain}
         navSecondary={navSecondary}
         actionButtonLabel="Nueva venta"
-        onActionClick={() =>
-          toast("Funcionalidad en desarrollo", {
-            description: "Módulo de ventas",
-          })
-        }
+        onActionClick={() => {
+          setSaleOpen(true);
+        }}
       />
 
       <SidebarInset>
-        {/* <MobileHeader title="Toexi Tech" /> */}
         <Header />
         <main className="p-6 mx-auto max-w-6xl w-full">
           <Outlet />
         </main>
       </SidebarInset>
+
+      <SheetNewSale open={saleOpen} onOpenChange={setSaleOpen} lead={null} />
     </SidebarProvider>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -32,8 +32,8 @@ import {
   IconTrash,
   IconCirclePlus,
 } from "@tabler/icons-react";
-import { useNavigate } from "react-router-dom";
-import { useSaleStore } from "../store/useSaleStore";
+// import { useNavigate } from "react-router-dom";
+// import { useSaleStore } from "../store/useSaleStore";
 
 export default function SheetNewSale({ open, onOpenChange, lead }) {
   // --- Wizard ---
@@ -79,11 +79,11 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentInstallments, setPaymentInstallments] = useState([]);
 
-  const navigate = useNavigate();
-  const setCustomer = useSaleStore((s) => s.setCustomer);
-  const setItems = useSaleStore((s) => s.setItems);
-  const setFxRate = useSaleStore((s) => s.setFxRate);
-  const setNotes = useSaleStore((s) => s.setNotes);
+  // const navigate = useNavigate();
+  // const setCustomer = useSaleStore((s) => s.setCustomer);
+  // const setItems = useSaleStore((s) => s.setItems);
+  // const setFxRate = useSaleStore((s) => s.setFxRate);
+  // const setNotes = useSaleStore((s) => s.setNotes);
 
   // ========== HELPERS ==========
   const formatARS = (n) =>

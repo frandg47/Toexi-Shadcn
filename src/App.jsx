@@ -17,7 +17,6 @@ import UnauthorizedPage from "./pages/UnauthorizedPage";
 import ConcentricLoader from "./components/ui/loading";
 import ConfigurationPage from "./pages/ConfigurationPage";
 import AuthCallback from "./pages/AuthCallback";
-import CheckoutPage from "./pages/CheckoutPage";
 
 // ⚙️ Configuración
 import ComissionConfig from "./pages/config/ComissionConfig";
@@ -107,7 +106,6 @@ export default function App() {
             <Route path="customers" element={<CustomersPage />} />
             <Route path="team" element={<TeamPage />} />
             <Route path="orders" element={<OrdersPage />} />
-            <Route path="checkout" element={<CheckoutPage />} />
 
             {/* ⚙️ CONFIGURACIONES */}
             <Route

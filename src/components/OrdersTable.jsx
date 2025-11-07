@@ -3,6 +3,20 @@ import { supabase } from "../lib/supabaseClient";
 import { toast } from "sonner";
 import SheetNewSale from "./SheetNewSale";
 import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Badge } from "@/components/ui/badge";
+import {
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+} from "date-fns";
+import { es } from "date-fns/locale";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -51,6 +65,18 @@ const OrdersTable = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [nameFilter, setNameFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("todos");
+  const [dateRange, setDateRange] = useState({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  });
+
+  const handleWeekFilter = () => {
+    setDateRange({
+      from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+      to: endOfWeek(new Date(), { weekStartsOn: 1 }),
+    });
+  };
 
   const fetchOrders = useCallback(async (showSkeleton = false) => {
     if (showSkeleton) setLoading(true);
@@ -159,30 +185,10 @@ const OrdersTable = () => {
     completado: orders.filter((o) => o.status === "completado").length,
     cancelado: orders.filter((o) => o.status === "cancelado").length,
   };
-  // Mostralos arriba en 4 badges/cards si querés
 
-  // Cambiar estado del lead
-  // const handleUpdateStatus = async (id, status) => {
-  //   const { error } = await supabase
-  //     .from("leads")
-  //     .update({ status, updated_at: new Date().toISOString() })
-  //     .eq("id", id);
-
-  //   if (error) {
-  //     toast.error("No se pudo actualizar el estado", {
-  //       description: error.message,
-  //     });
-  //   } else {
-  //     toast.success(`Estado cambiado a "${status}"`);
-  //     fetchOrders(false);
-  //   }
-  // };
-
-  // Abrir modal de reprogramación (lo implementamos en el Paso 2)
   const [rescheduleLead, setRescheduleLead] = useState(null);
   const openReschedule = (lead) => setRescheduleLead(lead);
   const closeReschedule = () => setRescheduleLead(null);
-  const [statusFilter, setStatusFilter] = useState("todos");
   const [saleLead, setSaleLead] = useState(null);
   const [saleOpen, setSaleOpen] = useState(false);
 
@@ -199,29 +205,35 @@ const OrdersTable = () => {
         })
       : "-";
 
+  // 🔹 Filtro combinado (nombre + estado + fecha)
   const filteredOrders = orders
     .filter((o) => {
       const customerName =
-        o.customers?.name?.toLowerCase() +
+        (o.customers?.name?.toLowerCase() || "") +
         " " +
         (o.customers?.last_name?.toLowerCase() || "");
       return customerName.includes(nameFilter.toLowerCase());
     })
     .filter((o) =>
       statusFilter === "todos" ? true : o.status === statusFilter
-    );
+    )
+    .filter((o) => {
+      const date = new Date(o.created_at);
+      return date >= dateRange.from && date <= dateRange.to;
+    });
 
   return (
     <div className="space-y-4">
       {/* 🔹 Header */}
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="flex flex-col sm:flex-row gap-3 flex-1">
             <Input
               placeholder="Buscar por cliente..."
               onChange={(e) => setNameFilter(e.target.value)}
               className="w-full sm:w-80"
             />
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-40">
                 <SelectValue placeholder="Filtrar por estado" />
@@ -234,18 +246,61 @@ const OrdersTable = () => {
                 <SelectItem value="cancelado">Cancelado</SelectItem>
               </SelectContent>
             </Select>
+
+            {/* 🔹 Filtro por fecha */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="whitespace-nowrap">
+                  📅{" "}
+                  {dateRange?.from && dateRange?.to
+                    ? `${dateRange.from.toLocaleDateString(
+                        "es-AR"
+                      )} - ${dateRange.to.toLocaleDateString("es-AR")}`
+                    : "Filtrar por fecha"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="p-3" align="start">
+                <Calendar
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  locale={es}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Button variant="secondary" onClick={handleWeekFilter}>
+              Semana actual
+            </Button>
           </div>
+
           <Button
             variant="outline"
             onClick={() => fetchOrders(false)}
             disabled={refreshing}
-            className="flex items-center gap-1 sm:self-start"
+            className="flex items-center gap-1"
           >
             <IconRefresh
               className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
             />
             Refrescar
           </Button>
+        </div>
+
+        {/* KPIs rápidos */}
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(kpis).map(([key, value]) => (
+            <Badge
+              key={key}
+              variant="outline"
+              className={`capitalize ${
+                STATUS_STYLES[key] || "text-gray-700"
+              } border ${STATUS_COLORS[key] || "bg-gray-300"} bg-opacity-20`}
+            >
+              {key}: {value}
+            </Badge>
+          ))}
         </div>
       </div>
 
@@ -290,7 +345,7 @@ const OrdersTable = () => {
                   key={o.id}
                   className="hover:bg-muted/50 transition-colors"
                 >
-                  {/* 👤 Cliente con teléfono debajo */}
+                  {/* 👤 Cliente */}
                   <TableCell className="font-medium">
                     <div className="flex flex-col">
                       <span>
@@ -298,7 +353,6 @@ const OrdersTable = () => {
                           ? `${o.customers.name} ${o.customers.last_name || ""}`
                           : "Sin cliente"}
                       </span>
-
                       {o.customers?.phone && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                           <IconPhone size={12} className="text-zinc-500" />
@@ -308,7 +362,6 @@ const OrdersTable = () => {
                     </div>
                   </TableCell>
 
-                  {/* 🧑‍💼 Vendedor */}
                   <TableCell>
                     {o.seller?.user
                       ? `${o.seller.user.name ?? ""} ${
@@ -319,7 +372,6 @@ const OrdersTable = () => {
 
                   <TableCell>{formatDate(o.appointment_datetime)}</TableCell>
 
-                  {/* 💡 Productos interesados */}
                   <TableCell className="max-w-xs">
                     {Array.isArray(o.interested_variants) &&
                     o.interested_variants.length > 0 ? (
@@ -339,7 +391,6 @@ const OrdersTable = () => {
                     )}
                   </TableCell>
 
-                  {/* 🟢 Estado con pin animado */}
                   <TableCell>
                     <div className="relative flex items-center gap-2">
                       <span
@@ -368,49 +419,76 @@ const OrdersTable = () => {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Abrir menú</span>
                           <IconDotsVertical size={18} />
                         </Button>
                       </DropdownMenuTrigger>
-
                       <DropdownMenuContent align="end" className="w-48">
                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                         <DropdownMenuSeparator />
 
-                        <DropdownMenuItem
-                          onClick={() => handleUpdateStatus(o.id, "confirmado")}
-                        >
-                          ✅ Confirmado (llegó)
-                        </DropdownMenuItem>
-
-                        <DropdownMenuItem
-                          onClick={() => handleUpdateStatus(o.id, "completado")}
-                        >
-                          💰 Completado (compró)
-                        </DropdownMenuItem>
-
-                        <DropdownMenuItem
-                          onClick={() => handleUpdateStatus(o.id, "pendiente")}
-                        >
-                          ⏳ Volver a pendiente
-                        </DropdownMenuItem>
-
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => handleUpdateStatus(o.id, "cancelado")}
-                        >
-                          ❌ Cancelar
-                        </DropdownMenuItem>
-
-                        <DropdownMenuSeparator />
-
-                        <DropdownMenuItem onClick={() => openReschedule(o)}>
-                          📅 Reprogramar cita
-                        </DropdownMenuItem>
-
-                        <DropdownMenuItem onClick={() => handleCreateSale(o)}>
-                          🧾 Registrar venta
-                        </DropdownMenuItem>
+                        {o.status === "completado" ? (
+                          <DropdownMenuItem
+                            disabled
+                            className="text-muted-foreground"
+                          >
+                            🔒 Venta completada
+                          </DropdownMenuItem>
+                        ) : (
+                          <>
+                            {(o.status === "pendiente" ||
+                              o.status === "confirmado") && (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    handleUpdateStatus(o.id, "confirmado")
+                                  }
+                                >
+                                  ✅ Confirmado (llegó)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    handleUpdateStatus(o.id, "completado")
+                                  }
+                                >
+                                  💰 Completado (compró)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    handleUpdateStatus(o.id, "pendiente")
+                                  }
+                                >
+                                  ⏳ Volver a pendiente
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-red-600"
+                                  onClick={() =>
+                                    handleUpdateStatus(o.id, "cancelado")
+                                  }
+                                >
+                                  ❌ Cancelar
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => openReschedule(o)}
+                                >
+                                  📅 Reprogramar cita
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleCreateSale(o)}
+                                >
+                                  🧾 Registrar venta
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {o.status === "cancelado" && (
+                              <DropdownMenuItem
+                                onClick={() => openReschedule(o)}
+                              >
+                                📅 Reprogramar cita
+                              </DropdownMenuItem>
+                            )}
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
