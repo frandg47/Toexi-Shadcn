@@ -31,7 +31,7 @@ export default function DialogReschedule({ open, onClose, lead, onSaved }) {
         .from("leads")
         .update({
           appointment_datetime: iso,
-          status: "confirmado",
+          status: "pendiente",
           updated_at: new Date().toISOString(),
         })
         .eq("id", lead.id);

@@ -9,12 +9,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import {
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-} from "date-fns";
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   DropdownMenu,
@@ -24,7 +19,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { IconDotsVertical } from "@tabler/icons-react";
+import {
+  IconDotsVertical,
+  IconCheck,
+  IconX,
+  IconCalendarEvent,
+  IconReceipt2,
+  IconRotateClockwise,
+  IconPhone,
+  IconRefresh,
+  IconShoppingBag,
+  IconCash,
+  IconBan,
+  IconCalendar,
+  IconCircleX,
+  IconCircleCheck,
+  IconCircleDashed,
+} from "@tabler/icons-react";
 import {
   Table,
   TableHeader,
@@ -37,7 +48,6 @@ import DialogReschedule from "./DialogReschedule";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { IconRefresh, IconPhone } from "@tabler/icons-react";
 import {
   Select,
   SelectContent,
@@ -48,15 +58,15 @@ import {
 
 const STATUS_STYLES = {
   pendiente: "text-yellow-700",
-  confirmado: "text-blue-700",
-  completado: "text-green-700",
+  sin_exito: "text-blue-700",
+  vendido: "text-green-700",
   cancelado: "text-red-700",
 };
 
 const STATUS_COLORS = {
   pendiente: "bg-yellow-400",
-  confirmado: "bg-blue-400",
-  completado: "bg-green-400",
+  sin_exito: "bg-blue-400",
+  vendido: "bg-green-400",
   cancelado: "bg-red-400",
 };
 
@@ -155,16 +165,22 @@ const OrdersTable = () => {
   };
 
   const autoCancelExpired = async (leads) => {
-    const now = new Date();
-    const toCancel = leads.filter(
-      (l) =>
-        l.status === "pendiente" &&
-        l.appointment_datetime &&
-        new Date(l.appointment_datetime) < now
-    );
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // normalizar a medianoche
+
+    const toCancel = leads.filter((l) => {
+      if (l.status !== "pendiente" || !l.appointment_datetime) return false;
+
+      const appt = new Date(l.appointment_datetime);
+      appt.setHours(0, 0, 0, 0); // ignorar la hora
+
+      return appt < today;
+    });
+
     if (toCancel.length === 0) return;
 
     const ids = toCancel.map((l) => l.id);
+
     const { error } = await supabase
       .from("leads")
       .update({ status: "cancelado", updated_at: new Date().toISOString() })
@@ -172,7 +188,7 @@ const OrdersTable = () => {
 
     if (!error) {
       toast("Citas vencidas canceladas", {
-        description: `${ids.length} lead(s) actualizados`,
+        description: `${ids.length} pedido(s) actualizados`,
       });
       fetchOrders(false);
     }
@@ -181,8 +197,8 @@ const OrdersTable = () => {
   const kpis = {
     total: orders.length,
     pendiente: orders.filter((o) => o.status === "pendiente").length,
-    confirmado: orders.filter((o) => o.status === "confirmado").length,
-    completado: orders.filter((o) => o.status === "completado").length,
+    sin_exito: orders.filter((o) => o.status === "sin_exito").length,
+    vendido: orders.filter((o) => o.status === "vendido").length,
     cancelado: orders.filter((o) => o.status === "cancelado").length,
   };
 
@@ -205,7 +221,6 @@ const OrdersTable = () => {
         })
       : "-";
 
-  // 🔹 Filtro combinado (nombre + estado + fecha)
   const filteredOrders = orders
     .filter((o) => {
       const customerName =
@@ -234,24 +249,11 @@ const OrdersTable = () => {
               className="w-full sm:w-80"
             />
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue placeholder="Filtrar por estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="confirmado">Confirmado</SelectItem>
-                <SelectItem value="completado">Completado</SelectItem>
-                <SelectItem value="cancelado">Cancelado</SelectItem>
-              </SelectContent>
-            </Select>
-
             {/* 🔹 Filtro por fecha */}
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="whitespace-nowrap">
-                  📅{" "}
+                  <IconCalendar className="h-4 w-4 mr-2" />
                   {dateRange?.from && dateRange?.to
                     ? `${dateRange.from.toLocaleDateString(
                         "es-AR"
@@ -270,9 +272,21 @@ const OrdersTable = () => {
               </PopoverContent>
             </Popover>
 
-            <Button variant="secondary" onClick={handleWeekFilter}>
+            <Button variant="outline" onClick={handleWeekFilter}>
               Semana actual
             </Button>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue placeholder="Filtrar por estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="pendiente">Pendiente</SelectItem>
+                <SelectItem value="sin_exito">Sin éxito</SelectItem>
+                <SelectItem value="vendido">Vendido</SelectItem>
+                <SelectItem value="cancelado">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <Button
@@ -288,20 +302,22 @@ const OrdersTable = () => {
           </Button>
         </div>
 
-        {/* KPIs rápidos */}
-        <div className="flex flex-wrap gap-2">
+        {/* KPIs
+        <div className="grid grid-cols-5 gap-2 w-full">
           {Object.entries(kpis).map(([key, value]) => (
             <Badge
               key={key}
               variant="outline"
-              className={`capitalize ${
+              className={`hidden capitalize text-center md:block ${
                 STATUS_STYLES[key] || "text-gray-700"
-              } border ${STATUS_COLORS[key] || "bg-gray-300"} bg-opacity-20`}
+              } border ${
+                STATUS_COLORS[key] || "bg-gray-300"
+              } bg-opacity-20 p-2`}
             >
               {key}: {value}
             </Badge>
           ))}
-        </div>
+        </div> */}
       </div>
 
       {/* 🔹 Tabla */}
@@ -345,7 +361,7 @@ const OrdersTable = () => {
                   key={o.id}
                   className="hover:bg-muted/50 transition-colors"
                 >
-                  {/* 👤 Cliente */}
+                  {/* Cliente */}
                   <TableCell className="font-medium">
                     <div className="flex flex-col">
                       <span>
@@ -422,73 +438,102 @@ const OrdersTable = () => {
                           <IconDotsVertical size={18} />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuContent align="end" className="w-52">
                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                         <DropdownMenuSeparator />
 
-                        {o.status === "completado" ? (
-                          <DropdownMenuItem
-                            disabled
-                            className="text-muted-foreground"
-                          >
-                            🔒 Venta completada
-                          </DropdownMenuItem>
-                        ) : (
-                          <>
-                            {(o.status === "pendiente" ||
-                              o.status === "confirmado") && (
-                              <>
+                        {(() => {
+                          switch (o.status) {
+                            case "vendido":
+                              return (
                                 <DropdownMenuItem
-                                  onClick={() =>
-                                    handleUpdateStatus(o.id, "confirmado")
-                                  }
+                                  disabled
+                                  className="text-muted-foreground"
                                 >
-                                  ✅ Confirmado (llegó)
+                                  <IconCircleCheck className="mr-2 h-4 w-4" />
+                                  Venta completada
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    handleUpdateStatus(o.id, "completado")
-                                  }
-                                >
-                                  💰 Completado (compró)
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    handleUpdateStatus(o.id, "pendiente")
-                                  }
-                                >
-                                  ⏳ Volver a pendiente
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="text-red-600"
-                                  onClick={() =>
-                                    handleUpdateStatus(o.id, "cancelado")
-                                  }
-                                >
-                                  ❌ Cancelar
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
+                              );
+
+                            case "pendiente":
+                              return (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      handleUpdateStatus(o.id, "sin_exito")
+                                    }
+                                  >
+                                    <IconBan className="mr-2 h-4 w-4" />
+                                    Sin éxito (no concretó)
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      handleUpdateStatus(o.id, "vendido")
+                                    }
+                                  >
+                                    <IconCash className="mr-2 h-4 w-4" />
+                                    Vendido (compró)
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-red-600"
+                                    onClick={() =>
+                                      handleUpdateStatus(o.id, "cancelado")
+                                    }
+                                  >
+                                    <IconCircleX className="mr-2 h-4 w-4" />
+                                    Cancelar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => openReschedule(o)}
+                                  >
+                                    <IconCalendarEvent className="mr-2 h-4 w-4" />
+                                    Reprogramar cita
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleCreateSale(o)}
+                                  >
+                                    <IconReceipt2 className="mr-2 h-4 w-4" />
+                                    Registrar venta
+                                  </DropdownMenuItem>
+                                </>
+                              );
+
+                            case "sin_exito":
+                              return (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => openReschedule(o)}
+                                  >
+                                    <IconCalendarEvent className="mr-2 h-4 w-4" />
+                                    Reprogramar cita
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-red-600"
+                                    onClick={() =>
+                                      handleUpdateStatus(o.id, "cancelado")
+                                    }
+                                  >
+                                    <IconCircleX className="mr-2 h-4 w-4" />
+                                    Cancelar
+                                  </DropdownMenuItem>
+                                </>
+                              );
+
+                            case "cancelado":
+                              return (
                                 <DropdownMenuItem
                                   onClick={() => openReschedule(o)}
                                 >
-                                  📅 Reprogramar cita
+                                  <IconRotateClockwise className="mr-2 h-4 w-4" />
+                                  Reprogramar cita
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleCreateSale(o)}
-                                >
-                                  🧾 Registrar venta
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            {o.status === "cancelado" && (
-                              <DropdownMenuItem
-                                onClick={() => openReschedule(o)}
-                              >
-                                📅 Reprogramar cita
-                              </DropdownMenuItem>
-                            )}
-                          </>
-                        )}
+                              );
+
+                            default:
+                              return null;
+                          }
+                        })()}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

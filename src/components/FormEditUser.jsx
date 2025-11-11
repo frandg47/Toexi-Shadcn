@@ -14,9 +14,11 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Loader2Icon } from "lucide-react";
+import { useAuth } from "../context/AuthContextProvider"
 
 export default function FormEditUser({ userId, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
+  const { role } = useAuth();
   const [user, setUser] = useState({
     name: "",
     last_name: "",
@@ -138,7 +140,7 @@ export default function FormEditUser({ userId, onClose, onSuccess }) {
           />
         </div>
 
-        {user.role === "superadmin" && (
+        {role === "superadmin" && (
           <div className="space-y-2">
             <Label htmlFor="role">Rol</Label>
             <Select
@@ -165,7 +167,7 @@ export default function FormEditUser({ userId, onClose, onSuccess }) {
           />
         </div>
 
-        {user.role === "superadmin" && (
+        {role === "superadmin" && (
           <div className="flex items-center space-x-2 sm:col-span-2">
             <Switch
               id="is_active"

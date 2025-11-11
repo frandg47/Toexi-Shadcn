@@ -54,7 +54,7 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
 
       await supabase.from("sale_items").insert(items);
 
-      toast.success("Venta registrada ✅");
+      toast.success("Venta registrada con éxito");
 
       handleDownloadPDF(savedSale); // 📄 PDF después del insert
       onClose();
