@@ -26,7 +26,7 @@ const showDevelopmentToast = (feature) =>
   });
 
 const navMain = [
-  { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
+  { title: "Panel principal", url: "/dashboard", icon: IconDashboard },
   { title: "Productos", url: "/dashboard/products", icon: IconReport },
   {
     title: "Catálogo",

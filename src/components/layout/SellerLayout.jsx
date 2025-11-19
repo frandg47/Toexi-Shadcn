@@ -8,12 +8,11 @@ import Header from "../Header";
 import {
   IconHome,
   IconShoppingCart,
-  IconChartBar,
   IconList,
   IconUsers,
+  IconMedal,
   IconSettings,
   IconCalculator,
-  IconQrcode,
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContextProvider";
@@ -47,10 +46,10 @@ const navMain = [
     icon: IconUsers,
   },
   {
-    title: "Mi QR",
-    url: "/seller/qr",
-    icon: IconQrcode,
-    onClick: () => showDevelopmentToast("Mi QR"),
+    title: "Top Vendedores",
+    url: "/seller/top-sellers",
+    icon: IconMedal,
+    onClick: () => showDevelopmentToast("Top Vendedores"),
   },
   {
     title: "Calculadora de cotizaciones",

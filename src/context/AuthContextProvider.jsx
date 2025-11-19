@@ -191,6 +191,7 @@ export const AuthContextProvider = ({ children }) => {
     () => ({
       user,
       role: profile?.role || role,
+      id_auth: profile?.id_auth || user?.id,
       isActive,
       status,
       error,

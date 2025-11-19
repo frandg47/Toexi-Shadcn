@@ -55,6 +55,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "../context/AuthContextProvider";
 
 const STATUS_STYLES = {
   pendiente: "text-yellow-700",
@@ -93,21 +94,28 @@ const OrdersTable = () => {
     else setRefreshing(true);
 
     try {
-      const { data: leadsData, error: leadsError } = await supabase
+      const query = supabase
         .from("leads")
-        .select(
-          `
-          id,
-          created_at,
-          status,
-          appointment_datetime,
-          notes,
-          interested_variants,
-          customers (id, name, last_name, phone),
-          seller:user_roles!leads_referred_by_fkey (id_auth, role)
-        `
-        )
+        .select(`
+                  id,
+                  created_at,
+                  status,
+                  appointment_datetime,
+                  notes,
+                  interested_variants,
+                  customers (id, name, last_name, phone),
+                  seller:user_roles!leads_referred_by_fkey (id_auth, role)
+            `)
         .order("created_at", { ascending: false });
+
+      // Si el usuario NO es superadmin (es vendedor), filtrar solo sus pedidos
+      if (role !== "superadmin") {
+        query.eq("referred_by", id_auth);
+      }
+
+      const { data: leadsData, error: leadsError } = await query;
+
+
 
       if (leadsError) throw leadsError;
 
@@ -216,9 +224,9 @@ const OrdersTable = () => {
   const formatDate = (dateString) =>
     dateString
       ? new Date(dateString).toLocaleString("es-AR", {
-          dateStyle: "short",
-          timeStyle: "short",
-        })
+        dateStyle: "short",
+        timeStyle: "short",
+      })
       : "-";
 
   const filteredOrders = orders
@@ -236,6 +244,8 @@ const OrdersTable = () => {
       const date = new Date(o.created_at);
       return date >= dateRange.from && date <= dateRange.to;
     });
+
+  const { role, id_auth } = useAuth();
 
   return (
     <div className="space-y-4">
@@ -256,8 +266,8 @@ const OrdersTable = () => {
                   <IconCalendar className="h-4 w-4 mr-2" />
                   {dateRange?.from && dateRange?.to
                     ? `${dateRange.from.toLocaleDateString(
-                        "es-AR"
-                      )} - ${dateRange.to.toLocaleDateString("es-AR")}`
+                      "es-AR"
+                    )} - ${dateRange.to.toLocaleDateString("es-AR")}`
                     : "Filtrar por fecha"}
                 </Button>
               </PopoverTrigger>
@@ -380,8 +390,7 @@ const OrdersTable = () => {
 
                   <TableCell>
                     {o.seller?.user
-                      ? `${o.seller.user.name ?? ""} ${
-                          o.seller.user.last_name ?? ""
+                      ? `${o.seller.user.name ?? ""} ${o.seller.user.last_name ?? ""
                         }`.trim() || "—"
                       : "—"}
                   </TableCell>
@@ -390,7 +399,7 @@ const OrdersTable = () => {
 
                   <TableCell className="max-w-xs">
                     {Array.isArray(o.interested_variants) &&
-                    o.interested_variants.length > 0 ? (
+                      o.interested_variants.length > 0 ? (
                       <div className="text-xs space-y-0.5">
                         {o.interested_variants.map((v, i) => (
                           <div key={i} className="block truncate">
@@ -410,19 +419,16 @@ const OrdersTable = () => {
                   <TableCell>
                     <div className="relative flex items-center gap-2">
                       <span
-                        className={`absolute inline-flex h-2 w-2 rounded-full ${
-                          STATUS_COLORS[o.status] || "bg-gray-400"
-                        } opacity-75 animate-ping`}
+                        className={`absolute inline-flex h-2 w-2 rounded-full ${STATUS_COLORS[o.status] || "bg-gray-400"
+                          } opacity-75 animate-ping`}
                       ></span>
                       <span
-                        className={`relative inline-flex h-2 w-2 rounded-full ${
-                          STATUS_COLORS[o.status] || "bg-gray-400"
-                        }`}
+                        className={`relative inline-flex h-2 w-2 rounded-full ${STATUS_COLORS[o.status] || "bg-gray-400"
+                          }`}
                       ></span>
                       <span
-                        className={`capitalize text-sm font-medium ${
-                          STATUS_STYLES[o.status] || "text-gray-700"
-                        }`}
+                        className={`capitalize text-sm font-medium ${STATUS_STYLES[o.status] || "text-gray-700"
+                          }`}
                       >
                         {o.status}
                       </span>
@@ -467,14 +473,6 @@ const OrdersTable = () => {
                                     Sin éxito (no concretó)
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
-                                    onClick={() =>
-                                      handleUpdateStatus(o.id, "vendido")
-                                    }
-                                  >
-                                    <IconCash className="mr-2 h-4 w-4" />
-                                    Vendido (compró)
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
                                     className="text-red-600"
                                     onClick={() =>
                                       handleUpdateStatus(o.id, "cancelado")
@@ -490,12 +488,16 @@ const OrdersTable = () => {
                                     <IconCalendarEvent className="mr-2 h-4 w-4" />
                                     Reprogramar cita
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleCreateSale(o)}
-                                  >
-                                    <IconReceipt2 className="mr-2 h-4 w-4" />
-                                    Registrar venta
-                                  </DropdownMenuItem>
+                                  {
+                                    role === "superadmin" && (
+                                      <DropdownMenuItem
+                                        onClick={() => handleCreateSale(o)}
+                                      >
+                                        <IconReceipt2 className="mr-2 h-4 w-4" />
+                                        Registrar venta
+                                      </DropdownMenuItem>
+                                    )
+                                  }
                                 </>
                               );
 
