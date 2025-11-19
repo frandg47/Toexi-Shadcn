@@ -15,8 +15,9 @@ import {
   IconUsersGroup,
   IconMenu4,
   IconBrandApple,
+  IconMedal
 } from "@tabler/icons-react";
-import SheetNewSale from "@/components/SheetNewSale"; 
+import SheetNewSale from "@/components/SheetNewSale";
 import { toast } from "sonner";
 import MobileHeader from "./MobileHeader";
 
@@ -55,6 +56,11 @@ const navMain = [
     url: "/dashboard/customers",
   },
   { title: "Equipo", url: "/dashboard/team", icon: IconUsersGroup },
+  {
+    title: "Top Vendedores",
+    url: "/dashboard/top-sellers",
+    icon: IconMedal,
+  },
 ];
 
 const navSecondary = [
@@ -67,7 +73,7 @@ const navSecondary = [
 ];
 
 export default function DashboardLayout() {
-  const [saleOpen, setSaleOpen] = useState(false); 
+  const [saleOpen, setSaleOpen] = useState(false);
   return (
     <SidebarProvider>
       <AppSidebar

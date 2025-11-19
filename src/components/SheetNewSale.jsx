@@ -436,7 +436,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                 Completá los 3 pasos para registrar la venta.
               </SheetDescription>
             </div>
-            <IconReceipt2 className="h-6 w-6 text-primary" />
+            <IconReceipt2 className="absolute right-12 top-6 h-6 w-6 text-primary" />
           </div>
 
           {/* Wizard header */}

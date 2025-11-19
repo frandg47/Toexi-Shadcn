@@ -17,7 +17,7 @@ const AuthContext = createContext({
   status: "loading",
   error: null,
   profile: null,
-  refreshProfile: async () => {},
+  refreshProfile: async () => { },
 });
 
 export const AuthContextProvider = ({ children }) => {
@@ -88,8 +88,11 @@ export const AuthContextProvider = ({ children }) => {
               email: sessionUser.email,
               role: "seller",
               is_active: false,
+              avatar_url: sessionUser.user_metadata?.picture || null, // 🆕 FOTO DE GOOGLE
             },
           ]);
+
+
 
           if (insertError && insertError.code !== "23505") {
             console.error("Error al insertar usuario:", insertError.message);

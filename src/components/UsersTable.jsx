@@ -119,7 +119,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
       const { data, error } = await supabase
         .from("users")
         .select(
-          "id, name, last_name, email, role, is_active, phone, dni, adress, created_at"
+          "id, name, avatar_url, last_name, email, role, is_active, phone, dni, adress, created_at"
         )
         .order("created_at", { ascending: false });
 
@@ -154,9 +154,8 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
         await fetchUsers();
         // 🔄 REEMPLAZO 2: Usar toast para la confirmación de actualización
         toast.success("Estado actualizado", {
-          description: `La cuenta de ${user.email} ahora está ${
-            !user.is_active ? "activa" : "inactiva"
-          }.`,
+          description: `La cuenta de ${user.email} ahora está ${!user.is_active ? "activa" : "inactiva"
+            }.`,
         });
       } catch (error) {
         console.error(error);
@@ -170,6 +169,13 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
     },
     [fetchUsers]
   );
+
+  const fixGoogleAvatar = (url) => {
+    console.log("url imagen", url);
+    if (!url) return null;
+    return url.replace("=s96-c", "=s256-c");
+  };
+
 
   // 🆕 FUNCIÓN: Abre el AlertDialog de eliminación
   const handleOpenDeleteDialog = (user) => {
@@ -324,11 +330,10 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
                   {visibleColumns.includes("avatar") && (
                     <TableCell className="w-[70px]">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage
-                          src={getGoogleAvatarUrl(user.email)}
-                          alt={buildFullName(user)}
-                        />
-                        <AvatarFallback>{getInitials(user)}</AvatarFallback>
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={user.avatar_url} />
+                          <AvatarFallback>{getInitials(user)}</AvatarFallback>
+                        </Avatar>
                       </Avatar>
                     </TableCell>
                   )}

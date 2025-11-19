@@ -49,7 +49,6 @@ const navMain = [
     title: "Top Vendedores",
     url: "/seller/top-sellers",
     icon: IconMedal,
-    onClick: () => showDevelopmentToast("Top Vendedores"),
   },
   {
     title: "Calculadora de cotizaciones",
