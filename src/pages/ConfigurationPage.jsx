@@ -56,15 +56,7 @@ const ConfigurationPage = ({ titulo }) => {
         {CARDS_CONFIG.map((card) => (
           <Card
             key={card.id}
-            onClick={() => {
-              if (card.id === "sales") {
-                toast("Funcionalidad en desarrollo", {
-                  description: "Esta sección estará disponible próximamente.",
-                  icon: <IconInfoCircle className="h-5 w-5 text-blue-500" />,
-                  duration: 3000,
-                });
-                return;
-              }
+            onClick={() => {             
               navigate(card.path);
             }}
             className="cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02]"
