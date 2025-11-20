@@ -464,14 +464,26 @@ const OrdersTable = () => {
                             case "pendiente":
                               return (
                                 <>
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      handleUpdateStatus(o.id, "sin_exito")
-                                    }
-                                  >
-                                    <IconBan className="mr-2 h-4 w-4" />
-                                    Sin éxito (no concretó)
-                                  </DropdownMenuItem>
+                                  {
+                                    role === "superadmin" && (
+                                      <>
+                                        <DropdownMenuItem
+                                          onClick={() => handleCreateSale(o)}
+                                        >
+                                          <IconReceipt2 className="mr-2 h-4 w-4" />
+                                          Registrar venta
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={() =>
+                                            handleUpdateStatus(o.id, "sin_exito")
+                                          }
+                                        >
+                                          <IconBan className="mr-2 h-4 w-4" />
+                                          Sin éxito (no concretó)
+                                        </DropdownMenuItem>
+                                      </>
+                                    )
+                                  }
                                   <DropdownMenuItem
                                     className="text-red-600"
                                     onClick={() =>
@@ -488,16 +500,7 @@ const OrdersTable = () => {
                                     <IconCalendarEvent className="mr-2 h-4 w-4" />
                                     Reprogramar cita
                                   </DropdownMenuItem>
-                                  {
-                                    role === "superadmin" && (
-                                      <DropdownMenuItem
-                                        onClick={() => handleCreateSale(o)}
-                                      >
-                                        <IconReceipt2 className="mr-2 h-4 w-4" />
-                                        Registrar venta
-                                      </DropdownMenuItem>
-                                    )
-                                  }
+
                                 </>
                               );
 
@@ -527,7 +530,7 @@ const OrdersTable = () => {
                                 <DropdownMenuItem
                                   onClick={() => openReschedule(o)}
                                 >
-                                  <IconRotateClockwise className="mr-2 h-4 w-4" />
+                                  <IconCalendarEvent className="mr-2 h-4 w-4" />
                                   Reprogramar cita
                                 </DropdownMenuItem>
                               );

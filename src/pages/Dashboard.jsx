@@ -1,8 +1,8 @@
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
-import { DataTable } from "@/components/data-table";
+// import { DataTable } from "@/components/data-table";
 import { SectionCards } from "@/components/section-cards";
 import { SiteHeader } from "@/components/site-header";
-import data from "../app/dashboard/data.json";
+// import data from "../app/dashboard/data.json";
 
 const Dashboard = ({ titulo }) => {
   return (
@@ -15,7 +15,7 @@ const Dashboard = ({ titulo }) => {
             <div className="px-4 lg:px-6">
               <ChartAreaInteractive />
             </div>
-            <DataTable data={data} />
+            {/* <DataTable data={data} /> */}
           </div>
         </div>
       </div>
