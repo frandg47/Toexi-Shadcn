@@ -5,6 +5,13 @@ import AppSidebar from "@/components/app-sidebar";
 import { Outlet } from "react-router-dom";
 import SheetNewLead from "../SheetNewLead";
 import Header from "../Header";
+import PaymentCalculatorDialog from "../PaymentCalculatorDialog"; // OJO: ruta corregida
+
+import {
+  paymentMethods,
+  getInstallmentsForMethod,
+} from "../../lib/paymentsConfig";
+
 import {
   IconHome,
   IconShoppingCart,
@@ -22,42 +29,6 @@ const showDevelopmentToast = (feature) =>
     description: `El módulo de ${feature} estará disponible próximamente.`,
   });
 
-const navMain = [
-  { title: "Inicio", url: "/seller/products", icon: IconHome },
-  {
-    title: "Mis ventas",
-    url: "/seller/sales",
-    icon: IconShoppingCart,
-    onClick: () => showDevelopmentToast("Clientes"),
-  },
-  {
-    title: "Mis pedidos",
-    url: "/seller/orders",
-    icon: IconList,
-    // onClick: () => showDevelopmentToast("Mis pedidos"),
-  },
-  // { title: "Estadísticas", url: "/seller/stats", icon: IconChartBar,
-  //   onClick: () => showDevelopmentToast("Estadísticas")
-  //  },
-  {
-    title: "Clientes",
-    url: "/seller/clients",
-    // onClick: () => showDevelopmentToast("Clientes"),
-    icon: IconUsers,
-  },
-  {
-    title: "Top Vendedores",
-    url: "/seller/top-sellers",
-    icon: IconMedal,
-  },
-  {
-    title: "Calculadora de cotizaciones",
-    url: "/seller/calculator",
-    icon: IconCalculator,
-    onClick: () => showDevelopmentToast("Calculadora de cotizaciones"),
-  },
-];
-
 const navSecondary = [
   {
     title: "Configuración",
@@ -68,8 +39,10 @@ const navSecondary = [
 ];
 
 export default function SellerLayout() {
+  const [openCalculatorDialog, setOpenCalculatorDialog] = useState(false);
   const [openLeadDialog, setOpenLeadDialog] = useState(false);
   const { user, role, isActive, status } = useAuth();
+
   console.log(
     "object SellerLayout -> user, role, isActive, status",
     user,
@@ -79,6 +52,37 @@ export default function SellerLayout() {
   );
   console.log("id", user?.id);
 
+  // 🔹 navMain DENTRO del componente → acá sí podemos usar setOpenCalculatorDialog
+  const navMain = [
+    { title: "Inicio", url: "/seller/products", icon: IconHome },
+    {
+      title: "Mis ventas",
+      url: "/seller/sales",
+      icon: IconShoppingCart,
+      onClick: () => showDevelopmentToast("Clientes"),
+    },
+    {
+      title: "Mis pedidos",
+      url: "/seller/orders",
+      icon: IconList,
+    },
+    {
+      title: "Clientes",
+      url: "/seller/clients",
+      icon: IconUsers,
+    },
+    {
+      title: "Top Vendedores",
+      url: "/seller/top-sellers",
+      icon: IconMedal,
+    },
+    {
+      title: "Calculadora de cotizaciones",
+      icon: IconCalculator,
+      onClick: () => setOpenCalculatorDialog(true),
+    },
+  ];
+
   return (
     <SidebarProvider>
       <AppSidebar
@@ -87,7 +91,6 @@ export default function SellerLayout() {
         navSecondary={navSecondary}
         actionButtonLabel="Nuevo pedido"
         onActionClick={() => setOpenLeadDialog(true)}
-        // onActionClick={() => showDevelopmentToast("Crear pedido")}
       />
 
       <SidebarInset>
@@ -101,6 +104,16 @@ export default function SellerLayout() {
         open={openLeadDialog}
         onOpenChange={setOpenLeadDialog}
         sellerId={user?.id}
+      />
+
+      {/* Dialog de Calculadora */}
+      <PaymentCalculatorDialog
+        open={openCalculatorDialog}
+        onOpenChange={setOpenCalculatorDialog}
+        paymentMethods={paymentMethods}
+        getInstallmentsForMethod={getInstallmentsForMethod}
+        initialSubtotalUSD={0}
+        initialExchangeRate={1440}
       />
     </SidebarProvider>
   );
