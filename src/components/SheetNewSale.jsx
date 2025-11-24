@@ -138,10 +138,10 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   // multiplicador de interés
   const multiplier = interestMethod
     ? paymentInstallments.find(
-        (i) =>
-          i.payment_method_id === Number(interestMethod.payment_method_id) &&
-          i.installments === Number(interestMethod.installments)
-      )?.multiplier || 1
+      (i) =>
+        i.payment_method_id === Number(interestMethod.payment_method_id) &&
+        i.installments === Number(interestMethod.installments)
+    )?.multiplier || 1
     : 1;
 
   // total final con recargo
@@ -222,6 +222,41 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       setStep(1);
     }
   }, [lead]);
+
+  const resetFormData = () => {
+    // Paso del wizard
+    setStep(1);
+
+    // Cliente
+    setSelectedCustomer(null);
+    setSearchCustomer("");
+    setFocusCustomer(false);
+
+    // Producto y variantes
+    setSelectedProduct(null);
+    setSearchProduct("");
+    setVariants([]);
+    setSelectedVariants([]);
+
+    // Variantes búsqueda
+    setSearchVariant("");
+    setFocusVariant(false);
+
+    // Notas
+    setForm({ notes: "" });
+
+    // Pagos
+    setPayments([
+      { method: "", amount: "", reference: "", installments: "" }
+    ]);
+
+    // Datos del preview
+    setInvoiceData(null);
+
+    // Lead (no tocar)
+  };
+
+
 
   // Enriquecer variantes del lead
   useEffect(() => {
@@ -408,13 +443,11 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       notes: form.notes || null,
       payments: normalized,
       variants: items,
-      customer_name: `${selectedCustomer.name} ${
-        selectedCustomer.last_name ?? ""
-      }`,
+      customer_name: `${selectedCustomer.name} ${selectedCustomer.last_name ?? ""
+        }`,
       customer_phone: selectedCustomer.phone ?? "",
-      seller_name: `${lead?.seller?.user?.name ?? ""} ${
-        lead?.seller?.user?.last_name ?? ""
-      }`,
+      seller_name: `${lead?.seller?.user?.name ?? ""} ${lead?.seller?.user?.last_name ?? ""
+        }`,
       seller_email: lead?.seller?.user?.email ?? "",
       total_final_ars: totalWithSurcharge,
     };
@@ -487,9 +520,8 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                   readOnly={!!lead}
                   value={
                     selectedCustomer
-                      ? `${selectedCustomer.name} ${
-                          selectedCustomer.last_name || ""
-                        }`
+                      ? `${selectedCustomer.name} ${selectedCustomer.last_name || ""
+                      }`
                       : searchCustomer
                   }
                   onFocus={() => !lead && setFocusCustomer(true)}
@@ -773,37 +805,37 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
                     {getInstallmentsForMethod(p.payment_method_id).length >
                       0 && (
-                      <Select
-                        value={p.installments || ""}
-                        onValueChange={(val) => {
-                          const inst = getInstallmentsForMethod(
-                            p.payment_method_id
-                          ).find((x) => x.installments === Number(val));
-                          updatePaymentField(i, "installments", val);
-                          updatePaymentField(
-                            i,
-                            "multiplier",
-                            inst?.multiplier || 1
-                          );
-                        }}
-                      >
-                        <SelectTrigger className="w-28">
-                          <SelectValue placeholder="Cuotas" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getInstallmentsForMethod(p.payment_method_id).map(
-                            (inst) => (
-                              <SelectItem
-                                key={inst.id}
-                                value={inst.installments.toString()}
-                              >
-                                {inst.installments} cuotas
-                              </SelectItem>
-                            )
-                          )}
-                        </SelectContent>
-                      </Select>
-                    )}
+                        <Select
+                          value={p.installments || ""}
+                          onValueChange={(val) => {
+                            const inst = getInstallmentsForMethod(
+                              p.payment_method_id
+                            ).find((x) => x.installments === Number(val));
+                            updatePaymentField(i, "installments", val);
+                            updatePaymentField(
+                              i,
+                              "multiplier",
+                              inst?.multiplier || 1
+                            );
+                          }}
+                        >
+                          <SelectTrigger className="w-28">
+                            <SelectValue placeholder="Cuotas" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getInstallmentsForMethod(p.payment_method_id).map(
+                              (inst) => (
+                                <SelectItem
+                                  key={inst.id}
+                                  value={inst.installments.toString()}
+                                >
+                                  {inst.installments} cuotas
+                                </SelectItem>
+                              )
+                            )}
+                          </SelectContent>
+                        </Select>
+                      )}
 
                     {payments.length > 1 && (
                       <Button
@@ -888,20 +920,18 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
                 <div className="text-muted-foreground">Pagado:</div>
                 <div
-                  className={`text-right font-semibold ${
-                    Math.round(paidARS) === Math.round(totalWithSurcharge)
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
+                  className={`text-right font-semibold ${Math.round(paidARS) === Math.round(totalWithSurcharge)
+                    ? "text-green-600"
+                    : "text-red-600"
+                    }`}
                 >
                   {formatARS(paidARS)}
                 </div>
 
                 <div className="text-muted-foreground">Restante:</div>
                 <div
-                  className={`text-right font-bold ${
-                    remaining === 0 ? "text-green-600" : "text-blue-600"
-                  }`}
+                  className={`text-right font-bold ${remaining === 0 ? "text-green-600" : "text-blue-600"
+                    }`}
                 >
                   {formatARS(remaining)}
                 </div>
@@ -938,11 +968,14 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       </SheetContent>
 
       {/* Comprobante / Factura */}
-      <DialogSaleInvoice
-        open={invoiceOpen}
-        onClose={() => setInvoiceOpen(false)}
-        sale={invoiceData}
-      />
+      {invoiceData && (
+        <DialogSaleInvoice
+          open={invoiceOpen}
+          onClose={() => setInvoiceOpen(false)}
+          sale={{ ...invoiceData, reset: resetFormData }}
+        />
+      )}
+
     </Sheet>
   );
 }

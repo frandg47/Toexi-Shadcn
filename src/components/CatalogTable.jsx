@@ -198,16 +198,37 @@ export default function CatalogTable({ tipo }) {
 
   return (
     <>
-      <div className="flex justify-between items-center my-4 flex-wrap gap-3">
+      <div className="
+  flex flex-col gap-3
+  lg:flex-row lg:items-center lg:justify-between
+  my-4
+">
+
+        {/* Buscador */}
         <Input
           placeholder="Buscar por nombre..."
           onChange={(e) => setNameFilter(e.target.value)}
-          className="w-72"
+          className="w-full lg:w-72"
         />
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchData} disabled={loading}>
-            <IconRefresh className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} /> Refrescar
+
+        {/* Botones */}
+        <div className="
+    flex gap-2 justify-end
+    w-full lg:w-auto
+    flex-wrap
+  ">
+          <Button
+            variant="outline"
+            onClick={fetchData}
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            <IconRefresh
+              className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"}
+            />
+            Refrescar
           </Button>
+
           <Button
             onClick={() =>
               setModal({
@@ -217,11 +238,14 @@ export default function CatalogTable({ tipo }) {
                 type: tipo === "brands" ? "brand" : "category",
               })
             }
+            className="flex items-center gap-2"
           >
-            <IconPlus className="h-4 w-4" /> Agregar
+            <IconPlus className="h-4 w-4" />
+            Agregar
           </Button>
         </div>
       </div>
+
       <div className="container my-6 space-y-10 ">
         {(tipo === "all" || tipo === "categories") && (
           <>{renderCards(categories, "category")}</>

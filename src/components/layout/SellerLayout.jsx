@@ -2,10 +2,11 @@
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { useState } from "react";
 import AppSidebar from "@/components/app-sidebar";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import SheetNewLead from "../SheetNewLead";
-import Header from "../Header";
-import PaymentCalculatorDialog from "../PaymentCalculatorDialog"; // OJO: ruta corregida
+import { SiteHeader } from "@/components/site-header";
+
+import PaymentCalculatorDialog from "../PaymentCalculatorDialog";
 
 import {
   paymentMethods,
@@ -21,6 +22,7 @@ import {
   IconSettings,
   IconCalculator,
 } from "@tabler/icons-react";
+
 import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContextProvider";
 
@@ -41,41 +43,33 @@ const navSecondary = [
 export default function SellerLayout() {
   const [openCalculatorDialog, setOpenCalculatorDialog] = useState(false);
   const [openLeadDialog, setOpenLeadDialog] = useState(false);
-  const { user, role, isActive, status } = useAuth();
+  const { user } = useAuth();
 
-  console.log(
-    "object SellerLayout -> user, role, isActive, status",
-    user,
-    role,
-    isActive,
-    status
-  );
-  console.log("id", user?.id);
+  const location = useLocation();
 
-  // 🔹 navMain DENTRO del componente → acá sí podemos usar setOpenCalculatorDialog
+  // 🔹 Rutas → Títulos automáticos
+  const pageTitles = {
+    "/seller/products": "Productos",
+    "/seller/sales": "Mis ventas",
+    "/seller/orders": "Mis pedidos",
+    "/seller/clients": "Clientes",
+    "/seller/top-sellers": "Top Vendedores",
+    "/seller/settings": "Configuración",
+  };
+
+  const tituloActual = pageTitles[location.pathname] || "Panel del vendedor";
+
   const navMain = [
     { title: "Inicio", url: "/seller/products", icon: IconHome },
     {
       title: "Mis ventas",
       url: "/seller/sales",
       icon: IconShoppingCart,
-      onClick: () => showDevelopmentToast("Clientes"),
+      onClick: () => showDevelopmentToast("Mis ventas"),
     },
-    {
-      title: "Mis pedidos",
-      url: "/seller/orders",
-      icon: IconList,
-    },
-    {
-      title: "Clientes",
-      url: "/seller/clients",
-      icon: IconUsers,
-    },
-    {
-      title: "Top Vendedores",
-      url: "/seller/top-sellers",
-      icon: IconMedal,
-    },
+    { title: "Mis pedidos", url: "/seller/orders", icon: IconList },
+    { title: "Clientes", url: "/seller/clients", icon: IconUsers },
+    { title: "Top Vendedores", url: "/seller/top-sellers", icon: IconMedal },
     {
       title: "Calculadora de cotizaciones",
       icon: IconCalculator,
@@ -86,7 +80,7 @@ export default function SellerLayout() {
   return (
     <SidebarProvider>
       <AppSidebar
-        title="Panel de Ventas"
+        title="Toexi Tech"
         navMain={navMain}
         navSecondary={navSecondary}
         actionButtonLabel="Nuevo pedido"
@@ -94,8 +88,9 @@ export default function SellerLayout() {
       />
 
       <SidebarInset>
-        <Header />
-        <main className="p-6 mx-auto max-w-6xl w-full">
+        <SiteHeader titulo={tituloActual} />
+
+        <main className="p-6 mx-auto max-w-6xl w-full pt-[var(--header-height)]">
           <Outlet />
         </main>
       </SidebarInset>
@@ -106,7 +101,6 @@ export default function SellerLayout() {
         sellerId={user?.id}
       />
 
-      {/* Dialog de Calculadora */}
       <PaymentCalculatorDialog
         open={openCalculatorDialog}
         onOpenChange={setOpenCalculatorDialog}

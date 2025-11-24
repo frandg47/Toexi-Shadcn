@@ -250,85 +250,95 @@ const OrdersTable = () => {
   return (
     <div className="space-y-4">
       {/* 🔹 Header */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="flex flex-col sm:flex-row gap-3 flex-1">
-            <Input
-              placeholder="Buscar por cliente..."
-              onChange={(e) => setNameFilter(e.target.value)}
-              className="w-full sm:w-80"
-            />
 
-            {/* 🔹 Filtro por fecha */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="whitespace-nowrap">
-                  <IconCalendar className="h-4 w-4 mr-2" />
-                  {dateRange?.from && dateRange?.to
-                    ? `${dateRange.from.toLocaleDateString(
-                      "es-AR"
-                    )} - ${dateRange.to.toLocaleDateString("es-AR")}`
-                    : "Filtrar por fecha"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="p-3" align="start">
-                <Calendar
-                  mode="range"
-                  selected={dateRange}
-                  onSelect={setDateRange}
-                  locale={es}
-                  initialFocus
+      <div className="space-y-4">
+
+        {/* 🔹 HEADER PRINCIPAL */}
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+
+          {/* 🔸 🟩 FILA 1 – Buscador (sm–lg full width, en xl queda en la fila única) */}
+          <Input
+            placeholder="Buscar por cliente..."
+            onChange={(e) => setNameFilter(e.target.value)}
+            className="w-full xl:w-80"
+          />
+
+          {/* Contenedor de las filas 2 y 3 (sm–lg) / columna flexible (xl) */}
+          <div className="flex flex-col gap-3 w-full xl:flex-row xl:items-center xl:justify-end">
+
+            {/* 🔸 🟦 FILA 2 — Rango de fecha + Semana actual */}
+            <div className="flex flex-row gap-3 w-full justify-end">
+
+              {/* Rango de fecha (toma todo el espacio disponible en sm–lg) */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2 w-full flex-1 min-w-0"
+                  >
+                    <IconCalendar className="h-4 w-4" />
+                    {dateRange?.from && dateRange?.to
+                      ? `${dateRange.from.toLocaleDateString("es-AR")} - ${dateRange.to.toLocaleDateString("es-AR")}`
+                      : "Filtrar por fecha"}
+                  </Button>
+                </PopoverTrigger>
+
+                <PopoverContent className="p-3" align="start">
+                  <Calendar
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    locale={es}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {/* Botón Semana actual */}
+              <Button variant="outline" onClick={handleWeekFilter}>
+                Semana actual
+              </Button>
+            </div>
+
+            {/* 🔸 🟨 FILA 3 — Estados + Refrescar (sm–lg) */}
+            <div className="flex flex-row gap-3 w-full justify-end">
+
+              {/* Select Estado */}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Filtrar por estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="sin_exito">Sin éxito</SelectItem>
+                  <SelectItem value="vendido">Vendido</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Botón Refrescar */}
+              <Button
+                variant="outline"
+                onClick={() => fetchOrders(false)}
+                disabled={refreshing}
+                className="flex items-center gap-2 px-3"
+              >
+                {/* md–xl: ícono + texto */}
+                <IconRefresh
+                  className={refreshing && "h-4 w-4 animate-spin"}
                 />
-              </PopoverContent>
-            </Popover>
+                <span>Refrescar</span>
+              </Button>
+            </div>
 
-            <Button variant="outline" onClick={handleWeekFilter}>
-              Semana actual
-            </Button>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue placeholder="Filtrar por estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="sin_exito">Sin éxito</SelectItem>
-                <SelectItem value="vendido">Vendido</SelectItem>
-                <SelectItem value="cancelado">Cancelado</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
-
-          <Button
-            variant="outline"
-            onClick={() => fetchOrders(false)}
-            disabled={refreshing}
-            className="flex items-center gap-1"
-          >
-            <IconRefresh
-              className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
-            />
-            Refrescar
-          </Button>
         </div>
 
-        {/* KPIs
-        <div className="grid grid-cols-5 gap-2 w-full">
-          {Object.entries(kpis).map(([key, value]) => (
-            <Badge
-              key={key}
-              variant="outline"
-              className={`hidden capitalize text-center md:block ${
-                STATUS_STYLES[key] || "text-gray-700"
-              } border ${
-                STATUS_COLORS[key] || "bg-gray-300"
-              } bg-opacity-20 p-2`}
-            >
-              {key}: {value}
-            </Badge>
-          ))}
-        </div> */}
       </div>
+
+
+
 
       {/* 🔹 Tabla */}
       <div className="overflow-x-auto rounded-md border">

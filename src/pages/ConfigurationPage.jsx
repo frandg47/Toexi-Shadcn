@@ -1,6 +1,5 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { SiteHeader } from "@/components/site-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import {
@@ -12,7 +11,7 @@ import {
   IconInfoCircle,
 } from "@tabler/icons-react";
 
-const ConfigurationPage = ({ titulo }) => {
+const ConfigurationPage = () => {
   const navigate = useNavigate();
 
   const CARDS_CONFIG = [
@@ -50,8 +49,6 @@ const ConfigurationPage = ({ titulo }) => {
 
   return (
     <>
-      <SiteHeader titulo={titulo || "Configuraciones"} />
-
       <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
         {CARDS_CONFIG.map((card) => (
           <Card

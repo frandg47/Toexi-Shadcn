@@ -1,6 +1,7 @@
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
+import Header from "../components/Header"
 
 import {
   Sidebar,
@@ -27,36 +28,41 @@ export default function AppSidebar({
   const displayUser =
     user || profile
       ? {
-          id: profile?.id || "",
-          name:
-            profile?.name ||
-            user?.user_metadata?.full_name ||
-            user?.user_metadata?.name ||
-            "Usuario",
-          email: profile?.email || user?.email || "",
-          avatar:
-            user?.user_metadata?.avatar_url ||
-            user?.user_metadata?.picture ||
-            "/avatars/default.jpg",
-          role: profile?.role || "",
-        }
+        id: profile?.id || "",
+        name:
+          profile?.name ||
+          user?.user_metadata?.full_name ||
+          user?.user_metadata?.name ||
+          "Usuario",
+        email: profile?.email || user?.email || "",
+        avatar:
+          user?.user_metadata?.avatar_url ||
+          user?.user_metadata?.picture ||
+          "/avatars/default.jpg",
+        role: profile?.role || "",
+      }
       : {
-          name: "Cargando…",
-          email: "",
-          avatar: "/avatars/default.jpg",
-        };
+        name: "Cargando…",
+        email: "",
+        avatar: "/avatars/default.jpg",
+      };
 
   return (
-    <Sidebar collapsible="offcanvas">
-      <SidebarHeader>
+    <Sidebar collapsible="icon">
+
+      <Header />
+      {/* <SidebarHeader className="bg-green-500">
         <SidebarMenu>
+          <div className="flex justify-center">
+            <span className="text-xl font-bold text-white">{title}</span>
+          </div>
+
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <span className="text-xl font-bold">{title}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-      </SidebarHeader>
+      </SidebarHeader> */}
 
       <SidebarContent>
         <NavMain

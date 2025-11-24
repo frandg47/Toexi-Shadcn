@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { IconColumns } from "@tabler/icons-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -92,7 +93,7 @@ const getGoogleAvatarUrl = (email) => {
   )}`;
 };
 
-const UsersTable = ({ refreshToken = 0, onAdd }) => {
+const UsersTable = ({ refreshToken = 0 }) => {
   const [visibleColumns, setVisibleColumns] = useState(
     TABLE_COLUMNS.map((col) => col.id)
   );
@@ -234,20 +235,27 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
   return (
     <div className="space-y-4">
       {/* 🔹 Header de filtros y acciones */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+
         {/* 🔍 Buscador */}
         <Input
           placeholder="Buscar por nombre..."
           onChange={(e) => setNameFilter(e.target.value)}
-          className="w-full sm:w-80 max-w-sm"
+          className="w-full lg:w-80 max-w-full"
         />
 
-        {/* 🔘 Botones (en mobile quedan abajo en fila) */}
-        <div className="flex justify-center sm:justify-end flex-wrap gap-2">
+        {/* 🔘 Botones */}
+        <div className="flex flex-wrap gap-2 justify-end w-full lg:w-auto">
+
+          {/* Columnas */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">Columnas</Button>
+              <Button variant="outline" className="flex items-center gap-2">
+                <IconColumns className="h-4 w-4" />
+                <span>Columnas</span>
+              </Button>
             </DropdownMenuTrigger>
+
             <DropdownMenuContent className="w-40">
               {TABLE_COLUMNS.map((col) => (
                 <DropdownMenuCheckboxItem
@@ -261,10 +269,12 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* Refrescar */}
           <Button
             variant="outline"
             onClick={() => fetchUsers(false)}
             disabled={refreshing}
+            className="flex items-center gap-2"
           >
             <IconRefresh
               className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
@@ -272,7 +282,6 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
             Refrescar
           </Button>
 
-          {onAdd}
         </div>
       </div>
 
