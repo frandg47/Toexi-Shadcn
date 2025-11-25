@@ -1,0 +1,20 @@
+// /utils/routeTranslations.js
+export const ROUTE_TRANSLATIONS = {
+  dashboard: "Dashboard",
+  products: "Productos",
+  catalog: "Catálogo",
+  brands: "Marcas",
+  categories: "Categorías",
+  customers: "Clientes",
+  team: "Equipo",
+  orders: "Pedidos",
+  "top-sellers": "Top Vendedores",
+
+  // ⚙️ Configuración
+  settings: "Configuraciones",
+  comission: "Comisiones",
+  "fx-rates": "Tipos de Cambio",
+  "payment-methods": "Métodos de Pago",
+  inventory: "Inventario",
+  sales: "Ventas",
+};

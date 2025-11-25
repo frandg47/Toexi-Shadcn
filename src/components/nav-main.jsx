@@ -1,51 +1,36 @@
 import { useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import {
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
-import {
-  IconCirclePlusFilled,
-  IconChevronDown,
-  IconInfoCircle,
-} from "@tabler/icons-react";
+import { SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, } from "@/components/ui/sidebar";
+import { IconCirclePlusFilled, IconChevronDown, IconInfoCircle, } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useSidebar } from "@/components/ui/sidebar";
+
 
 export function NavMain({ items, actionButtonLabel, onActionClick }) {
-  const navigate = useNavigate();
-
-  const showDevelopmentToast = (feature) => {
-    toast("Funcionalidad en desarrollo", {
-      description: `El módulo de ${feature} estará disponible próximamente.`,
-      icon: <IconInfoCircle className="h-5 w-5 text-blue-500" />,
-      duration: 3000,
-    });
-  };
+  const { collapsed } = useSidebar(); // <-- clave
 
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
+
         {/* Botón Nueva venta */}
         <SidebarMenu>
           <SidebarMenuItem>
             <Button
               variant="outline"
-              className="w-full justify-start bg-gray-900 text-white hover:bg-gray-800 hover:text-white"
-              onClick={() => {
-                if (onActionClick) onActionClick();
-                else showDevelopmentToast(actionButtonLabel);
-              }}
+              className={`w-full justify-start bg-gray-900 text-white hover:bg-gray-800 hover:text-white
+                ${collapsed ? "justify-center" : ""}
+              `}
+              onClick={onActionClick}
             >
-              <IconCirclePlusFilled className="mr-2 h-5 w-5" />
-              {actionButtonLabel}
+              <IconCirclePlusFilled className="h-5 w-5" />
+              {!collapsed && <span className="ml-2">{actionButtonLabel}</span>}
             </Button>
           </SidebarMenuItem>
         </SidebarMenu>
 
-        {/* Links de navegación */}
+        {/* Links */}
         <SidebarMenu>
           {items.map((item) =>
             item.items ? (
@@ -54,24 +39,16 @@ export function NavMain({ items, actionButtonLabel, onActionClick }) {
               <SidebarMenuItem key={item.title}>
                 <NavLink
                   to={item.url}
-                  end={true}
-                  onClick={(e) => {
-                    if (item.onClick) {
-                      e.preventDefault();
-                      item.onClick();
-                    }
-                  }}
+                  end
                   className={({ isActive }) =>
                     `flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors
-                     ${
-                       isActive && !item.onClick
-                         ? "bg-primary text-primary-foreground shadow-sm"
-                         : "hover:bg-muted hover:text-foreground"
-                     }`
+                     ${isActive ? "bg-primary text-primary-foreground shadow-sm" :
+                      "hover:bg-muted hover:text-foreground"}
+                     ${collapsed ? "justify-center px-2" : ""}`
                   }
                 >
                   {item.icon && <item.icon className="h-5 w-5" />}
-                  <span>{item.title}</span>
+                  {!collapsed && <span>{item.title}</span>}
                 </NavLink>
               </SidebarMenuItem>
             )
@@ -82,55 +59,59 @@ export function NavMain({ items, actionButtonLabel, onActionClick }) {
   );
 }
 
-/* --- Subcomponente para dropdown --- */
+
 function DropMenu({ item }) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const { collapsed } = useSidebar();
 
-  // Verificar si alguna subruta coincide con la ruta actual
   const isAnyChildActive = item.items.some(
     (sub) => location.pathname === sub.url
   );
 
+  const shouldOpen = open && !collapsed; // 🔥 nunca abrir en modo ícono
+
   return (
     <SidebarMenuItem className="flex flex-col">
-      {/* Botón padre con el mismo estilo que un NavLink */}
+
+      {/* Botón padre */}
       <button
-        onClick={() => setOpen(!open)}
-        className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-sm transition-colors
-          ${
-            open || isAnyChildActive
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "hover:bg-muted hover:text-foreground"
-          }`}
+        onClick={() => !collapsed && setOpen(!open)}
+        className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors
+          ${isAnyChildActive || open
+            ? "bg-primary text-primary-foreground shadow-sm"
+            : "hover:bg-muted hover:text-foreground"}
+          ${collapsed ? "justify-center px-2" : ""}
+        `}
       >
-        <span className="flex items-center gap-2">
-          {item.icon && <item.icon className="h-5 w-5" />}
-          {item.title}
-        </span>
-        <IconChevronDown
-          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
-        />
+        {item.icon && <item.icon className="h-5 w-5" />}
+
+        {!collapsed && <span>{item.title}</span>}
+
+        {!collapsed && (
+          <IconChevronDown
+            className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        )}
       </button>
 
-      {/* Submenú desplegable */}
-      {open && (
-        <SidebarMenu className="pl-3 mt-1 flex flex-col gap-1 overflow-x-hidden w-[calc(100%-0.75rem)]">
+      {/* Submenú */}
+      {shouldOpen && (
+        <SidebarMenu className="pl-3 mt-1 flex flex-col gap-1">
           {item.items.map((sub) => (
             <SidebarMenuItem key={sub.title}>
               <NavLink
                 to={sub.url}
                 className={({ isActive }) =>
                   `flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors
-                   ${
-                     isActive
-                       ? "bg-primary text-primary-foreground"
-                       : "hover:bg-muted hover:text-foreground"
-                   }`
+                     ${isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-muted hover:text-foreground"
+                  }`
                 }
               >
                 {sub.icon && <sub.icon className="h-4 w-4" />}
-                {sub.title}
+                {!collapsed && <span>{sub.title}</span>}
               </NavLink>
             </SidebarMenuItem>
           ))}

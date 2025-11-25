@@ -95,43 +95,54 @@ export function SalesList() {
         <div className="pb-6 space-y-6">
 
             {/* 🔎 FILTROS EXACTO AL ESTILO FxRatesConfig */}
-            <div className="flex flex-wrap items-center justify-between gap-4">
-
-                {/* Rango de fechas */}
+            <div
+                className="flex flex-col gap-3 sm:flex-row lg:items-center sm:justify-between"
+            >
+                {/* ------- FILA 1 (siempre) ------- */}
                 <div className="flex gap-3">
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className="flex items-center gap-2">
-                                <IconCalendar className="h-4 w-4" />
-                                {dateRange?.from
-                                    ? `${dateRange.from.toLocaleDateString("es-AR")} → ${dateRange.to
-                                        ? dateRange.to.toLocaleDateString("es-AR")
-                                        : "..."
-                                    }`
-                                    : "Seleccionar rango"}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="p-2" align="start">
-                            <Calendar
-                                mode="range"
-                                selected={dateRange}
-                                onSelect={setDateRange}
-                                className="rounded-lg border shadow-sm"
-                            />
-                        </PopoverContent>
-                    </Popover>
+                    {/* Rango (ocupa espacio restante en mobile) */}
+                    <div className="flex-1">
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    className="flex items-center gap-2 w-full sm:w-auto"
+                                >
+                                    <IconCalendar className="h-4 w-4" />
+                                    {dateRange?.from
+                                        ? `${dateRange.from.toLocaleDateString("es-AR")} → ${dateRange.to
+                                            ? dateRange.to.toLocaleDateString("es-AR")
+                                            : "..."
+                                        }`
+                                        : "Seleccionar rango"}
+                                </Button>
+                            </PopoverTrigger>
 
-                    {/* Semana */}
+                            <PopoverContent className="p-2" align="start">
+                                <Calendar
+                                    mode="range"
+                                    selected={dateRange}
+                                    onSelect={setDateRange}
+                                    className="rounded-lg border shadow-sm"
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+
+                    {/* Semana actual */}
                     <Button
                         variant="outline"
                         onClick={() => setDateRange(getDefaultWeekRange())}
+                        className="whitespace-nowrap"
                     >
                         Semana actual
                     </Button>
                 </div>
 
-                {/* Acciones */}
-                <div className="flex gap-3">
+                {/* ------- FILA 2 SOLO EN MOBILE, MISMA FILA EN LG+ ------- */}
+                <div
+                    className="flex w-full justify-end gap-3 lg:w-auto lg:justify-end"
+                >
                     <Button
                         variant="outline"
                         onClick={() => {
@@ -147,6 +158,7 @@ export function SalesList() {
                     </Button>
                 </div>
             </div>
+
 
             {/* Filtro por vendedor */}
             {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-muted p-4 rounded-lg">
@@ -227,120 +239,120 @@ export function SalesList() {
             </div>
 
             {/* 📄 Paginación */}
-                {/* 📄 Paginación Shadcn */}
-                <Pagination className="mt-10 flex justify-center">
-                    <PaginationContent>
+            {/* 📄 Paginación Shadcn */}
+            <Pagination className="mt-10 flex justify-center">
+                <PaginationContent>
 
-                        {/* Botón Anterior */}
-                        <PaginationItem>
-                            <PaginationPrevious
-                                href="#"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    if (page > 1) setPage((p) => p - 1);
-                                }}
-                                className={page === 1 ? "pointer-events-none opacity-50" : ""}
-                            />
-                        </PaginationItem>
+                    {/* Botón Anterior */}
+                    <PaginationItem>
+                        <PaginationPrevious
+                            href="#"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                if (page > 1) setPage((p) => p - 1);
+                            }}
+                            className={page === 1 ? "pointer-events-none opacity-50" : ""}
+                        />
+                    </PaginationItem>
 
-                        {/* Primera página */}
-                        {page > 3 && (
-                            <PaginationItem>
-                                <PaginationLink
-                                    href="#"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        setPage(1);
-                                    }}
-                                >
-                                    1
-                                </PaginationLink>
-                            </PaginationItem>
-                        )}
-
-                        {/* ... */}
-                        {page > 4 && (
-                            <PaginationItem>
-                                <PaginationEllipsis />
-                            </PaginationItem>
-                        )}
-
-                        {/* Páginas anteriores */}
-                        {page > 1 && (
-                            <PaginationItem>
-                                <PaginationLink
-                                    href="#"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        setPage(page - 1);
-                                    }}
-                                >
-                                    {page - 1}
-                                </PaginationLink>
-                            </PaginationItem>
-                        )}
-
-                        {/* Página actual */}
+                    {/* Primera página */}
+                    {page > 3 && (
                         <PaginationItem>
                             <PaginationLink
                                 href="#"
-                                isActive
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    setPage(1);
+                                }}
                             >
-                                {page}
+                                1
                             </PaginationLink>
                         </PaginationItem>
+                    )}
 
-                        {/* Página siguiente */}
-                        {page < totalPages && (
-                            <PaginationItem>
-                                <PaginationLink
-                                    href="#"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        setPage(page + 1);
-                                    }}
-                                >
-                                    {page + 1}
-                                </PaginationLink>
-                            </PaginationItem>
-                        )}
-
-                        {/* ... */}
-                        {page < totalPages - 3 && (
-                            <PaginationItem>
-                                <PaginationEllipsis />
-                            </PaginationItem>
-                        )}
-
-                        {/* Última página */}
-                        {page < totalPages - 2 && (
-                            <PaginationItem>
-                                <PaginationLink
-                                    href="#"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        setPage(totalPages);
-                                    }}
-                                >
-                                    {totalPages}
-                                </PaginationLink>
-                            </PaginationItem>
-                        )}
-
-                        {/* Botón Siguiente */}
+                    {/* ... */}
+                    {page > 4 && (
                         <PaginationItem>
-                            <PaginationNext
+                            <PaginationEllipsis />
+                        </PaginationItem>
+                    )}
+
+                    {/* Páginas anteriores */}
+                    {page > 1 && (
+                        <PaginationItem>
+                            <PaginationLink
                                 href="#"
                                 onClick={(e) => {
                                     e.preventDefault();
-                                    if (page < totalPages) setPage((p) => p + 1);
+                                    setPage(page - 1);
                                 }}
-                                className={page === totalPages ? "pointer-events-none opacity-50" : ""}
-                            />
+                            >
+                                {page - 1}
+                            </PaginationLink>
                         </PaginationItem>
+                    )}
 
-                    </PaginationContent>
-                </Pagination>
+                    {/* Página actual */}
+                    <PaginationItem>
+                        <PaginationLink
+                            href="#"
+                            isActive
+                        >
+                            {page}
+                        </PaginationLink>
+                    </PaginationItem>
+
+                    {/* Página siguiente */}
+                    {page < totalPages && (
+                        <PaginationItem>
+                            <PaginationLink
+                                href="#"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    setPage(page + 1);
+                                }}
+                            >
+                                {page + 1}
+                            </PaginationLink>
+                        </PaginationItem>
+                    )}
+
+                    {/* ... */}
+                    {page < totalPages - 3 && (
+                        <PaginationItem>
+                            <PaginationEllipsis />
+                        </PaginationItem>
+                    )}
+
+                    {/* Última página */}
+                    {page < totalPages - 2 && (
+                        <PaginationItem>
+                            <PaginationLink
+                                href="#"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    setPage(totalPages);
+                                }}
+                            >
+                                {totalPages}
+                            </PaginationLink>
+                        </PaginationItem>
+                    )}
+
+                    {/* Botón Siguiente */}
+                    <PaginationItem>
+                        <PaginationNext
+                            href="#"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                if (page < totalPages) setPage((p) => p + 1);
+                            }}
+                            className={page === totalPages ? "pointer-events-none opacity-50" : ""}
+                        />
+                    </PaginationItem>
+
+                </PaginationContent>
+            </Pagination>
 
         </div>
     );

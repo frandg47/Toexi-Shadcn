@@ -1,20 +1,47 @@
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useLocation } from "react-router-dom";
+import BreadcrumbHeader from "@/components/BreadcrumbHeader";
 
-/**
- * Componente de cabecera reutilizable
- *
- * @param {string} titulo - Título a mostrar en la barra
- * @param {ReactNode} actions - Botones, search bar u otros elementos a la derecha
- */
-export function SiteHeader({ titulo, actions }) {
+const TITULOS = {
+  dashboard: "Dashboard",
+  products: "Productos",
+  catalog: "Catálogo",
+  "catalog/brands": "Marcas",
+  "catalog/categories": "Categorías",
+  customers: "Clientes",
+  team: "Equipo",
+  orders: "Pedidos",
+  "top-sellers": "Top Vendedores",
+
+  // ⚙️ Config
+  settings: "Configuraciones",
+  "settings/comission": "Comisiones",
+  "settings/fx-rates": "Tipos de Cambio",
+  "settings/payment-methods": "Métodos de Pago",
+  "settings/inventory": "Inventario",
+  "settings/sales": "Ventas",
+};
+
+export function SiteHeader({ actions }) {
+  const location = useLocation();
+
+  // 👉 Tomamos la ruta sin el prefijo /dashboard/ o /seller/
+  const path = location.pathname
+    .replace("/dashboard/", "")
+    .replace("/seller/", "")
+    .replace("/", "");
+
+  // 👉 Buscar el título exacto
+  const titulo = TITULOS[path] || TITULOS[path.split("/")[0]] || "Panel";
+
   return (
     <header
       className="
         sticky top-0 z-40 
         flex h-16
         shrink-0 items-center gap-2 border-b 
-        bg-green-700/90 md:bg-white/90 backdrop-blur-sm
+        bg-green-600/80 md:bg-white/90 backdrop-blur-sm
         transition-[width,height] ease-linear
       "
     >
@@ -26,7 +53,9 @@ export function SiteHeader({ titulo, actions }) {
           className="mx-2 data-[orientation=vertical]:h-4"
         />
 
-        <h1 className="text-base text-white md:text-black/90 font-medium">{titulo}</h1>
+        <div className="ml-3">
+          <BreadcrumbHeader />
+        </div>
 
         <div className="ml-auto flex items-center gap-2">
           {actions}
@@ -35,4 +64,3 @@ export function SiteHeader({ titulo, actions }) {
     </header>
   );
 }
-

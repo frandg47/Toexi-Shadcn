@@ -2,35 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardFooter,
-} from "@/components/ui/card";
-
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-
-import { IconMedal, IconTrendingUp } from "@tabler/icons-react";
 import { BarChart, Bar, XAxis, YAxis } from "recharts";
-
-
-// ------------------------------
-// MEDALLAS
-// ------------------------------
-const medals = [
-  <IconMedal size={26} color="#FFD700" />, // OR0
-  <IconMedal size={26} color="#C0C0C0" />, // PLATA
-  <IconMedal size={26} color="#CD7F32" />, // BRONCE
-];
-
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { IconTrendingUp } from "@tabler/icons-react";
+import ConcentricLoader from "./ui/loading";
 
 // ------------------------------
 // COMPONENTE GENERAL
@@ -38,6 +14,34 @@ const medals = [
 export default function SellersTop() {
   const [topSales, setTopSales] = useState([]);
   const [topCommission, setTopCommission] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Responsive row height
+  const getRowHeight = () => {
+    if (typeof window === "undefined") return 55;
+    if (window.innerWidth < 480) return 80;
+    if (window.innerWidth < 768) return 65;
+    return 50;
+  };
+
+  const getYAxisWidth = () => {
+    if (typeof window === "undefined") return 230;
+    if (window.innerWidth < 480) return 40;
+    if (window.innerWidth < 768) return 60;
+    return 230;
+  };
+
+  const [rowHeight, setRowHeight] = useState(getRowHeight());
+  const [yAxisWidth, setYAxisWidth] = useState(getYAxisWidth());
+
+  useEffect(() => {
+    const onResize = () => {
+      setRowHeight(getRowHeight());
+      setYAxisWidth(getYAxisWidth());
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // --------------------------
   // CARGAR **TOP SELLERS**
@@ -50,7 +54,6 @@ export default function SellersTop() {
 
     const formatted = sorted.map((s, i) => ({
       ...s,
-      medal: medals[i] || "",
       fill: `var(--chart-${(i % 5) + 1})`,
     }));
 
@@ -64,26 +67,28 @@ export default function SellersTop() {
     const { data, error } = await supabase.rpc("get_top_commission_earners");
     if (error) return console.error(error);
 
-    const sorted = [...data].sort(
-      (a, b) => b.total_commission - a.total_commission
-    );
+    const sorted = [...data].sort((a, b) => b.total_commission - a.total_commission);
 
     const formatted = sorted.map((s, i) => ({
       ...s,
-      medal: medals[i] || "",
       fill: `var(--chart-${(i % 5) + 1})`,
     }));
 
     setTopCommission(formatted);
   };
 
-
   // --------------------------
-  // CARGAR TODO
+  // CARGA INICIAL (limpia y correcta)
   // --------------------------
   useEffect(() => {
-    loadTopSales();
-    loadTopCommission();
+    const loadAll = async () => {
+      setLoading(true);
+      await loadTopSales();
+      await loadTopCommission();
+      setLoading(false);
+    };
+
+    loadAll();
   }, []);
 
   // --------------------------
@@ -103,8 +108,6 @@ export default function SellersTop() {
             fontSize: "14px",
           }}
         >
-          {seller.medal}
-
           <img
             src={seller.avatar_url}
             alt={seller.seller_name}
@@ -116,16 +119,31 @@ export default function SellersTop() {
             }}
           />
 
-          <span>{seller.seller_name}</span>
+          <span className="hidden md:inline">{seller.seller_name}</span>
         </div>
       </foreignObject>
     );
   };
 
+  // --------------------------
+  // LOADER GLOBAL
+  // --------------------------
+  if (loading) {
+    return (
+      <div className="w-full flex justify-center py-12">
+        <ConcentricLoader />
+      </div>
+    );
+  }
+
+  // --------------------------
+  // RENDER
+  // --------------------------
   return (
     <div className="space-y-10">
+
       {/* -------------------------------------------------- */}
-      {/*        1) RANKING POR VENTAS REALIZADAS            */}
+      {/* 1) RANKING POR VENTAS */}
       {/* -------------------------------------------------- */}
       <Card>
         <CardHeader>
@@ -136,23 +154,33 @@ export default function SellersTop() {
         <CardContent>
           <ChartContainer
             config={{}}
-            style={{ height: `${topSales.length * 55}px` }}
+            style={{ height: `${topSales.length * rowHeight}px`, width: "100%" }}
           >
             <BarChart data={topSales} layout="vertical" barSize={32}>
               <YAxis
                 dataKey="seller_name"
                 type="category"
-                width={230}
+                width={yAxisWidth}
                 tickLine={false}
                 axisLine={false}
                 tick={(props) => renderTick(topSales, props.payload, props.y)}
               />
-
               <XAxis type="number" hide />
 
               <ChartTooltip
                 cursor={{ fill: "rgba(0,0,0,0.06)" }}
-                content={<ChartTooltipContent />}
+                content={
+                  <ChartTooltipContent
+                    formatter={(value) => (
+                      <>
+                        <span className="text-muted-foreground">Ventas:</span>
+                        <span className="text-foreground font-mono font-medium tabular-nums">
+                          {value.toLocaleString("es-AR")}
+                        </span>
+                      </>
+                    )}
+                  />
+                }
               />
 
               <Bar dataKey="total_sales" radius={6} />
@@ -160,7 +188,6 @@ export default function SellersTop() {
           </ChartContainer>
         </CardContent>
 
-        {/* FOOTER */}
         <CardFooter className="flex-col items-start gap-2 text-sm">
           <div className="flex gap-2 leading-none font-medium">
             Cantidad de ventas completadas por vendedor en el mes actual
@@ -173,7 +200,7 @@ export default function SellersTop() {
       </Card>
 
       {/* -------------------------------------------------- */}
-      {/*        2) RANKING POR COMISIONES GANADAS           */}
+      {/* 2) RANKING POR COMISIONES */}
       {/* -------------------------------------------------- */}
       <Card>
         <CardHeader>
@@ -184,25 +211,33 @@ export default function SellersTop() {
         <CardContent>
           <ChartContainer
             config={{}}
-            style={{ height: `${topCommission.length * 55}px` }}
+            style={{ height: `${topCommission.length * rowHeight}px`, width: "100%" }}
           >
             <BarChart data={topCommission} layout="vertical" barSize={32}>
               <YAxis
                 dataKey="seller_name"
                 type="category"
-                width={230}
+                width={yAxisWidth}
                 tickLine={false}
                 axisLine={false}
-                tick={(props) =>
-                  renderTick(topCommission, props.payload, props.y)
-                }
+                tick={(props) => renderTick(topCommission, props.payload, props.y)}
               />
-
               <XAxis type="number" hide />
 
               <ChartTooltip
                 cursor={{ fill: "rgba(0,0,0,0.06)" }}
-                content={<ChartTooltipContent />}
+                content={
+                  <ChartTooltipContent
+                    formatter={(value) => (
+                      <>
+                        <span className="text-muted-foreground">Comisión:</span>
+                        <span className="text-foreground font-mono font-medium tabular-nums">
+                          US$ {value.toLocaleString("es-AR")}
+                        </span>
+                      </>
+                    )}
+                  />
+                }
               />
 
               <Bar dataKey="total_commission" radius={6} />
@@ -210,7 +245,6 @@ export default function SellersTop() {
           </ChartContainer>
         </CardContent>
 
-        {/* FOOTER */}
         <CardFooter className="flex-col items-start gap-2 text-sm">
           <div className="flex gap-2 leading-none font-medium">
             Cantidad de comisiones generadas por vendedor en el mes actual

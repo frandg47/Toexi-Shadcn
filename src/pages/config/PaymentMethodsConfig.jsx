@@ -236,7 +236,7 @@ export default function PaymentMethodsConfig() {
 
   return (
     <>
-      <SiteHeader titulo="Configuración de Métodos de Pago" />
+      {/* <SiteHeader titulo="Configuración de Métodos de Pago" /> */}
       <div className="mt-6 flex justify-end items-center gap-3">
         <Button variant="outline" onClick={fetchMethods}>
           <IconRefresh className="h-4 w-4" /> Refrescar
