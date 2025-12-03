@@ -7,6 +7,26 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { IconTrendingUp } from "@tabler/icons-react";
 import ConcentricLoader from "./ui/loading";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+
+const getMonthName = (dateString) => {
+  if (!dateString) return "-";
+  try {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat("es-ES", {
+      month: "long",
+      year: "numeric",
+    }).format(date);
+  } catch {
+    return "-";
+  }
+};
 
 // ------------------------------
 // COMPONENTE GENERAL
@@ -15,6 +35,14 @@ export default function SellersTop() {
   const [topSales, setTopSales] = useState([]);
   const [topCommission, setTopCommission] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [monthFilter, setMonthFilter] = useState(() => {
+    const now = new Date();
+    // Defecto: último día del mes actual
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      .toISOString()
+      .split("T")[0];
+  });
+  const [availableMonths, setAvailableMonths] = useState([]);
 
   // Responsive row height
   const getRowHeight = () => {
@@ -47,10 +75,62 @@ export default function SellersTop() {
   // CARGAR **TOP SELLERS**
   // --------------------------
   const loadTopSales = async () => {
-    const { data, error } = await supabase.rpc("get_top_sellers");
-    if (error) return console.error(error);
+    // Obtener el período completo basado en period_end
+    const { data: periodData, error: periodError } = await supabase
+      .from("commission_payments")
+      .select("period_start, period_end")
+      .eq("period_end", monthFilter)
+      .limit(1)
+      .single();
+    
+    if (periodError || !periodData) {
+      setTopSales([]);
+      return;
+    }
 
-    const sorted = [...data].sort((a, b) => b.total_sales - a.total_sales);
+    // Obtener todas las ventas en el período filtrado
+    const { data: sales, error: salesError } = await supabase
+      .from("sales")
+      .select("seller_id")
+      .gte("sale_date", periodData.period_start)
+      .lte("sale_date", periodData.period_end)
+      .eq("status", "vendido");
+
+    if (salesError) return console.error(salesError);
+
+    // Obtener datos de usuarios
+    const { data: users, error: usersError } = await supabase
+      .from("users")
+      .select("id_auth, name, last_name, avatar_url");
+    
+    if (usersError) return console.error(usersError);
+
+    // Crear mapa de usuarios
+    const usersMap = {};
+    users?.forEach(u => {
+      usersMap[u.id_auth] = u;
+    });
+
+    // Agrupar por vendedor
+    const sellerData = {};
+    sales?.forEach(sale => {
+      if (!sale.seller_id) return;
+
+      const seller = usersMap[sale.seller_id];
+      if (!seller) return;
+
+      if (!sellerData[sale.seller_id]) {
+        sellerData[sale.seller_id] = {
+          seller_id: sale.seller_id,
+          seller_name: `${seller.name} ${seller.last_name || ''}`.trim(),
+          avatar_url: seller.avatar_url,
+          total_sales: 0,
+        };
+      }
+      sellerData[sale.seller_id].total_sales += 1;
+    });
+
+    const sorted = Object.values(sellerData).sort((a, b) => b.total_sales - a.total_sales);
 
     const formatted = sorted.map((s, i) => ({
       ...s,
@@ -64,10 +144,47 @@ export default function SellersTop() {
   // CARGAR **TOP COMMISSIONS**
   // --------------------------
   const loadTopCommission = async () => {
-    const { data, error } = await supabase.rpc("get_top_commission_earners");
-    if (error) return console.error(error);
+    // Obtener comisiones del mes filtrado
+    const { data: monthPayments, error: paymentsError } = await supabase
+      .from("commission_payments")
+      .select("seller_id, total_amount")
+      .eq("period_end", monthFilter);
+    
+    if (paymentsError) return console.error(paymentsError);
 
-    const sorted = [...data].sort((a, b) => b.total_commission - a.total_commission);
+    // Obtener datos de usuarios
+    const { data: users, error: usersError } = await supabase
+      .from("users")
+      .select("id_auth, name, last_name, avatar_url");
+    
+    if (usersError) return console.error(usersError);
+
+    // Crear mapa de usuarios
+    const usersMap = {};
+    users?.forEach(u => {
+      usersMap[u.id_auth] = u;
+    });
+
+    // Agrupar comisiones por vendedor
+    const commissionsByVendor = {};
+    monthPayments?.forEach(payment => {
+      const seller = usersMap[payment.seller_id];
+      if (!seller) return;
+
+      if (!commissionsByVendor[payment.seller_id]) {
+        commissionsByVendor[payment.seller_id] = {
+          seller_id: payment.seller_id,
+          seller_name: `${seller.name} ${seller.last_name || ''}`.trim(),
+          avatar_url: seller.avatar_url,
+          total_commission: 0,
+        };
+      }
+      commissionsByVendor[payment.seller_id].total_commission += Number(payment.total_amount || 0);
+    });
+
+    const sorted = Object.values(commissionsByVendor).sort(
+      (a, b) => b.total_commission - a.total_commission
+    );
 
     const formatted = sorted.map((s, i) => ({
       ...s,
@@ -85,11 +202,23 @@ export default function SellersTop() {
       setLoading(true);
       await loadTopSales();
       await loadTopCommission();
+      
+      // Obtener todos los meses disponibles
+      const { data: allPayments, error } = await supabase
+        .from("commission_payments")
+        .select("period_end")
+        .order("period_end", { ascending: false });
+      
+      if (!error && allPayments) {
+        const uniqueMonths = [...new Set(allPayments.map(p => p.period_end))];
+        setAvailableMonths(uniqueMonths);
+      }
+      
       setLoading(false);
     };
 
     loadAll();
-  }, []);
+  }, [monthFilter]);
 
   // --------------------------
   // FUNCIÓN PARA RENDER TICKS
@@ -141,6 +270,25 @@ export default function SellersTop() {
   // --------------------------
   return (
     <div className="space-y-10">
+      {/* Filtro de mes */}
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Filtrar por Mes</h2>
+          <p className="text-sm text-muted-foreground">Selecciona un período para ver el ranking</p>
+        </div>
+        <Select value={monthFilter} onValueChange={setMonthFilter}>
+          <SelectTrigger className="w-full lg:w-56">
+            <SelectValue placeholder="Filtrar por mes" />
+          </SelectTrigger>
+          <SelectContent>
+            {availableMonths.map((month) => (
+              <SelectItem key={month} value={month}>
+                {getMonthName(month)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* -------------------------------------------------- */}
       {/* 1) RANKING POR VENTAS */}

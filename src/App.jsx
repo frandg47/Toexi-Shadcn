@@ -19,6 +19,7 @@ import ConfigurationPage from "./pages/ConfigurationPage";
 import AuthCallback from "./pages/AuthCallback";
 import TopSellersPage from "./pages/TopSellersPage";
 import PaymentCalculator from "./pages/PaymentCalculator";
+import SellersPayments from "./pages/SellersPayments";
 
 // ⚙️ Configuración
 import ComissionConfig from "./pages/config/ComissionConfig";
@@ -109,6 +110,7 @@ export default function App() {
             <Route path="team" element={<TeamPage />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="top-sellers" element={<TopSellersPage />} />
+            <Route path="sellers-payments" element={<SellersPayments />} />
 
             {/* ⚙️ CONFIGURACIONES */}
             <Route

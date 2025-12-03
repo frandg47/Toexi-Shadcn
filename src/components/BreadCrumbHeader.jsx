@@ -41,10 +41,12 @@ export default function BreadcrumbHeader() {
 
         {segments.map((seg, index) => {
           accumulatedPath += `/${seg}`;
+          console.log("SEGMENTO REAL:", seg)
+
           const isLast = index === segments.length - 1;
 
           return (
-            <div key={seg} className="flex items-center">
+            <div key={index} className="flex items-center">
               <BreadcrumbSeparator className="mx-2 text-white md:text-muted-foreground" />
 
               {isLast ? (

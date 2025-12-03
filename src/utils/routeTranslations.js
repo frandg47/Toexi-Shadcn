@@ -10,6 +10,8 @@ export const ROUTE_TRANSLATIONS = {
   orders: "Pedidos",
   "top-sellers": "Top Vendedores",
   "payment-calculator": "Calculadora de Cotizaciones",
+  "sellers-payments": "Pagos a Vendedores",
+  "s-payments": "Pagos a Vendedores",
 
   // ⚙️ Configuración
   settings: "Configuraciones",

@@ -14,7 +14,8 @@ import {
   IconBrandApple,
   IconMedal,
   IconUsersGroup,
-  IconReport
+  IconReport,
+  IconCash,
 } from "@tabler/icons-react";
 
 import SheetNewSale from "@/components/SheetNewSale";
@@ -40,6 +41,7 @@ const navMain = [
   { title: "Clientes", url: "/dashboard/customers", icon: IconUsers },
   { title: "Equipo", url: "/dashboard/team", icon: IconUsersGroup },
   { title: "Top Vendedores", url: "/dashboard/top-sellers", icon: IconMedal },
+  { title: "Pagos a Vendedores", url: "/dashboard/sellers-payments", icon: IconCash },
 ];
 
 const navSecondary = [
@@ -60,6 +62,9 @@ export default function DashboardLayout() {
     "/dashboard/team": "Equipo",
     "/dashboard/top-sellers": "Top Vendedores",
     "/dashboard/settings": "Configuración",
+    "/dashboard/sellers-payments": "Pagos a Vendedores",
+    "/dashboard/settings/comission": "Comisiones",
+    "/dashboard/settings/fx-rates": "Cotizaciones",
   };
 
   const tituloActual = pageTitles[location.pathname] || "Dashboard";
