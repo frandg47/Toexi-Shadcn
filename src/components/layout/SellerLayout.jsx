@@ -8,10 +8,10 @@ import { SiteHeader } from "@/components/site-header";
 
 import PaymentCalculatorDialog from "../PaymentCalculatorDialog";
 
-import {
-  paymentMethods,
-  getInstallmentsForMethod,
-} from "../../lib/paymentsConfig";
+// import {
+//   paymentMethods,
+//   getInstallmentsForMethod,
+// } from "../../lib/paymentsConfig";
 
 import {
   IconHome,
@@ -25,6 +25,7 @@ import {
 
 import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContextProvider";
+// import { url } from "inspector";
 
 const showDevelopmentToast = (feature) =>
   toast("Funcionalidad en desarrollo", {
@@ -41,7 +42,7 @@ const navSecondary = [
 ];
 
 export default function SellerLayout() {
-  const [openCalculatorDialog, setOpenCalculatorDialog] = useState(false);
+  // const [openCalculatorDialog, setOpenCalculatorDialog] = useState(false);
   const [openLeadDialog, setOpenLeadDialog] = useState(false);
   const { user } = useAuth();
 
@@ -61,19 +62,20 @@ export default function SellerLayout() {
 
   const navMain = [
     { title: "Inicio", url: "/seller/products", icon: IconHome },
-    {
-      title: "Mis ventas",
-      url: "/seller/sales",
-      icon: IconShoppingCart,
-      onClick: () => showDevelopmentToast("Mis ventas"),
-    },
+    // {
+    //   title: "Mis ventas",
+    //   url: "/seller/sales",
+    //   icon: IconShoppingCart,
+    //   onClick: () => showDevelopmentToast("Mis ventas"),
+    // },
     { title: "Mis pedidos", url: "/seller/orders", icon: IconList },
     { title: "Clientes", url: "/seller/clients", icon: IconUsers },
     { title: "Top Vendedores", url: "/seller/top-sellers", icon: IconMedal },
     {
       title: "Calculadora de cotizaciones",
       icon: IconCalculator,
-      onClick: () => setOpenCalculatorDialog(true),
+      url: "/seller/payment-calculator",
+      // onClick: () => setOpenCalculatorDialog(true),
     },
   ];
 
@@ -101,14 +103,14 @@ export default function SellerLayout() {
         sellerId={user?.id}
       />
 
-      <PaymentCalculatorDialog
+      {/* <PaymentCalculatorDialog
         open={openCalculatorDialog}
         onOpenChange={setOpenCalculatorDialog}
         paymentMethods={paymentMethods}
         getInstallmentsForMethod={getInstallmentsForMethod}
         initialSubtotalUSD={0}
         initialExchangeRate={1440}
-      />
+      /> */}
     </SidebarProvider>
   );
 }

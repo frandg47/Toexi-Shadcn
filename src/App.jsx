@@ -18,6 +18,7 @@ import ConcentricLoader from "./components/ui/loading";
 import ConfigurationPage from "./pages/ConfigurationPage";
 import AuthCallback from "./pages/AuthCallback";
 import TopSellersPage from "./pages/TopSellersPage";
+import PaymentCalculator from "./pages/PaymentCalculator";
 
 // ⚙️ Configuración
 import ComissionConfig from "./pages/config/ComissionConfig";
@@ -137,6 +138,7 @@ export default function App() {
             <Route path="clients" element={<CustomersPage />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="top-sellers" element={<TopSellersPage titulo="Top Vendedores" />} />
+            <Route path="payment-calculator" element={<PaymentCalculator />} />
             {/* Agregá más rutas específicas del vendedor aquí */}
           </Route>
 
