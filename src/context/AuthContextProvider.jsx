@@ -57,7 +57,7 @@ export const AuthContextProvider = ({ children }) => {
 
       const { data, error: queryError } = await supabase
         .from("users")
-        .select("id, name, last_name, role, is_active, email")
+        .select("id, name, last_name, role, is_active, email, phone")
         .eq("id_auth", sessionUser.id)
         .maybeSingle();
 

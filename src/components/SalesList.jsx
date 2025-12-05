@@ -26,7 +26,9 @@ import {
     PopoverContent,
 } from "@/components/ui/popover";
 
-import { IconCalendar, IconRefresh } from "@tabler/icons-react";
+import { IconCalendar, IconRefresh, IconDownload } from "@tabler/icons-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export function SalesList() {
     const [sales, setSales] = useState([]);
@@ -90,6 +92,183 @@ export function SalesList() {
     }, [load]);
 
     const totalPages = Math.ceil(count / 10);
+
+    // 📄 Generar PDF de venta
+    const handleDownloadSalePDF = (sale) => {
+        try {
+            const doc = new jsPDF();
+            const margin = 14;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            let y = margin;
+
+            // Logo
+            const logoWidth = 22;
+            const logoHeight = 22;
+            const logoX = pageWidth - logoWidth - margin;
+            doc.addImage("/toexi.jpg", "JPEG", logoX - 2, margin - 8, logoWidth, logoHeight);
+
+            // Encabezado
+            doc.setFontSize(22);
+            doc.setFont("helvetica", "bold");
+            doc.text("COMPROBANTE DE VENTA", margin, y);
+
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text(`N°: VTA-${String(sale.sale_id).padStart(6, "0")}`, margin, y + 6);
+
+            y += 26;
+
+            // Cliente / Fechas
+            const fecha = new Date(sale.sale_date).toLocaleDateString("es-AR");
+
+            doc.setFontSize(11);
+            doc.rect(margin, y, 180, 22);
+
+            doc.text("Fecha:", margin + 4, y + 6);
+            doc.text(fecha, margin + 40, y + 6);
+
+            doc.text("Cliente:", margin + 4, y + 12);
+            doc.text(
+                `${sale.customer_name} ${sale.customer_last_name} (Tel: ${sale.customer_phone || "-"})`,
+                margin + 40,
+                y + 12
+            );
+
+            y += 30;
+
+            // Vendedor
+            const vendedorNombre = sale.seller_name && sale.seller_name.trim() 
+                ? `${sale.seller_name}${sale.seller_last_name ? ' ' + sale.seller_last_name : ''}`
+                : "Toexi Tech";
+            
+            doc.setFontSize(11);
+            doc.rect(margin, y, 180, 16);
+
+            doc.text("Vendedor:", margin + 4, y + 6);
+            doc.text(vendedorNombre, margin + 40, y + 6);
+
+            y += 24;
+            autoTable(doc, {
+                startY: y,
+                headStyles: {
+                    fillColor: [255, 255, 255],
+                    textColor: [0, 0, 0],
+                    fontSize: 10,
+                    fontStyle: "bold",
+                    lineWidth: 0.3,
+                    lineColor: [0, 0, 0],
+                },
+                bodyStyles: {
+                    fontSize: 10,
+                    lineWidth: 0.3,
+                    lineColor: [0, 0, 0],
+                },
+                head: [["Producto", "Variante", "Color", "Cant", "Subtotal USD", "Subtotal ARS"]],
+                body: sale.items?.map((i) => [
+                    i.product_name,
+                    i.variant_name,
+                    i.color || "-",
+                    i.quantity,
+                    `USD ${(i.subtotal_usd || i.usd_price * i.quantity).toFixed(2)}`,
+                    `$ ${Number(i.subtotal_ars).toLocaleString("es-AR")}`,
+                ]) || [],
+                columnStyles: {
+                    0: { cellWidth: 40 },
+                    1: { cellWidth: 35 },
+                    2: { cellWidth: 22 },
+                    3: { halign: "center", cellWidth: 15 },
+                    4: { halign: "right", cellWidth: 34 },
+                    5: { halign: "right", cellWidth: 34 },
+                },
+                theme: "plain",
+                margin: { top: 0, right: 0, bottom: 0, left: margin },
+                didDrawCell: (data) => {
+                    const { table, row, column } = data;
+                    const totalRows = table.body.length;
+                    const totalCols = table.columns.length;
+                    
+                    if (row.index === 0 && column.index === 0) {
+                        data.cell.styles.lineWidth = [0, 0.3, 0.3, 0];
+                    } else if (row.index === 0 && column.index === totalCols - 1) {
+                        data.cell.styles.lineWidth = [0, 0, 0.3, 0.3];
+                    } else if (row.index === totalRows - 1 && column.index === 0) {
+                        data.cell.styles.lineWidth = [0.3, 0.3, 0, 0];
+                    } else if (row.index === totalRows - 1 && column.index === totalCols - 1) {
+                        data.cell.styles.lineWidth = [0.3, 0, 0, 0.3];
+                    } else if (row.index === 0) {
+                        data.cell.styles.lineWidth = [0, 0.3, 0.3, 0.3];
+                    } else if (row.index === totalRows - 1) {
+                        data.cell.styles.lineWidth = [0.3, 0.3, 0, 0.3];
+                    } else if (column.index === 0) {
+                        data.cell.styles.lineWidth = [0.3, 0.3, 0.3, 0];
+                    } else if (column.index === totalCols - 1) {
+                        data.cell.styles.lineWidth = [0.3, 0, 0.3, 0.3];
+                    } else {
+                        data.cell.styles.lineWidth = [0.3, 0.3, 0.3, 0.3];
+                    }
+                }
+            });
+
+            y = doc.lastAutoTable.finalY + 10;
+
+            // Resumen financiero
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "normal");
+
+            doc.text(`Subtotal USD: USD ${sale.total_usd?.toFixed(2) || "0.00"}`, margin, y);
+            y += 6;
+
+            doc.text(`Subtotal ARS: $ ${Number(sale.total_ars).toLocaleString("es-AR")}`, margin, y);
+            y += 6;
+
+            doc.text(`Cotización aplicada: $ ${sale.fx_rate_used}`, margin, y);
+            y += 6;
+
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(0, 100, 200);
+            doc.text(`TOTAL: $ ${Number(sale.total_ars).toLocaleString("es-AR")}`, margin, y);
+
+            y += 14;
+
+            // Métodos de pago
+            doc.setFontSize(11);
+            doc.setTextColor(0);
+            doc.setFont("helvetica", "bold");
+            doc.text("Formas de Pago:", margin, y);
+            y += 6;
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            sale.payments?.forEach((p) => {
+                doc.text(
+                    `• ${p.method}${p.card_brand ? ` (${p.card_brand})` : ""}${p.installments > 1 ? ` · ${p.installments} cuotas` : ""}: $ ${Number(p.amount_ars).toLocaleString("es-AR")}`,
+                    margin,
+                    y
+                );
+                y += 5;
+            });
+
+            y += 4;
+
+            // Footer
+            doc.setFontSize(9);
+            doc.setTextColor(120);
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const footerY = pageHeight - 14;
+            
+            const text1 = "Gracias por su compra - Toexi Tech ©";
+            const text1Width = doc.getTextWidth(text1);
+            
+            doc.text(text1, (pageWidth - text1Width) / 2, footerY);
+
+            doc.save(`venta_${sale.sale_id}.pdf`);
+            toast.success("PDF descargado correctamente");
+        } catch (err) {
+            console.error("Error generando PDF:", err);
+            toast.error("Error al generar PDF");
+        }
+    };
 
     return (
         <div className="pb-6 space-y-6">
@@ -207,7 +386,7 @@ export function SalesList() {
                             {s.items?.map((i, idx) => (
                                 <div key={idx} className="flex justify-between border-b py-1">
                                     <span>
-                                        {i.product_name} {i.variant_name} — {i.quantity}u
+                                        {i.product_name} {i.variant_name} {i.color ? `(${i.color})` : ""} — {i.quantity}u
                                     </span>
                                     <span>${i.subtotal_ars.toLocaleString("es-AR")}</span>
                                 </div>
@@ -234,6 +413,18 @@ export function SalesList() {
                         <p className="font-bold text-right text-xl mt-3 text-primary">
                             Total: ${Number(s.total_ars).toLocaleString("es-AR")}
                         </p>
+
+                        {/* Botón descargar PDF */}
+                        <div className="mt-4 flex justify-end">
+                            <Button
+                                onClick={() => handleDownloadSalePDF(s)}
+                                size="sm"
+                                className="gap-2"
+                            >
+                                <IconDownload className="h-4 w-4" />
+                                Descargar PDF
+                            </Button>
+                        </div>
                     </Card>
                 ))}
             </div>

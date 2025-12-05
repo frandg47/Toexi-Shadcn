@@ -31,7 +31,7 @@ const getMonthName = (dateString) => {
 // ------------------------------
 // COMPONENTE GENERAL
 // ------------------------------
-export default function SellersTop() {
+export default function SellersTop({ role }) {
   const [topSales, setTopSales] = useState([]);
   const [topCommission, setTopCommission] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +70,7 @@ export default function SellersTop() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
 
   // --------------------------
   // CARGAR **TOP SELLERS**
@@ -295,8 +296,8 @@ export default function SellersTop() {
       {/* -------------------------------------------------- */}
       <Card>
         <CardHeader>
-          <CardTitle>Ranking: Cantidad de Ventas</CardTitle>
-          <CardDescription>Vendedores con más ventas completadas</CardDescription>
+          <CardTitle>{role === "superadmin" ? "Ranking: Cantidad de ventas" : "Mis Ventas"}</CardTitle>
+          <CardDescription>{role === "superadmin" ? "Vendedores con más ventas completadas" : "Ventas completadas en el mes actual"}</CardDescription>
         </CardHeader>
 
         <CardContent>
@@ -338,7 +339,7 @@ export default function SellersTop() {
 
         <CardFooter className="flex-col items-start gap-2 text-sm">
           <div className="flex gap-2 leading-none font-medium">
-            Cantidad de ventas completadas por vendedor en el mes actual
+            {role === "superadmin" ? "Cantidad de ventas completadas por vendedor en el mes filtrado" : "Ventas completadas en el mes filtrado"}
             <IconTrendingUp className="h-4 w-4" />
           </div>
           <div className="text-muted-foreground leading-none">
@@ -352,8 +353,8 @@ export default function SellersTop() {
       {/* -------------------------------------------------- */}
       <Card>
         <CardHeader>
-          <CardTitle>Ranking: Comisiones Ganadas</CardTitle>
-          <CardDescription>Vendedores que más dinero generaron</CardDescription>
+          <CardTitle>{role === "superadmin" ? "Ranking: Comisiones Ganadas" : "Mis Comisiones"}</CardTitle>
+          <CardDescription>{role === "superadmin" ? "Vendedores que más dinero generaron" : "Comisiones generadas en el mes actual"}</CardDescription>
         </CardHeader>
 
         <CardContent>
@@ -395,7 +396,7 @@ export default function SellersTop() {
 
         <CardFooter className="flex-col items-start gap-2 text-sm">
           <div className="flex gap-2 leading-none font-medium">
-            Cantidad de comisiones generadas por vendedor en el mes actual
+            {role === "superadmin" ? "Cantidad de comisiones generadas por vendedor en el mes filtrado" : "Comisiones generadas en el mes filtrado"}
             <IconTrendingUp className="h-4 w-4" />
           </div>
           <div className="text-muted-foreground leading-none">

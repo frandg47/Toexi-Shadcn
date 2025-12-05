@@ -104,7 +104,16 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
   const handleDownloadPDF = (savedSale) => {
     const doc = new jsPDF();
     const margin = 14;
+    const pageWidth = doc.internal.pageSize.getWidth();
     let y = margin;
+
+    // =============================
+    //  LOGO (PARTE SUPERIOR DERECHA)
+    // =============================
+    const logoWidth = 22;
+    const logoHeight = 22;
+    const logoX = pageWidth - logoWidth - margin;
+    doc.addImage("/toexi.jpg", "JPEG", logoX - 2, margin - 8, logoWidth, logoHeight);
 
     // =============================
     //  ENCABEZADO
@@ -117,7 +126,7 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
     doc.setFont("helvetica", "normal");
     doc.text(`N°: VTA-${String(savedSale.id).padStart(6, "0")}`, margin, y + 6);
 
-    y += 18;
+    y += 26;
 
     // =============================
     //  CUADRO CLIENTE / FECHAS
@@ -125,7 +134,7 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
     const fecha = new Date().toLocaleDateString("es-AR");
 
     doc.setFontSize(11);
-    doc.rect(margin, y, 180, 28);
+    doc.rect(margin, y, 180, 22);
 
     doc.text("Fecha:", margin + 4, y + 6);
     doc.text(fecha, margin + 40, y + 6);
@@ -137,17 +146,7 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
       y + 12
     );
 
-    y += 36;
-
-    // =============================
-    //  CUADRO VENDEDOR
-    // =============================
-    doc.rect(margin, y, 180, 18);
-    doc.text("Vendedor:", margin + 4, y + 6);
-    doc.text(safeSale.seller_name, margin + 40, y + 6);
-    doc.text(`Email: ${safeSale.seller_email}`, margin + 40, y + 12);
-
-    y += 28;
+    y += 30;
 
     // =============================
     //  TABLA DE ITEMS
@@ -155,85 +154,133 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
     autoTable(doc, {
       startY: y,
       headStyles: {
-        fillColor: [50, 50, 50],
-        textColor: 255,
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
         fontSize: 10,
+        fontStyle: "bold",
+        lineWidth: 0.3,
+        lineColor: [0, 0, 0],
       },
       bodyStyles: {
         fontSize: 10,
+        lineWidth: 0.3,
+        lineColor: [0, 0, 0],
       },
-      head: [["Producto", "Cant", "USD", "Subtotal ARS"]],
+      head: [["Producto", "Variante", "Cant", "USD", "Subtotal USD", "Subtotal ARS"]],
       body: safeSale.variants.map((v) => [
-        `${v.product_name} ${v.variant_name} ` +
-        `(${v.storage || "-"} / ${v.ram || "-"} / ${v.color || "-"})`,
+        v.product_name,
+        v.variant_name,
         v.quantity,
-        `USD ${v.usd_price}`,
+        `USD ${v.usd_price.toFixed(2)}`,
+        `USD ${v.subtotal_usd.toFixed(2)}`,
         `$ ${v.subtotal_ars.toLocaleString("es-AR")}`,
       ]),
       columnStyles: {
-        0: { cellWidth: 90 },
-        1: { halign: "center" },
-        2: { halign: "right" },
-        3: { halign: "right" },
+        0: { cellWidth: 40 },
+        1: { cellWidth: 35 },
+        2: { halign: "center", cellWidth: 15 },
+        3: { halign: "right", cellWidth: 25 },
+        4: { halign: "right", cellWidth: 30 },
+        5: { halign: "right", cellWidth: 35 },
       },
-      theme: "grid",
+      theme: "plain",
+      margin: { top: 0, right: 0, bottom: 0, left: margin },
+      didDrawCell: (data) => {
+        const { table, row, column } = data;
+        const totalRows = table.body.length;
+        const totalCols = table.columns.length;
+        
+        // Remover bordes externos
+        if (row.index === 0 && column.index === 0) {
+          // Top-left
+          data.cell.styles.lineWidth = [0, 0.3, 0.3, 0];
+        } else if (row.index === 0 && column.index === totalCols - 1) {
+          // Top-right
+          data.cell.styles.lineWidth = [0, 0, 0.3, 0.3];
+        } else if (row.index === totalRows - 1 && column.index === 0) {
+          // Bottom-left
+          data.cell.styles.lineWidth = [0.3, 0.3, 0, 0];
+        } else if (row.index === totalRows - 1 && column.index === totalCols - 1) {
+          // Bottom-right
+          data.cell.styles.lineWidth = [0.3, 0, 0, 0.3];
+        } else if (row.index === 0) {
+          // Top
+          data.cell.styles.lineWidth = [0, 0.3, 0.3, 0.3];
+        } else if (row.index === totalRows - 1) {
+          // Bottom
+          data.cell.styles.lineWidth = [0.3, 0.3, 0, 0.3];
+        } else if (column.index === 0) {
+          // Left
+          data.cell.styles.lineWidth = [0.3, 0.3, 0.3, 0];
+        } else if (column.index === totalCols - 1) {
+          // Right
+          data.cell.styles.lineWidth = [0.3, 0, 0.3, 0.3];
+        } else {
+          // Interior
+          data.cell.styles.lineWidth = [0.3, 0.3, 0.3, 0.3];
+        }
+      }
     });
 
     y = doc.lastAutoTable.finalY + 10;
 
     // =============================
-    //  TOTAL
+    //  RESUMEN FINANCIERO
     // =============================
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text(
-      `Subtotal: $${safeSale.total_ars.toLocaleString("es-AR")}`,
-      margin,
-      y
-    );
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
 
+    doc.text(`Subtotal USD: USD ${safeSale.total_usd.toFixed(2)}`, margin, y);
     y += 6;
 
-    doc.text(`Cotización aplicada: $${safeSale.fx_rate_used}`, margin, y);
+    doc.text(`Subtotal ARS: $ ${safeSale.total_ars.toLocaleString("es-AR")}`, margin, y);
+    y += 6;
 
+    doc.text(`Cotización aplicada: $ ${safeSale.fx_rate_used}`, margin, y);
     y += 6;
 
     doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 100, 200);
-    doc.text(
-      `TOTAL: $${safeSale.total_final_ars.toLocaleString("es-AR")}`,
-      margin,
-      y
-    );
+    doc.text(`TOTAL: $ ${safeSale.total_final_ars.toLocaleString("es-AR")}`, margin, y);
 
     y += 14;
 
     // =============================
     //  MÉTODOS DE PAGO
     // =============================
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setTextColor(0);
     doc.setFont("helvetica", "bold");
-    doc.text("Métodos de Pago", margin, y);
+    doc.text("Formas de Pago:", margin, y);
     y += 6;
 
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
     safeSale.payments.forEach((p) => {
       doc.text(
-        `• ${p.method_name}${p.installments > 1 ? ` (${p.installments} cuotas)` : ""
-        }: $${p.amount.toLocaleString("es-AR")}`,
+        `• ${p.method_name}${p.installments > 1 ? ` (${p.installments} cuotas)` : ""}: $ ${Number(p.amount).toLocaleString("es-AR")}`,
         margin,
         y
       );
       y += 5;
     });
 
+    y += 4;
+
     // =============================
     //  FOOTER
     // =============================
     doc.setFontSize(9);
     doc.setTextColor(120);
-    doc.text("Gracias por su compra - Toexi Tech ©", margin, 290);
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const footerY = pageHeight - 14;
+    
+    const text1 = "Gracias por su compra - Toexi Tech ©";
+    
+    const text1Width = doc.getTextWidth(text1);
+    
+    doc.text(text1, (pageWidth - text1Width) / 2, footerY);
 
     // =============================
     //  DESCARGA

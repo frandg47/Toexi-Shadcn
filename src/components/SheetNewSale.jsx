@@ -851,15 +851,28 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
                   {/* Inputs debajo */}
                   <div className="grid gap-2">
-                    <Input
-                      className="w-full"
-                      placeholder="Monto (ARS)"
-                      type="number"
-                      value={p.amount}
-                      onChange={(e) =>
-                        updatePaymentField(i, "amount", e.target.value)
-                      }
-                    />
+                    <div className="flex gap-2 items-end">
+                      <Input
+                        className="flex-1"
+                        placeholder="Monto (ARS)"
+                        type="number"
+                        value={p.amount}
+                        onChange={(e) =>
+                          updatePaymentField(i, "amount", e.target.value)
+                        }
+                      />
+                      {i === payments.length - 1 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            updatePaymentField(i, "amount", String(remaining));
+                          }}
+                        >
+                          Restante
+                        </Button>
+                      )}
+                    </div>
 
                     {p.method === "transferencia" && (
                       <Input

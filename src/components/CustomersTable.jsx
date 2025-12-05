@@ -259,17 +259,16 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
               </div>
 
               {/* ✏️ Acciones */}
-              <div className="flex justify-between items-center mt-auto pt-3 border-t">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setEditingCustomerId(c.id)}
-                  >
-                    <IconEdit className="h-4 w-4" />
-                  </Button>
-
-                  {!isSellerView && (
+              {!isSellerView && (
+                <div className="flex justify-between items-center mt-auto pt-3 border-t">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingCustomerId(c.id)}
+                    >
+                      <IconEdit className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="destructive"
                       size="sm"
@@ -279,9 +278,9 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
                     >
                       <IconTrash className="h-4 w-4" />
                     </Button>
-                  )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           ))}
       </div>

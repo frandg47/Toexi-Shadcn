@@ -87,154 +87,154 @@ export default function ProductDetailDialog({
   }, [paymentMethods, paymentInstallments]);
 
   // 🔹 Función para exportar el producto a PDF (con imagen y estructura)
-  const handleExportPDF = async () => {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    let currentY = 10;
+  // const handleExportPDF = async () => {
+  //   const doc = new jsPDF();
+  //   const pageWidth = doc.internal.pageSize.getWidth();
+  //   let currentY = 10;
 
-    // 🔹 Si hay imagen, convertir a Base64 y agregarla
-    if (product.coverImageUrl) {
-      try {
-        const img = await fetch(product.coverImageUrl);
-        const blob = await img.blob();
-        const reader = new FileReader();
-        const imagePromise = new Promise((resolve) => {
-          reader.onloadend = () => resolve(reader.result);
-        });
-        reader.readAsDataURL(blob);
-        const imageData = await imagePromise;
+  //   // 🔹 Si hay imagen, convertir a Base64 y agregarla
+  //   if (product.coverImageUrl) {
+  //     try {
+  //       const img = await fetch(product.coverImageUrl);
+  //       const blob = await img.blob();
+  //       const reader = new FileReader();
+  //       const imagePromise = new Promise((resolve) => {
+  //         reader.onloadend = () => resolve(reader.result);
+  //       });
+  //       reader.readAsDataURL(blob);
+  //       const imageData = await imagePromise;
 
-        const imgWidth = 60;
-        const imgHeight = 60;
-        const imgX = (pageWidth - imgWidth) / 2;
-        doc.addImage(imageData, "JPEG", imgX, currentY, imgWidth, imgHeight);
-        currentY += imgHeight + 10;
-      } catch (error) {
-        console.warn("No se pudo cargar la imagen para el PDF:", error);
-      }
-    }
+  //       const imgWidth = 60;
+  //       const imgHeight = 60;
+  //       const imgX = (pageWidth - imgWidth) / 2;
+  //       doc.addImage(imageData, "JPEG", imgX, currentY, imgWidth, imgHeight);
+  //       currentY += imgHeight + 10;
+  //     } catch (error) {
+  //       console.warn("No se pudo cargar la imagen para el PDF:", error);
+  //     }
+  //   }
 
-    // 🔹 Encabezado principal
-    doc.setFontSize(16);
-    doc.setTextColor(40, 40, 40);
-    doc.text(product.name, pageWidth / 2, currentY, { align: "center" });
+  //   // 🔹 Encabezado principal
+  //   doc.setFontSize(16);
+  //   doc.setTextColor(40, 40, 40);
+  //   doc.text(product.name, pageWidth / 2, currentY, { align: "center" });
 
-    doc.setFontSize(12);
-    doc.setTextColor(100, 100, 100);
-    doc.text(
-      `${product.brandName} — ${product.categoryName}`,
-      pageWidth / 2,
-      currentY + 8,
-      { align: "center" }
-    );
+  //   doc.setFontSize(12);
+  //   doc.setTextColor(100, 100, 100);
+  //   doc.text(
+  //     `${product.brandName} — ${product.categoryName}`,
+  //     pageWidth / 2,
+  //     currentY + 8,
+  //     { align: "center" }
+  //   );
 
-    currentY += 18;
+  //   currentY += 18;
 
-    // 🔹 Datos generales
-    doc.setFontSize(11);
-    doc.setTextColor(60, 60, 60);
-    doc.text(`Cotización actual: ${formatCurrencyARS(fxRate)}`, 14, currentY);
-    if (product.allowBackorder) {
-      doc.setTextColor(200, 120, 0);
-      doc.text(
-        "Producto con posibilidad de encargo en caso de no haber stock" +
-          (product.leadTimeLabel
-            ? ` (Disponible a partir de ${product.leadTimeLabel})`
-            : ""),
-        14,
-        currentY + 6
-      );
-      doc.text(
-        "Seña para reservar: " +
-          (product.depositAmount
-            ? formatCurrencyARS(product.depositAmount)
-            : "—"),
-        14,
-        currentY + 12
-      );
-    }
+  //   // 🔹 Datos generales
+  //   doc.setFontSize(11);
+  //   doc.setTextColor(60, 60, 60);
+  //   doc.text(`Cotización actual: ${formatCurrencyARS(fxRate)}`, 14, currentY);
+  //   if (product.allowBackorder) {
+  //     doc.setTextColor(200, 120, 0);
+  //     doc.text(
+  //       "Producto con posibilidad de encargo en caso de no haber stock" +
+  //         (product.leadTimeLabel
+  //           ? ` (Disponible a partir de ${product.leadTimeLabel})`
+  //           : ""),
+  //       14,
+  //       currentY + 6
+  //     );
+  //     doc.text(
+  //       "Seña para reservar: " +
+  //         (product.depositAmount
+  //           ? formatCurrencyARS(product.depositAmount)
+  //           : "—"),
+  //       14,
+  //       currentY + 12
+  //     );
+  //   }
 
-    currentY += 24;
+  //   currentY += 24;
 
-    // 🔹 Tabla de variantes
-    const variantRows = realVariants.map((v) => [
-      v.color || "—",
-      v.storage || "—",
-      v.ram || "—",
-      formatCurrencyUSD(v.usd_price),
-      formatCurrencyARS(v.usd_price * fxRate),
-      v.stock ?? 0,
-    ]);
+  //   // 🔹 Tabla de variantes
+  //   const variantRows = realVariants.map((v) => [
+  //     v.color || "—",
+  //     v.storage || "—",
+  //     v.ram || "—",
+  //     formatCurrencyUSD(v.usd_price),
+  //     formatCurrencyARS(v.usd_price * fxRate),
+  //     v.stock ?? 0,
+  //   ]);
 
-    autoTable(doc, {
-      startY: currentY,
-      head: [
-        ["Color", "Almacenamiento", "RAM", "Precio USD", "Precio ARS", "Stock"],
-      ],
-      body: variantRows,
-      styles: { fontSize: 10 },
-      headStyles: {
-        fillColor: [25, 118, 210],
-        textColor: 255,
-        fontStyle: "bold",
-      },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-    });
+  //   autoTable(doc, {
+  //     startY: currentY,
+  //     head: [
+  //       ["Color", "Almacenamiento", "RAM", "Precio USD", "Precio ARS", "Stock"],
+  //     ],
+  //     body: variantRows,
+  //     styles: { fontSize: 10 },
+  //     headStyles: {
+  //       fillColor: [25, 118, 210],
+  //       textColor: 255,
+  //       fontStyle: "bold",
+  //     },
+  //     alternateRowStyles: { fillColor: [245, 245, 245] },
+  //   });
 
-    currentY = doc.lastAutoTable.finalY + 10;
+  //   currentY = doc.lastAutoTable.finalY + 10;
 
-    // 🔹 Tabla de métodos de pago
-    const methodRows = enrichedMethods.flatMap((m) => {
-      const basePriceUSD = product.usdPrice;
-      if (m.installments.length === 0) {
-        return [
-          [m.name, "1 pago", formatCurrencyARS(basePriceUSD * fxRate), "—"],
-        ];
-      }
+  //   // 🔹 Tabla de métodos de pago
+  //   const methodRows = enrichedMethods.flatMap((m) => {
+  //     const basePriceUSD = product.usdPrice;
+  //     if (m.installments.length === 0) {
+  //       return [
+  //         [m.name, "1 pago", formatCurrencyARS(basePriceUSD * fxRate), "—"],
+  //       ];
+  //     }
 
-      return m.installments.map((i) => {
-        const total = basePriceUSD * fxRate * i.multiplier;
-        const cuota = total / i.installments;
-        const extra = (i.multiplier - 1) * 100;
-        return [
-          m.name,
-          `${i.installments} cuotas`,
-          formatCurrencyARS(cuota),
-          `+${extra.toFixed(1)}%`,
-        ];
-      });
-    });
+  //     return m.installments.map((i) => {
+  //       const total = basePriceUSD * fxRate * i.multiplier;
+  //       const cuota = total / i.installments;
+  //       const extra = (i.multiplier - 1) * 100;
+  //       return [
+  //         m.name,
+  //         `${i.installments} cuotas`,
+  //         formatCurrencyARS(cuota),
+  //         `+${extra.toFixed(1)}%`,
+  //       ];
+  //     });
+  //   });
 
-    autoTable(doc, {
-      startY: currentY,
-      head: [["Método", "Cuotas", "Monto por cuota", "Recargo"]],
-      body: methodRows,
-      styles: { fontSize: 10 },
-      headStyles: {
-        fillColor: [46, 125, 50],
-        textColor: 255,
-        fontStyle: "bold",
-      },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-    });
+  //   autoTable(doc, {
+  //     startY: currentY,
+  //     head: [["Método", "Cuotas", "Monto por cuota", "Recargo"]],
+  //     body: methodRows,
+  //     styles: { fontSize: 10 },
+  //     headStyles: {
+  //       fillColor: [46, 125, 50],
+  //       textColor: 255,
+  //       fontStyle: "bold",
+  //     },
+  //     alternateRowStyles: { fillColor: [245, 245, 245] },
+  //   });
 
-    currentY = doc.lastAutoTable.finalY + 15;
+  //   currentY = doc.lastAutoTable.finalY + 15;
 
-    // 🔹 Pie con cotización
-    doc.setFontSize(10);
-    doc.setTextColor(80, 80, 80);
-    doc.text(
-      `Cotización utilizada: ${formatCurrencyARS(
-        fxRate
-      )} — Generado automáticamente`,
-      pageWidth / 2,
-      currentY,
-      { align: "center" }
-    );
+  //   // 🔹 Pie con cotización
+  //   doc.setFontSize(10);
+  //   doc.setTextColor(80, 80, 80);
+  //   doc.text(
+  //     `Cotización utilizada: ${formatCurrencyARS(
+  //       fxRate
+  //     )} — Generado automáticamente`,
+  //     pageWidth / 2,
+  //     currentY,
+  //     { align: "center" }
+  //   );
 
-    // 🔹 Guardar PDF
-    doc.save(`Producto_${product.name}.pdf`);
-  };
+  //   // 🔹 Guardar PDF
+  //   doc.save(`Producto_${product.name}.pdf`);
+  // };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -250,7 +250,7 @@ export default function ProductDetailDialog({
         </DialogHeader>
 
         {/* 🔹 Botón Exportar PDF */}
-        <div className="flex justify-center mt-3 mb-4">
+        {/* <div className="flex justify-center mt-3 mb-4">
           <Button
             variant="outline"
             size="sm"
@@ -260,7 +260,7 @@ export default function ProductDetailDialog({
             <IconFileTypePdf className="w-4 h-4 text-red-600" />
             <span>Exportar PDF</span>
           </Button>
-        </div>
+        </div> */}
 
         {/* 🔹 Imagen + Datos básicos */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">

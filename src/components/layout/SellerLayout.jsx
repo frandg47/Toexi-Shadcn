@@ -54,7 +54,7 @@ export default function SellerLayout() {
     "/seller/sales": "Mis ventas",
     "/seller/orders": "Mis pedidos",
     "/seller/clients": "Clientes",
-    "/seller/top-sellers": "Top Vendedores",
+    "/seller/top-sellers": "Mis ventas",
     "/seller/settings": "Configuración",
   };
 
@@ -70,7 +70,7 @@ export default function SellerLayout() {
     // },
     { title: "Mis pedidos", url: "/seller/orders", icon: IconList },
     { title: "Clientes", url: "/seller/clients", icon: IconUsers },
-    { title: "Top Vendedores", url: "/seller/top-sellers", icon: IconMedal },
+    { title: "Mis ventas", url: "/seller/top-sellers", icon: IconMedal },
     {
       title: "Calculadora de cotizaciones",
       icon: IconCalculator,

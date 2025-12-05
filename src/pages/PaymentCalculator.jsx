@@ -13,10 +13,13 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { IconCash, IconCreditCard, IconBuildingBank, IconTrash, IconCirclePlus } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/context/AuthContextProvider";
 
-import DialogSaleInvoice from "@/components/DialogSaleInvoice";
+import DialogQuoteInvoice from "@/components/DialogQuoteInvoice";
 
 export default function PaymentCalculator() {
+    const { profile } = useAuth();
+    
     // --- Cliente ---
     const [customers, setCustomers] = useState([]);
     const [searchCustomer, setSearchCustomer] = useState("");
@@ -82,7 +85,7 @@ export default function PaymentCalculator() {
         const fetchCustomers = async () => {
             const { data } = await supabase
                 .from("customers")
-                .select("id, name, last_name, phone, dni")
+                .select("id, name, last_name, phone, dni, email")
                 .or(
                     `name.ilike.%${q}%,last_name.ilike.%${q}%,dni.ilike.%${q}%,phone.ilike.%${q}%`
                 )
@@ -229,6 +232,12 @@ export default function PaymentCalculator() {
             customer_name: selectedCustomer
                 ? `${selectedCustomer.name} ${selectedCustomer.last_name || ""}`
                 : "Consumidor Final",
+            customer_phone: selectedCustomer ? selectedCustomer.phone : "",
+            customer_email: selectedCustomer ? selectedCustomer.email : "",
+            seller_name: profile?.name || "",
+            seller_last_name: profile?.last_name || "",
+            seller_phone: profile?.phone || "",
+            seller_email: profile?.email || "",
             items: selectedVariants.map((v) => ({
                 name: v.products.name,
                 variant: v.variant_name,
@@ -504,26 +513,43 @@ export default function PaymentCalculator() {
                                 )}
                             </div>
 
-                            <Input
-                                placeholder="Monto (ARS)"
-                                value={p.amount}
-                                type="number"
-                                className="w-auto"
-                                onChange={(e) =>
-                                    setPayments((prev) =>
-                                        prev.map((row, idx) =>
-                                            idx === i ? { ...row, amount: e.target.value } : row
+                            <div className="flex gap-2 items-end">
+                                <Input
+                                    placeholder="Monto (ARS)"
+                                    value={p.amount}
+                                    type="number"
+                                    className="w-auto flex-1"
+                                    onChange={(e) =>
+                                        setPayments((prev) =>
+                                            prev.map((row, idx) =>
+                                                idx === i ? { ...row, amount: e.target.value } : row
+                                            )
                                         )
-                                    )
-                                }
-                            />
+                                    }
+                                />
+                                {i === payments.length - 1 && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setPayments((prev) =>
+                                                prev.map((row, idx) =>
+                                                    idx === i ? { ...row, amount: String(remainingARS) } : row
+                                                )
+                                            );
+                                        }}
+                                    >
+                                        Restante
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     ))}
 
                     <Button variant="outline" className="w-full" onClick={() =>
                         setPayments((prev) => [...prev, { payment_method_id: "", method_name: "", amount: "", installments: "", reference: "" }])
                     }>
-                        <IconCirclePlus className="h-4 w-4 mr-1" />
+                        <IconCirclePlus className="h-4 w-4" />
                         Agregar pago
                     </Button>
                 </section>
@@ -578,10 +604,10 @@ export default function PaymentCalculator() {
 
                 {/* ======================= MODAL ===================== */}
                 {invoiceData && (
-                    <DialogSaleInvoice
+                    <DialogQuoteInvoice
                         open={invoiceOpen}
                         onClose={() => setInvoiceOpen(false)}
-                        sale={invoiceData}
+                        quote={invoiceData}
                     />
                 )}
             </div>
