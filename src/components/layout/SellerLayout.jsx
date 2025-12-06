@@ -69,8 +69,8 @@ export default function SellerLayout() {
     //   onClick: () => showDevelopmentToast("Mis ventas"),
     // },
     { title: "Mis pedidos", url: "/seller/orders", icon: IconList },
-    { title: "Clientes", url: "/seller/clients", icon: IconUsers },
-    { title: "Mis ventas", url: "/seller/top-sellers", icon: IconMedal },
+    { title: "Clientes", url: "/seller/customers", icon: IconUsers },
+    { title: "Mis ventas", url: "/seller/my-sales", icon: IconMedal },
     {
       title: "Calculadora de cotizaciones",
       icon: IconCalculator,

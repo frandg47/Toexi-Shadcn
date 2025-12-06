@@ -60,6 +60,7 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
         ram: v.ram,
         usd_price: v.usd_price,
         quantity: v.quantity,
+        imei: v.imei || null,
         subtotal_usd: v.subtotal_usd,
         subtotal_ars: v.subtotal_ars,
       }));
@@ -156,32 +157,32 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
       headStyles: {
         fillColor: [255, 255, 255],
         textColor: [0, 0, 0],
-        fontSize: 10,
+        fontSize: 9,
         fontStyle: "bold",
         lineWidth: 0.3,
         lineColor: [0, 0, 0],
       },
       bodyStyles: {
-        fontSize: 10,
+        fontSize: 9,
         lineWidth: 0.3,
         lineColor: [0, 0, 0],
       },
-      head: [["Producto", "Variante", "Cant", "USD", "Subtotal USD", "Subtotal ARS"]],
+      head: [["Producto", "Variante", "IMEI", "Cant", "USD", "Subtotal ARS"]],
       body: safeSale.variants.map((v) => [
         v.product_name,
         v.variant_name,
+        v.imei || "-",
         v.quantity,
         `USD ${v.usd_price.toFixed(2)}`,
-        `USD ${v.subtotal_usd.toFixed(2)}`,
         `$ ${v.subtotal_ars.toLocaleString("es-AR")}`,
       ]),
       columnStyles: {
-        0: { cellWidth: 40 },
-        1: { cellWidth: 35 },
-        2: { halign: "center", cellWidth: 15 },
-        3: { halign: "right", cellWidth: 25 },
-        4: { halign: "right", cellWidth: 30 },
-        5: { halign: "right", cellWidth: 35 },
+        0: { cellWidth: 32 },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 30 },
+        3: { halign: "center", cellWidth: 12 },
+        4: { halign: "right", cellWidth: 22 },
+        5: { halign: "right", cellWidth: 34 },
       },
       theme: "plain",
       margin: { top: 0, right: 0, bottom: 0, left: margin },
@@ -310,7 +311,8 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
           <div className="border rounded p-2 max-h-40 overflow-y-auto">
             {safeSale.variants.map((v, i) => (
               <div key={i} className="text-xs border-b py-1">
-                {v.product_name} {v.variant_name} — {v.quantity}u · USD {v.usd_price}
+                <div className="font-medium">{v.product_name} {v.variant_name} — {v.quantity}u · USD {v.usd_price}</div>
+                {v.imei && <div className="text-muted-foreground">IMEI: {v.imei}</div>}
               </div>
             ))}
           </div>

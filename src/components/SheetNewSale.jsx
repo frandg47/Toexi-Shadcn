@@ -21,6 +21,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import DialogSaleInvoice from "./DialogSaleInvoice";
+import DialogAddCustomer from "./DialogAddCustomer";
 import {
   IconX,
   IconCash,
@@ -31,6 +32,7 @@ import {
   IconChevronLeft,
   IconTrash,
   IconCirclePlus,
+  IconUserPlus,
 } from "@tabler/icons-react";
 // import { useNavigate } from "react-router-dom";
 // import { useSaleStore } from "../store/useSaleStore";
@@ -74,6 +76,9 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   // --- Invoice dialog ---
   const [invoiceData, setInvoiceData] = useState(null);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+
+  // --- Add Customer dialog ---
+  const [dialogCustomerOpen, setDialogCustomerOpen] = useState(false);
 
   // Métodos de pago desde la BD
   const [paymentMethods, setPaymentMethods] = useState([]);
@@ -364,6 +369,12 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     );
   };
 
+  const handleIMEIChange = (id, imei) => {
+    setSelectedVariants((prev) =>
+      prev.map((v) => (v.id === id ? { ...v, imei: imei } : v))
+    );
+  };
+
   // ========== PAYMENTS HANDLERS ==========
   const addPaymentRow = () =>
     setPayments((p) => [
@@ -429,6 +440,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       ram: v.ram,
       usd_price: v.usd_price,
       quantity: v.quantity,
+      imei: v.imei || null,
       subtotal_usd: v.usd_price * v.quantity,
       subtotal_ars: v.usd_price * v.quantity * exchangeRate,
     }));
@@ -515,26 +527,38 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
               <h3 className="font-medium ">Seleccionar cliente</h3>
 
               <div className="relative">
-                <Input
-                  placeholder="Buscar cliente..."
-                  readOnly={!!lead}
-                  value={
-                    selectedCustomer
-                      ? `${selectedCustomer.name} ${selectedCustomer.last_name || ""
-                      }`
-                      : searchCustomer
-                  }
-                  onFocus={() => !lead && setFocusCustomer(true)}
-                  onBlur={() =>
-                    !lead && setTimeout(() => setFocusCustomer(false), 160)
-                  }
-                  onChange={(e) => {
-                    if (!lead) {
-                      setSelectedCustomer(null);
-                      setSearchCustomer(e.target.value);
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Buscar cliente..."
+                    readOnly={!!lead}
+                    value={
+                      selectedCustomer
+                        ? `${selectedCustomer.name} ${selectedCustomer.last_name || ""
+                        }`
+                        : searchCustomer
                     }
-                  }}
-                />
+                    onFocus={() => !lead && setFocusCustomer(true)}
+                    onBlur={() =>
+                      !lead && setTimeout(() => setFocusCustomer(false), 160)
+                    }
+                    onChange={(e) => {
+                      if (!lead) {
+                        setSelectedCustomer(null);
+                        setSearchCustomer(e.target.value);
+                      }
+                    }}
+                  />
+                  {!lead && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setDialogCustomerOpen(true)}
+                      title="Nuevo cliente"
+                    >
+                      <IconUserPlus className="h-5 w-5" />
+                    </Button>
+                  )}
+                </div>
                 {focusCustomer && !lead && (
                   <div className="absolute z-[50] mt-1 w-full rounded-md border bg-background shadow">
                     <ScrollArea className="max-h-[250px] overflow-y-auto">
@@ -673,34 +697,61 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                   {selectedVariants.map((v) => (
                     <div
                       key={v.id}
-                      className="flex justify-between items-center border rounded-lg p-2"
+                      className="border rounded-lg p-3 space-y-2 bg-muted/20"
                     >
-                      <div className="flex flex-col">
-                        <span className="font-medium text-sm">
-                          {v.products?.name} - {v.variant_name}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {v.color} • Stock: {v.stock}
-                          {v.storage ? ` • ${v.storage}GB` : ""}
-                          {v.ram ? ` • ${v.ram} RAM` : ""}
-                        </span>
+                      <div className="flex justify-between items-start">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-sm">
+                            {v.products?.name} - {v.variant_name}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {v.color} • Stock: {v.stock}
+                            {v.storage ? ` • ${v.storage}GB` : ""}
+                            {v.ram ? ` • ${v.ram} RAM` : ""}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVariant(v.id)}
+                          className="p-1 rounded hover:bg-red-50 text-red-600"
+                          title="Quitar"
+                        >
+                          <IconTrash className="h-4 w-4" />
+                        </button>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          value={v.quantity}
-                          onChange={(e) =>
-                            handleQuantityChange(
-                              v.id,
-                              parseInt(e.target.value || "0", 10),
-                              v.stock
-                            )
-                          }
-                          className="w-16 text-center"
-                          min={1}
-                          max={v.stock}
-                        />
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <label className="text-xs text-muted-foreground">Cantidad</label>
+                          <Input
+                            type="number"
+                            value={v.quantity}
+                            onChange={(e) =>
+                              handleQuantityChange(
+                                v.id,
+                                parseInt(e.target.value || "0", 10),
+                                v.stock
+                              )
+                            }
+                            className="w-full text-center"
+                            min={1}
+                            max={v.stock}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">IMEI/Código</label>
+                          <Input
+                            type="text"
+                            placeholder="IMEI o código único"
+                            value={v.imei || ""}
+                            onChange={(e) => handleIMEIChange(v.id, e.target.value)}
+                            className="w-full text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between pt-2 border-t">
+                        <div className="text-xs text-muted-foreground">Subtotal</div>
                         <div className="text-right">
                           <div className="text-sm font-semibold">
                             {formatARS(
@@ -711,14 +762,6 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                             USD {v.usd_price} × {v.quantity}
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveVariant(v.id)}
-                          className="p-1 rounded hover:bg-red-50 text-red-600"
-                          title="Quitar"
-                        >
-                          <IconTrash className="h-4 w-4" />
-                        </button>
                       </div>
                     </div>
                   ))}
@@ -989,6 +1032,16 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
         />
       )}
 
+      {/* 💬 Modal para crear cliente */}
+      <DialogAddCustomer
+        open={dialogCustomerOpen}
+        onClose={() => setDialogCustomerOpen(false)}
+        onSuccess={(newCustomer) => {
+          setSelectedCustomer(newCustomer);
+          setDialogCustomerOpen(false);
+          toast.success(`Cliente ${newCustomer.name} agregado correctamente`);
+        }}
+      />
     </Sheet>
   );
 }

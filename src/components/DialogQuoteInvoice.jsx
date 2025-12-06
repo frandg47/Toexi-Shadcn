@@ -241,7 +241,7 @@ export default function DialogQuoteInvoice({ open, onClose, quote }) {
         const pageHeight = doc.internal.pageSize.getHeight();
         const footerY = pageHeight - 14;
         
-        const text1 = "Este presupuesto tiene validez de 7 días desde su emisión.";
+        const text1 = "Este presupuesto tiene validez de 3 días desde su emisión.";
         const text2 = "Sujeto a disponibilidad de stock y cambios en la cotización.";
         
         const text1Width = doc.getTextWidth(text1);
@@ -378,7 +378,7 @@ export default function DialogQuoteInvoice({ open, onClose, quote }) {
 
                     {/* Footer */}
                     <div className="border-t pt-4 text-xs text-muted-foreground text-center">
-                        <p>Este presupuesto tiene validez de 7 días desde su emisión.</p>
+                        <p>Este presupuesto tiene validez de 3 días desde su emisión.</p>
                         <p>Sujeto a disponibilidad de stock y cambios en la cotización.</p>
                     </div>
                 </div>

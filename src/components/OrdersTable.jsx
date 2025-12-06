@@ -71,6 +71,11 @@ const STATUS_COLORS = {
   cancelado: "bg-red-400",
 };
 
+const PRODUCT_STATUS_COLORS = {
+  disponible: "bg-blue-100 text-blue-800 border-blue-300",
+  "en espera": "bg-orange-100 text-orange-800 border-orange-300",
+};
+
 const OrdersTable = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -100,6 +105,7 @@ const OrdersTable = () => {
                   id,
                   created_at,
                   status,
+                  product_status,
                   appointment_datetime,
                   notes,
                   interested_variants,
@@ -168,6 +174,20 @@ const OrdersTable = () => {
       toast.error("Error actualizando estado");
     } else {
       toast.success("Estado actualizado");
+      fetchOrders(false);
+    }
+  };
+
+  const handleUpdateProductStatus = async (id, productStatus) => {
+    const { error } = await supabase
+      .from("leads")
+      .update({ product_status: productStatus, updated_at: new Date() })
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Error actualizando estado del producto");
+    } else {
+      toast.success("Estado del producto actualizado");
       fetchOrders(false);
     }
   };
@@ -350,6 +370,7 @@ const OrdersTable = () => {
               <TableHead>Fecha cita</TableHead>
               <TableHead>Interesado en</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead>Producto</TableHead>
               <TableHead>Creado</TableHead>
               <TableHead className="w-10 text-center"></TableHead>
             </TableRow>
@@ -358,7 +379,7 @@ const OrdersTable = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8}>
+                <TableCell colSpan={9}>
                   <div className="grid gap-2">
                     {[...Array(8)].map((_, i) => (
                       <Skeleton key={i} className="h-10 w-full" />
@@ -369,7 +390,7 @@ const OrdersTable = () => {
             ) : filteredOrders.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={9}
                   className="py-10 text-center text-muted-foreground"
                 >
                   No hay pedidos registrados.
@@ -443,6 +464,52 @@ const OrdersTable = () => {
                         {o.status}
                       </span>
                     </div>
+                  </TableCell>
+
+                  {/* 📦 Estado del Producto */}
+                  <TableCell>
+                    {role === "superadmin" ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Badge
+                            variant="outline"
+                            className={`cursor-pointer ${
+                              PRODUCT_STATUS_COLORS[o.product_status || "en espera"] ||
+                              "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {o.product_status || "en espera"}
+                          </Badge>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem
+                            onClick={() =>
+                              handleUpdateProductStatus(o.id, "disponible")
+                            }
+                          >
+                            <span className="text-blue-600">● </span>
+                            Disponible
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              handleUpdateProductStatus(o.id, "en espera")
+                            }
+                          >
+                            <span className="text-orange-600">● </span>
+                            En espera
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <Badge
+                        className={
+                          PRODUCT_STATUS_COLORS[o.product_status || "en espera"] ||
+                          "bg-gray-100 text-gray-800"
+                        }
+                      >
+                        {o.product_status || "en espera"}
+                      </Badge>
+                    )}
                   </TableCell>
 
                   <TableCell>{formatDate(o.created_at)}</TableCell>

@@ -163,22 +163,24 @@ export function SalesList() {
                     lineWidth: 0.3,
                     lineColor: [0, 0, 0],
                 },
-                head: [["Producto", "Variante", "Color", "Cant", "Subtotal USD", "Subtotal ARS"]],
+                head: [["Producto", "Variante", "Color", "IMEI", "Cant", "Subtotal USD", "Subtotal ARS"]],
                 body: sale.items?.map((i) => [
                     i.product_name,
                     i.variant_name,
                     i.color || "-",
+                    i.imei ? String(i.imei).trim() : "-",
                     i.quantity,
                     `USD ${(i.subtotal_usd || i.usd_price * i.quantity).toFixed(2)}`,
                     `$ ${Number(i.subtotal_ars).toLocaleString("es-AR")}`,
                 ]) || [],
                 columnStyles: {
-                    0: { cellWidth: 40 },
-                    1: { cellWidth: 35 },
-                    2: { cellWidth: 22 },
-                    3: { halign: "center", cellWidth: 15 },
-                    4: { halign: "right", cellWidth: 34 },
-                    5: { halign: "right", cellWidth: 34 },
+                    0: { cellWidth: 32 },
+                    1: { cellWidth: 32 },
+                    2: { cellWidth: 18 },
+                    3: { cellWidth: 30 },
+                    4: { halign: "center", cellWidth: 12 },
+                    5: { halign: "right", cellWidth: 30 },
+                    6: { halign: "right", cellWidth: 26 },
                 },
                 theme: "plain",
                 margin: { top: 0, right: 0, bottom: 0, left: margin },
@@ -384,11 +386,14 @@ export function SalesList() {
                         <div className="text-sm border rounded p-3 bg-muted/40">
                             <strong>Productos:</strong>
                             {s.items?.map((i, idx) => (
-                                <div key={idx} className="flex justify-between border-b py-1">
-                                    <span>
-                                        {i.product_name} {i.variant_name} {i.color ? `(${i.color})` : ""} — {i.quantity}u
-                                    </span>
-                                    <span>${i.subtotal_ars.toLocaleString("es-AR")}</span>
+                                <div key={idx} className="border-b py-1 last:border-0">
+                                    <div className="flex justify-between">
+                                        <span>
+                                            {i.product_name} {i.variant_name} {i.color ? `(${i.color})` : ""} — {i.quantity}u
+                                        </span>
+                                        <span>${i.subtotal_ars.toLocaleString("es-AR")}</span>
+                                    </div>
+                                    {i.imei && i.imei.toString().trim() !== "" && <div className="text-xs text-muted-foreground">IMEI: {i.imei}</div>}
                                 </div>
                             ))}
                         </div>

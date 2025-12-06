@@ -82,7 +82,7 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
       const q = searchVariant.trim();
       const { data, error } = await supabase
         .from("product_variants")
-        .select("id, variant_name, color, storage, ram, products(name)")
+        .select("id, variant_name, color, storage, ram, stock, products(name)")
         .eq("product_id", selectedProduct.id)
         .ilike("variant_name", `%${q}%`)
         .limit(40);
@@ -104,6 +104,13 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
   // ❌ Quitar variante
   const handleRemoveVariant = (id) => {
     setSelectedVariants(selectedVariants.filter((v) => v.id !== id));
+  };
+
+  // 📦 Calcular estado del producto según stock
+  const getProductStatus = () => {
+    if (selectedVariants.length === 0) return null;
+    const allHaveStock = selectedVariants.every((v) => v.stock > 0);
+    return allHaveStock ? "disponible" : "en espera";
   };
 
   // 🧾 Enviar lead
@@ -140,7 +147,10 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
       color: v.color,
       storage: v.storage,
       ram: v.ram,
+      stock: v.stock,
     }));
+
+    const productStatus = getProductStatus();
 
     const { error } = await supabase.from("leads").insert([
       {
@@ -150,6 +160,7 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
         appointment_datetime: form.appointmentDatetime || null,
         notes: form.notes || null,
         status: "pendiente",
+        product_status: productStatus, // ✅ "disponible" o "en espera"
       },
     ]);
 

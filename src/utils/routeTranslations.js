@@ -5,13 +5,14 @@ export const ROUTE_TRANSLATIONS = {
   catalog: "Catálogo",
   brands: "Marcas",
   categories: "Categorías",
-  clients: "Clientes",
+  customers: "Clientes",
   team: "Equipo",
   orders: "Pedidos",
   "top-sellers": "Top Vendedores",
   "payment-calculator": "Calculadora de Cotizaciones",
   "sellers-payments": "Pagos a Vendedores",
   "s-payments": "Pagos a Vendedores",
+  "my-sales": "Mis Ventas",
 
   // ⚙️ Configuración
   settings: "Configuraciones",
