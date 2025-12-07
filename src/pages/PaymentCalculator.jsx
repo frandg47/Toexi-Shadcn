@@ -19,7 +19,7 @@ import DialogQuoteInvoice from "@/components/DialogQuoteInvoice";
 
 export default function PaymentCalculator() {
     const { profile } = useAuth();
-    
+
     // --- Cliente ---
     const [customers, setCustomers] = useState([]);
     const [searchCustomer, setSearchCustomer] = useState("");
@@ -383,7 +383,11 @@ export default function PaymentCalculator() {
                     {selectedVariants.length > 0 && (
                         <div className="space-y-3 border-t pt-4">
                             {selectedVariants.map((v) => (
-                                <div key={v.id} className="flex justify-between items-center border p-2 rounded-md">
+                                <div
+                                    key={v.id}
+                                    className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border p-2 rounded-md"
+                                >
+
                                     <div>
                                         <div className="font-medium">{v.products.name}</div>
                                         <div className="text-sm text-muted-foreground">
