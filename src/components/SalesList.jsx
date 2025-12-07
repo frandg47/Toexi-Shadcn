@@ -353,10 +353,10 @@ export function SalesList() {
           />
         </div>
       </div> */}
-
-            {/* 🧾 LISTA DE TICKETS */}
+      
+            {/* 🧾 LISTA DE TICKETS */}            
             <div className="space-y-6">
-                {sales.map((s) => (
+                {sales.length !== 0 ? sales.map((s) => (
                     <Card key={s.sale_id} className="p-5 shadow-md w-full">
                         <div className="flex justify-between">
                             <h2 className="font-bold text-lg">Venta #{s.sale_id}</h2>
@@ -431,7 +431,10 @@ export function SalesList() {
                             </Button>
                         </div>
                     </Card>
-                ))}
+                )) :
+                (
+                    <p className="text-center text-muted-foreground">No se encontraron ventas para los filtros seleccionados.</p>
+                )}
             </div>
 
             {/* 📄 Paginación */}

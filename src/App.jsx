@@ -39,7 +39,7 @@ function ProtectedRoute({ children, allowedRoles }) {
   // 🔍 Mostrar loader solo mientras se verifica sesión por primera vez
   if (status === "loading") {
     return (
-      <div className="flex h-[100svh] w-full items-center justify-center">
+      <div className="flex min-h-[100svh] w-full items-center justify-center">
         <ConcentricLoader />
       </div>
     );
