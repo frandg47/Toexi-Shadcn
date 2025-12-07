@@ -296,7 +296,7 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
   // ==============================
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Confirmar Venta</DialogTitle>
           <DialogDescription>
