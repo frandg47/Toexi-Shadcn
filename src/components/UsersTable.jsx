@@ -171,11 +171,11 @@ const UsersTable = ({ refreshToken = 0 }) => {
     [fetchUsers]
   );
 
-  const fixGoogleAvatar = (url) => {
-    console.log("url imagen", url);
-    if (!url) return null;
-    return url.replace("=s96-c", "=s256-c");
-  };
+  // const fixGoogleAvatar = (url) => {
+  //   console.log("url imagen", url);
+  //   if (!url) return null;
+  //   return url.replace("=s96-c", "=s256-c");
+  // };
 
 
   // 🆕 FUNCIÓN: Abre el AlertDialog de eliminación

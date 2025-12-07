@@ -29,8 +29,6 @@ export function NavUser({ user }) {
   const logout = useAuthStore((state) => state.logout);
 
   const [openProfileDialog, setOpenProfileDialog] = useState(false);
-  console.log("user en navuser:", user);
-
   const handleLogout = async () => {
     try {
       await logout();

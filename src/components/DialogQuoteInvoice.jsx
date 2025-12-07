@@ -25,7 +25,6 @@ const formatCurrencyUSD = (value) => {
 
 export default function DialogQuoteInvoice({ open, onClose, quote }) {
     const [isPrinting, setIsPrinting] = useState(false);
-    console.log("presupuesto", quote);
 
     if (!quote) return null;
 

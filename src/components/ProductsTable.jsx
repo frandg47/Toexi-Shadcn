@@ -290,7 +290,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       setCategories(categoriesRes?.data || []);
       setPaymentMethods(filteredMethods);
       setPaymentInstallments(flatInstallments);
-      console.log("Processed products:", processed);
     } catch (err) {
       console.error(err);
       // 🔄 REEMPLAZO 3: Reemplazar Swal por toast
@@ -391,24 +390,18 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
 
           {/* Contenedor de filtros + botones (stack en sm–lg, inline en xl) */}
           <div
-            className="
-      flex flex-col gap-3 w-full
-      xl:flex-row xl:items-center xl:justify-end
-    "
+            className="flex flex-col gap-3 w-full xl:flex-row xl:items-center xl:justify-end"
           >
 
             {/* 🟦 FILA 2 — Filtros (marca + categoría) */}
             <div
-              className="
-        flex flex-wrap gap-2 justify-end
-        w-full
-      "
+              className="flex flex-wrap gap-2 justify-end w-full"
             >
               <Select
                 value={selectedBrand || "all"}
                 onValueChange={(v) => setSelectedBrand(v === "all" ? "" : v)}
               >
-                <SelectTrigger className="w-auto min-w-[180px]">
+                <SelectTrigger className="w-full md:w-auto min-w-[180px]">
                   <SelectValue placeholder="Todas las marcas" />
                 </SelectTrigger>
                 <SelectContent>
@@ -425,7 +418,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                 value={selectedCategory || "all"}
                 onValueChange={(v) => setSelectedCategory(v === "all" ? "" : v)}
               >
-                <SelectTrigger className="w-auto min-w-[180px]">
+                <SelectTrigger className="w-full md:w-auto min-w-[180px]">
                   <SelectValue placeholder="Todas las categorías" />
                 </SelectTrigger>
                 <SelectContent>

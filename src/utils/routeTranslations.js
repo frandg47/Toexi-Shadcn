@@ -9,7 +9,7 @@ export const ROUTE_TRANSLATIONS = {
   team: "Equipo",
   orders: "Pedidos",
   "top-sellers": "Top Vendedores",
-  "payment-calculator": "Calculadora de Cotizaciones",
+  "payment-calculator": "Generador de Presupuestos",
   "sellers-payments": "Pagos a Vendedores",
   "s-payments": "Pagos a Vendedores",
   "my-sales": "Mis Ventas",

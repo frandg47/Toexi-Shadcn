@@ -60,7 +60,7 @@ export default function AuthCallback() {
           const user_id = sessionUser.id;
 
           if (avatar) {
-            console.log("🔄 Clonando avatar desde Google...", avatar);
+            // console.log("🔄 Clonando avatar desde Google...", avatar);
 
             await supabase.functions.invoke("bright-responder", {
               body: {
@@ -69,7 +69,7 @@ export default function AuthCallback() {
               },
             });
 
-            console.log("✅ Avatar clonado correctamente.");
+            // console.log("✅ Avatar clonado correctamente.");
           }
         } catch (err) {
           console.error("⚠️ Error clonando avatar:", err);

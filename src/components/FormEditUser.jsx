@@ -46,7 +46,6 @@ export default function FormEditUser({ userId, onClose, onSuccess }) {
       }
 
       setUser(data);
-      console.log("Usuario cargado:", data);
     };
 
     fetchUser();

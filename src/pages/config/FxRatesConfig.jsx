@@ -134,7 +134,6 @@ const FxRatesConfig = () => {
 
       if (error) throw error;
       setRates(data || []);
-      console.log("datos", data);
     } catch {
       // 🔄 REEMPLAZO 1: Usar toast para error de carga
       toast.error("Error", {

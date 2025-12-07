@@ -41,7 +41,6 @@ export default function BreadcrumbHeader() {
 
         {segments.map((seg, index) => {
           accumulatedPath += `/${seg}`;
-          console.log("SEGMENTO REAL:", seg)
 
           const isLast = index === segments.length - 1;
 

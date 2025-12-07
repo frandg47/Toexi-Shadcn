@@ -43,7 +43,6 @@ export default function ProductDetailDialog({
   paymentInstallments = [],
 }) {
   if (!product) return null;
-  console.log("producto en detalle:", product);
 
   // 🔹 Variantes reales
   const realVariants = useMemo(
