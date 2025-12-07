@@ -102,23 +102,22 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
   // ========================================
   // PDF – GENERACIÓN ESTABLE (VERSIÓN ORIGINAL)
   // ========================================
+  // ========================================
+  // PDF – GENERACIÓN (CORREGIDO CON VENDEDOR + MISMOS TAMAÑOS)
+  // ========================================
   const handleDownloadPDF = (savedSale) => {
     const doc = new jsPDF();
     const margin = 14;
     const pageWidth = doc.internal.pageSize.getWidth();
     let y = margin;
 
-    // =============================
-    //  LOGO (PARTE SUPERIOR DERECHA)
-    // =============================
+    // Logo
     const logoWidth = 22;
     const logoHeight = 22;
     const logoX = pageWidth - logoWidth - margin;
     doc.addImage("/toexi.jpg", "JPEG", logoX - 2, margin - 8, logoWidth, logoHeight);
 
-    // =============================
-    //  ENCABEZADO
-    // =============================
+    // Encabezado
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
     doc.text("COMPROBANTE DE VENTA", margin, y);
@@ -142,7 +141,7 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
 
     doc.text("Cliente:", margin + 4, y + 12);
     doc.text(
-      `${safeSale.customer_name}  (Tel: ${safeSale.customer_phone || "-"})`,
+      `${safeSale.customer_name} (Tel: ${safeSale.customer_phone || "-"})`,
       margin + 40,
       y + 12
     );
@@ -150,27 +149,44 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
     y += 30;
 
     // =============================
-    //  TABLA DE ITEMS
+    //  VENDEDOR (NUEVO - IGUAL QUE SALES LIST)
+    // =============================
+    const vendedorNombre =
+      safeSale.seller_name && safeSale.seller_name.trim()
+        ? `${safeSale.seller_name}${safeSale.seller_last_name ? " " + safeSale.seller_last_name : ""}`
+        : "Toexi Tech";
+
+    doc.setFontSize(11);
+    doc.rect(margin, y, 180, 16);
+
+    doc.text("Vendedor:", margin + 4, y + 6);
+    doc.text(vendedorNombre, margin + 40, y + 6);
+
+    y += 24;
+
+    // =============================
+    //  TABLA DE ITEMS (COLUMNAS IGUAL QUE SALES LIST)
     // =============================
     autoTable(doc, {
       startY: y,
       headStyles: {
         fillColor: [255, 255, 255],
         textColor: [0, 0, 0],
-        fontSize: 9,
+        fontSize: 10,
         fontStyle: "bold",
         lineWidth: 0.3,
         lineColor: [0, 0, 0],
       },
       bodyStyles: {
-        fontSize: 9,
+        fontSize: 10,
         lineWidth: 0.3,
         lineColor: [0, 0, 0],
       },
-      head: [["Producto", "Variante", "IMEI", "Cant", "USD", "Subtotal ARS"]],
+      head: [["Producto", "Variante", "Color", "IMEI", "Cant", "Subtotal USD", "Subtotal ARS"]],
       body: safeSale.variants.map((v) => [
         v.product_name,
         v.variant_name,
+        v.color || "-",
         v.imei || "-",
         v.quantity,
         `USD ${v.usd_price.toFixed(2)}`,
@@ -178,11 +194,12 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
       ]),
       columnStyles: {
         0: { cellWidth: 32 },
-        1: { cellWidth: 30 },
-        2: { cellWidth: 30 },
-        3: { halign: "center", cellWidth: 12 },
-        4: { halign: "right", cellWidth: 22 },
-        5: { halign: "right", cellWidth: 34 },
+        1: { cellWidth: 32 },
+        2: { cellWidth: 18 },
+        3: { cellWidth: 30 },
+        4: { halign: "center", cellWidth: 12 },
+        5: { halign: "right", cellWidth: 30 },
+        6: { halign: "right", cellWidth: 26 },
       },
       theme: "plain",
       margin: { top: 0, right: 0, bottom: 0, left: margin },
@@ -190,43 +207,33 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
         const { table, row, column } = data;
         const totalRows = table.body.length;
         const totalCols = table.columns.length;
-        
-        // Remover bordes externos
+
         if (row.index === 0 && column.index === 0) {
-          // Top-left
           data.cell.styles.lineWidth = [0, 0.3, 0.3, 0];
         } else if (row.index === 0 && column.index === totalCols - 1) {
-          // Top-right
           data.cell.styles.lineWidth = [0, 0, 0.3, 0.3];
         } else if (row.index === totalRows - 1 && column.index === 0) {
-          // Bottom-left
           data.cell.styles.lineWidth = [0.3, 0.3, 0, 0];
         } else if (row.index === totalRows - 1 && column.index === totalCols - 1) {
-          // Bottom-right
           data.cell.styles.lineWidth = [0.3, 0, 0, 0.3];
         } else if (row.index === 0) {
-          // Top
           data.cell.styles.lineWidth = [0, 0.3, 0.3, 0.3];
         } else if (row.index === totalRows - 1) {
-          // Bottom
           data.cell.styles.lineWidth = [0.3, 0.3, 0, 0.3];
         } else if (column.index === 0) {
-          // Left
           data.cell.styles.lineWidth = [0.3, 0.3, 0.3, 0];
         } else if (column.index === totalCols - 1) {
-          // Right
           data.cell.styles.lineWidth = [0.3, 0, 0.3, 0.3];
         } else {
-          // Interior
           data.cell.styles.lineWidth = [0.3, 0.3, 0.3, 0.3];
         }
-      }
+      },
     });
 
     y = doc.lastAutoTable.finalY + 10;
 
     // =============================
-    //  RESUMEN FINANCIERO
+    //  RESUMEN FINANCIERO (SIN CAMBIOS)
     // =============================
     doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
@@ -248,7 +255,7 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
     y += 14;
 
     // =============================
-    //  MÉTODOS DE PAGO
+    // MÉTODOS DE PAGO (SIN CAMBIOS)
     // =============================
     doc.setFontSize(11);
     doc.setTextColor(0);
@@ -269,25 +276,20 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
 
     y += 4;
 
-    // =============================
-    //  FOOTER
-    // =============================
+    // Footer
     doc.setFontSize(9);
     doc.setTextColor(120);
     const pageHeight = doc.internal.pageSize.getHeight();
     const footerY = pageHeight - 14;
-    
+
     const text1 = "Gracias por su compra - Toexi Tech ©";
-    
     const text1Width = doc.getTextWidth(text1);
-    
+
     doc.text(text1, (pageWidth - text1Width) / 2, footerY);
 
-    // =============================
-    //  DESCARGA
-    // =============================
     doc.save(`venta_${savedSale.id}.pdf`);
   };
+
 
   // ==============================
   // UI
@@ -305,7 +307,7 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
         <div className="space-y-2 text-sm">
           <p><strong>Cliente:</strong> {safeSale.customer_name}</p>
           <p><strong>Tel:</strong> {safeSale.customer_phone || "-"}</p>
-          <p><strong>Vendedor:</strong> {safeSale.seller_name}</p>
+          <p><strong>Vendedor:</strong> {safeSale.seller_name && safeSale.seller_name.trim() ? safeSale.seller_name : "Toexi Tech"}</p>
           <p><strong>Cotización:</strong> ${safeSale.fx_rate_used}</p>
 
           <div className="border rounded p-2 max-h-40 overflow-y-auto">

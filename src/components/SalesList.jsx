@@ -402,7 +402,7 @@ export function SalesList() {
                         <div className="text-sm border rounded p-3 mt-3 bg-muted/40">
                             <strong>Métodos de pago:</strong>
                             {s.payments?.map((p, idx) => (
-                                <div key={idx} className="flex justify-between border-b py-1">
+                                <div key={idx} className="flex justify-between border-b last:border-0 py-1">
                                     <span>
                                         {p.method}
                                         {p.card_brand ? ` (${p.card_brand})` : ""}

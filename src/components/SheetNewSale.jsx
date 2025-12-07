@@ -785,11 +785,26 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                     <Button
                       className=""
                       disabled={selectedVariants.length === 0}
-                      onClick={() => setStep((s) => (s < 3 ? s + 1 : s))}
+                      onClick={() => {
+                        // Validar IMEI obligatorio
+                        const missingIMEI = selectedVariants.find(
+                          (v) => !v.imei || v.imei.trim() === ""
+                        );
+
+                        if (missingIMEI) {
+                          toast.error(
+                            `Los productos requieren IMEI/Código.`
+                          );
+                          return;
+                        }
+
+                        setStep((s) => (s < 3 ? s + 1 : s));
+                      }}
                     >
                       Siguiente
                       <IconChevronRight className="h-4 w-4" />
                     </Button>
+
                   </div>
                 </div>
               )}
