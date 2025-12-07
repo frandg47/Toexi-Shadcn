@@ -1,7 +1,8 @@
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useLocation } from "react-router-dom";
-import BreadcrumbHeader from "@/components/BreadcrumbHeader";
+import BreadcrumbHeader from "@/components/BreadCrumbHeader.jsx";
+
 
 const TITULOS = {
   dashboard: "Dashboard",
