@@ -187,7 +187,7 @@ export default function SectionCardsProducts() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold flex items-center gap-3">
-              {fxRate ? `$${fxRate.toLocaleString("es-AR")}` : "Cargando..."}
+              {fxRate ? `$${fxRate.toLocaleString("es-AR")}` : "-"}
               {getRateBadge()}
             </div>
             <div className="mt-1 text-sm text-muted-foreground">USD → ARS</div>
@@ -208,7 +208,7 @@ export default function SectionCardsProducts() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {loading ? "Cargando..." : totalProducts}
+                {loading ? "-" : totalProducts}
               </div>
               <div className="mt-1 text-sm text-muted-foreground">
                 Unidades ofrecidas en tienda
@@ -229,7 +229,7 @@ export default function SectionCardsProducts() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {loading ? "Cargando..." : totalStock}
+                {loading ? "-" : totalStock}
               </div>
               <div className="mt-1 text-sm text-muted-foreground">
                 Unidades disponibles en tienda

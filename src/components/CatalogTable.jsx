@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, } from "@/components/ui/alert-dialog";
 import {
   IconBallpen,
   IconEdit,
@@ -23,6 +24,13 @@ export default function CatalogTable({ tipo }) {
   const [loading, setLoading] = useState(true);
   const [nameFilter, setNameFilter] = useState("");
   const [productCounts, setProductCounts] = useState({});
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    item: null,
+    type: "",
+  });
+
+
 
   // Modales
   const [modal, setModal] = useState({
@@ -31,6 +39,15 @@ export default function CatalogTable({ tipo }) {
     initial: "",
     type: "",
   });
+
+
+  const deleteItem = (item, type) => {
+    setDeleteDialog({
+      open: true,
+      item,
+      type,
+    });
+  };
 
   useEffect(() => {
     fetchData();
@@ -90,6 +107,34 @@ export default function CatalogTable({ tipo }) {
     }
   };
 
+
+  const handleConfirmDelete = async () => {
+    const { item, type } = deleteDialog;
+    if (!item) return;
+
+    const table = type === "brand" ? "brands" : "categories";
+
+    try {
+      const { error } = await supabase.from(table).delete().eq("id", item.id);
+      if (error) throw error;
+
+      if (type === "brand") {
+        setBrands((prev) => prev.filter((b) => b.id !== item.id));
+      } else {
+        setCategories((prev) => prev.filter((c) => c.id !== item.id));
+      }
+
+      toast.success(
+        `${type === "brand" ? "Marca" : "Categoría"} eliminada correctamente`
+      );
+    } catch (err) {
+      toast.error("Error al eliminar", { description: err.message });
+    } finally {
+      setDeleteDialog({ open: false, item: null, type: "" });
+    }
+  };
+
+
   /* ---------- CRUD ---------- */
   const saveItem = async (name, id = null, type) => {
     if (!name) return toast.error("El nombre no puede estar vacío");
@@ -101,32 +146,32 @@ export default function CatalogTable({ tipo }) {
         .update({ name })
         .eq("id", id)
         .select();
-      if (error) return toast.error(`Error al editar ${type}`);
+      if (error) return toast.error(`Error al editar ${type === "brand" ? "marca" : "categoría"}`);
       if (type === "brand")
         setBrands((prev) => prev.map((b) => (b.id === id ? data[0] : b)));
       else
         setCategories((prev) => prev.map((c) => (c.id === id ? data[0] : c)));
-      toast.success(`${capitalize(type)} actualizada`);
+      toast.success(`${capitalize(type === "brand" ? "marca" : "categoría")} actualizada`);
     } else {
       const { data, error } = await supabase
         .from(table)
         .insert([{ name }])
         .select();
-      if (error) return toast.error(`Error al agregar ${type}`);
+      if (error) return toast.error(`Error al agregar ${type === "brand" ? "marca" : "categoría"}`);
       if (type === "brand") setBrands((prev) => [...prev, data[0]]);
       else setCategories((prev) => [...prev, data[0]]);
-      toast.success(`${capitalize(type)} agregada`);
+      toast.success(`${capitalize(type === "brand" ? "marca" : "categoría")} agregada`);
     }
   };
 
-  const deleteItem = async (id, type) => {
-    const table = type === "brand" ? "brands" : "categories";
-    const { error } = await supabase.from(table).delete().eq("id", id);
-    if (error) return toast.error(`Error al eliminar ${type}`);
-    if (type === "brand") setBrands((prev) => prev.filter((b) => b.id !== id));
-    else setCategories((prev) => prev.filter((c) => c.id !== id));
-    toast.success(`${capitalize(type)} eliminada`);
-  };
+  // const deleteItem = async (id, type) => {
+  //   const table = type === "brand" ? "brands" : "categories";
+  //   const { error } = await supabase.from(table).delete().eq("id", id);
+  //   if (error) return toast.error(`Error al eliminar ${type === "brand" ? "marca" : "categoría"}`);
+  //   if (type === "brand") setBrands((prev) => prev.filter((b) => b.id !== id));
+  //   else setCategories((prev) => prev.filter((c) => c.id !== id));
+  //   toast.success(`${capitalize(type === "brand" ? "marca" : "categoría")} eliminada`);
+  // };
 
   const capitalize = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
@@ -171,7 +216,7 @@ export default function CatalogTable({ tipo }) {
                   <Button
                     size="sm"
                     variant="destructive"
-                    onClick={() => deleteItem(item.id, type)}
+                    onClick={() => deleteItem(item, type)}
                   >
                     <IconTrash className="h-4 w-4" />
                   </Button>
@@ -198,16 +243,37 @@ export default function CatalogTable({ tipo }) {
 
   return (
     <>
-      <div className="flex justify-between items-center my-4 flex-wrap gap-3">
+      <div className="
+  flex flex-col gap-3
+  lg:flex-row lg:items-center lg:justify-between
+  my-4
+">
+
+        {/* Buscador */}
         <Input
           placeholder="Buscar por nombre..."
           onChange={(e) => setNameFilter(e.target.value)}
-          className="w-72"
+          className="w-full lg:w-72"
         />
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchData} disabled={loading}>
-            <IconRefresh className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} /> Refrescar
+
+        {/* Botones */}
+        <div className="
+    flex gap-2 justify-end
+    w-full lg:w-auto
+    flex-wrap
+  ">
+          <Button
+            variant="outline"
+            onClick={fetchData}
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            <IconRefresh
+              className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"}
+            />
+            Refrescar
           </Button>
+
           <Button
             onClick={() =>
               setModal({
@@ -217,11 +283,14 @@ export default function CatalogTable({ tipo }) {
                 type: tipo === "brands" ? "brand" : "category",
               })
             }
+            className="flex items-center gap-2"
           >
-            <IconPlus className="h-4 w-4" /> Agregar
+            <IconPlus className="h-4 w-4" />
+            Agregar
           </Button>
         </div>
       </div>
+
       <div className="container my-6 space-y-10 ">
         {(tipo === "all" || tipo === "categories") && (
           <>{renderCards(categories, "category")}</>
@@ -243,11 +312,40 @@ export default function CatalogTable({ tipo }) {
           }}
           label={
             modal.editId
-              ? `Editar ${capitalize(modal.type)}`
-              : `Agregar ${capitalize(modal.type)}`
+              ? `Editar ${capitalize(modal.type === "brand" ? "Marca" : "Categoría")}`
+              : `Agregar ${capitalize(modal.type === "brand" ? "Marca" : "Categoría")}`
           }
           initialValue={modal.initial}
         />
+
+        <AlertDialog
+          open={deleteDialog.open}
+          onOpenChange={(open) =>
+            !open && setDeleteDialog({ open: false, item: null, type: "" })
+          }
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminar</AlertDialogTitle>
+              <AlertDialogDescription>
+                Estás por eliminar{" "}
+                <strong>{deleteDialog.item?.name}</strong>. Esta acción no
+                puede deshacerse.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDelete}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
       </div>
     </>
   );

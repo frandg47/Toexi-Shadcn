@@ -278,7 +278,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
               placeholder="https://..."
               value={form.cover_image_url || ""}
               onChange={handleChange}
-              className="min-h-[70px]"
+              className="min-h-[70px] resize-none break-words max-w-xl"
             />
           </div>
 

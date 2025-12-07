@@ -1,5 +1,4 @@
 import { useLocation } from "react-router-dom";
-import { SiteHeader } from "@/components/site-header";
 import CatalogTable from "../components/CatalogTable";
 
 export default function CatalogPage() {
@@ -11,16 +10,9 @@ export default function CatalogPage() {
 
   return (
     <>
-      <SiteHeader
-        titulo={
-          tipo === "brands"
-            ? "Marcas"
-            : tipo === "categories"
-            ? "Categorías"
-            : "Catálogo"
-        }
-      />
-      <CatalogTable tipo={tipo} />
+      <div className="mt-6">
+        <CatalogTable tipo={tipo} />
+      </div>
     </>
   );
 }

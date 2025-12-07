@@ -143,13 +143,17 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
   return (
     <div className="space-y-4">
       {/* 🔹 Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:justify-between lg:flex-row lg:items-center lg:justify-between">
+
+        {/* Buscador */}
         <Input
           placeholder="Buscar cliente..."
           onChange={(e) => setFilter(e.target.value)}
-          className="w-full sm:w-80 max-w-sm"
+          className="w-full lg:w-80"
         />
-        <div className="flex justify-center sm:justify-end flex-wrap gap-2">
+
+        {/* Botones */}
+        <div className="flex justify-end gap-2">
           <Button
             variant="outline"
             onClick={() => fetchCustomers(false)}
@@ -173,6 +177,7 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
           />
         </div>
       </div>
+
 
       {/* 🔹 Cards View en lugar de tabla */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -254,17 +259,16 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
               </div>
 
               {/* ✏️ Acciones */}
-              <div className="flex justify-between items-center mt-auto pt-3 border-t">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setEditingCustomerId(c.id)}
-                  >
-                    <IconEdit className="h-4 w-4" />
-                  </Button>
-
-                  {!isSellerView && (
+              {!isSellerView && (
+                <div className="flex justify-between items-center mt-auto pt-3 border-t">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingCustomerId(c.id)}
+                    >
+                      <IconEdit className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="destructive"
                       size="sm"
@@ -274,9 +278,9 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
                     >
                       <IconTrash className="h-4 w-4" />
                     </Button>
-                  )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           ))}
       </div>

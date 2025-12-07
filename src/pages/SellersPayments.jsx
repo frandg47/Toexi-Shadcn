@@ -1,14 +1,14 @@
 import { useState } from "react";
-import UsersTable from "@/components/UsersTable";
+import SellersTable from "@/components/SellersTable";
 
-const TeamPage = () => {
+const SellersPayments = () => {
   const [refreshToken, setRefreshToken] = useState(0);
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-4 py-6">
-      <UsersTable refreshToken={refreshToken} />
+      <SellersTable refreshToken={refreshToken} />
     </div>
   );
 };
 
-export default TeamPage;
+export default SellersPayments;

@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { IconColumns } from "@tabler/icons-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -92,7 +93,7 @@ const getGoogleAvatarUrl = (email) => {
   )}`;
 };
 
-const UsersTable = ({ refreshToken = 0, onAdd }) => {
+const UsersTable = ({ refreshToken = 0 }) => {
   const [visibleColumns, setVisibleColumns] = useState(
     TABLE_COLUMNS.map((col) => col.id)
   );
@@ -119,7 +120,7 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
       const { data, error } = await supabase
         .from("users")
         .select(
-          "id, name, last_name, email, role, is_active, phone, dni, adress, created_at"
+          "id, name, avatar_url, last_name, email, role, is_active, phone, dni, adress, created_at"
         )
         .order("created_at", { ascending: false });
 
@@ -154,9 +155,8 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
         await fetchUsers();
         // 🔄 REEMPLAZO 2: Usar toast para la confirmación de actualización
         toast.success("Estado actualizado", {
-          description: `La cuenta de ${user.email} ahora está ${
-            !user.is_active ? "activa" : "inactiva"
-          }.`,
+          description: `La cuenta de ${user.email} ahora está ${!user.is_active ? "activa" : "inactiva"
+            }.`,
         });
       } catch (error) {
         console.error(error);
@@ -170,6 +170,13 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
     },
     [fetchUsers]
   );
+
+  const fixGoogleAvatar = (url) => {
+    console.log("url imagen", url);
+    if (!url) return null;
+    return url.replace("=s96-c", "=s256-c");
+  };
+
 
   // 🆕 FUNCIÓN: Abre el AlertDialog de eliminación
   const handleOpenDeleteDialog = (user) => {
@@ -228,20 +235,27 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
   return (
     <div className="space-y-4">
       {/* 🔹 Header de filtros y acciones */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+
         {/* 🔍 Buscador */}
         <Input
           placeholder="Buscar por nombre..."
           onChange={(e) => setNameFilter(e.target.value)}
-          className="w-full sm:w-80 max-w-sm"
+          className="w-full lg:w-80 max-w-full"
         />
 
-        {/* 🔘 Botones (en mobile quedan abajo en fila) */}
-        <div className="flex justify-center sm:justify-end flex-wrap gap-2">
+        {/* 🔘 Botones */}
+        <div className="flex flex-wrap gap-2 justify-end w-full lg:w-auto">
+
+          {/* Columnas */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">Columnas</Button>
+              <Button variant="outline" className="flex items-center gap-2">
+                <IconColumns className="h-4 w-4" />
+                <span>Columnas</span>
+              </Button>
             </DropdownMenuTrigger>
+
             <DropdownMenuContent className="w-40">
               {TABLE_COLUMNS.map((col) => (
                 <DropdownMenuCheckboxItem
@@ -255,10 +269,12 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* Refrescar */}
           <Button
             variant="outline"
             onClick={() => fetchUsers(false)}
             disabled={refreshing}
+            className="flex items-center gap-2"
           >
             <IconRefresh
               className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
@@ -266,7 +282,6 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
             Refrescar
           </Button>
 
-          {onAdd}
         </div>
       </div>
 
@@ -324,11 +339,10 @@ const UsersTable = ({ refreshToken = 0, onAdd }) => {
                   {visibleColumns.includes("avatar") && (
                     <TableCell className="w-[70px]">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage
-                          src={getGoogleAvatarUrl(user.email)}
-                          alt={buildFullName(user)}
-                        />
-                        <AvatarFallback>{getInitials(user)}</AvatarFallback>
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={user.avatar_url} />
+                          <AvatarFallback>{getInitials(user)}</AvatarFallback>
+                        </Avatar>
                       </Avatar>
                     </TableCell>
                   )}

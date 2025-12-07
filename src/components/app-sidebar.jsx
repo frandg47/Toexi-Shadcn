@@ -1,6 +1,7 @@
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
+import Header from "../components/Header";
 
 import {
   Sidebar,
@@ -8,9 +9,8 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
 } from "@/components/ui/sidebar";
+
 import { useAuth } from "@/context/AuthContextProvider";
 
 export default function AppSidebar({
@@ -21,8 +21,6 @@ export default function AppSidebar({
   onActionClick,
 }) {
   const { user, profile } = useAuth();
-
-  console.log("object AppSidebar -> user, profile", user, profile);
 
   const displayUser =
     user || profile
@@ -48,15 +46,7 @@ export default function AppSidebar({
 
   return (
     <Sidebar collapsible="offcanvas">
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <span className="text-xl font-bold">{title}</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
+      <Header />
 
       <SidebarContent>
         <NavMain
@@ -64,6 +54,7 @@ export default function AppSidebar({
           actionButtonLabel={actionButtonLabel}
           onActionClick={onActionClick}
         />
+
         <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
 

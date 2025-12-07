@@ -1,14 +1,11 @@
 import { SiteHeader } from "@/components/site-header";
 import OrdersTable from "../components/OrdersTable";
 
-const OrdersPage = ({ titulo }) => {
+const OrdersPage = () => {
   return (
-    <>
-      <SiteHeader titulo={titulo || "Pedidos"} />
-      <div className="mt-6">
-        <OrdersTable />
-      </div>
-    </>
+    <div className="@container/main flex flex-1 flex-col gap-4 py-6">
+      <OrdersTable />
+    </div>
   );
 };
 

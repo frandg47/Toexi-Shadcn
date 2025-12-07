@@ -82,7 +82,7 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
       const q = searchVariant.trim();
       const { data, error } = await supabase
         .from("product_variants")
-        .select("id, variant_name, color, storage, ram, products(name)")
+        .select("id, variant_name, color, storage, ram, stock, products(name)")
         .eq("product_id", selectedProduct.id)
         .ilike("variant_name", `%${q}%`)
         .limit(40);
@@ -104,6 +104,13 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
   // ❌ Quitar variante
   const handleRemoveVariant = (id) => {
     setSelectedVariants(selectedVariants.filter((v) => v.id !== id));
+  };
+
+  // 📦 Calcular estado del producto según stock
+  const getProductStatus = () => {
+    if (selectedVariants.length === 0) return null;
+    const allHaveStock = selectedVariants.every((v) => v.stock > 0);
+    return allHaveStock ? "disponible" : "en espera";
   };
 
   // 🧾 Enviar lead
@@ -140,7 +147,10 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
       color: v.color,
       storage: v.storage,
       ram: v.ram,
+      stock: v.stock,
     }));
+
+    const productStatus = getProductStatus();
 
     const { error } = await supabase.from("leads").insert([
       {
@@ -150,6 +160,7 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
         appointment_datetime: form.appointmentDatetime || null,
         notes: form.notes || null,
         status: "pendiente",
+        product_status: productStatus, // ✅ "disponible" o "en espera"
       },
     ]);
 
@@ -194,9 +205,8 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
                 placeholder="Buscar cliente..."
                 value={
                   selectedCustomer
-                    ? `${selectedCustomer.name} ${
-                        selectedCustomer.last_name || ""
-                      }`
+                    ? `${selectedCustomer.name} ${selectedCustomer.last_name || ""
+                    }`
                     : searchCustomer
                 }
                 onFocus={() => setFocusCustomer(true)}
@@ -339,15 +349,18 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
                   <Badge
                     key={v.id}
                     variant="secondary"
-                    className="flex items-center gap-1"
+                    className="flex items-center gap-1 pr-1"
                   >
-                    {v.products?.name || ""} - {v.variant_name || ""} -{" "}
-                    {v.color || ""}
-                    <IconX
-                      className="h-3 w-3 cursor-pointer"
+                    {v.products?.name || ""} - {v.variant_name || ""} - {v.color || ""}
+                    <button
+                      type="button"
                       onClick={() => handleRemoveVariant(v.id)}
-                    />
+                      className="ml-1 p-0.5 hover:bg-red-100 rounded"
+                    >
+                      <IconX className="h-3 w-3 text-red-600" />
+                    </button>
                   </Badge>
+
                 ))}
               </div>
             )}

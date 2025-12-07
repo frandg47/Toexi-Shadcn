@@ -2,63 +2,35 @@
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { useState } from "react";
 import AppSidebar from "@/components/app-sidebar";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import SheetNewLead from "../SheetNewLead";
-import Header from "../Header";
+import { SiteHeader } from "@/components/site-header";
+
+import PaymentCalculatorDialog from "../PaymentCalculatorDialog";
+
+// import {
+//   paymentMethods,
+//   getInstallmentsForMethod,
+// } from "../../lib/paymentsConfig";
+
 import {
   IconHome,
   IconShoppingCart,
-  IconChartBar,
   IconList,
   IconUsers,
+  IconMedal,
   IconSettings,
   IconCalculator,
-  IconQrcode,
 } from "@tabler/icons-react";
+
 import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContextProvider";
+// import { url } from "inspector";
 
 const showDevelopmentToast = (feature) =>
   toast("Funcionalidad en desarrollo", {
     description: `El módulo de ${feature} estará disponible próximamente.`,
   });
-
-const navMain = [
-  { title: "Inicio", url: "/seller/products", icon: IconHome },
-  {
-    title: "Mis ventas",
-    url: "/seller/sales",
-    icon: IconShoppingCart,
-    onClick: () => showDevelopmentToast("Clientes"),
-  },
-  {
-    title: "Mis pedidos",
-    // url: "/seller/orders",
-    icon: IconList,
-    onClick: () => showDevelopmentToast("Mis pedidos"),
-  },
-  // { title: "Estadísticas", url: "/seller/stats", icon: IconChartBar,
-  //   onClick: () => showDevelopmentToast("Estadísticas")
-  //  },
-  {
-    title: "Clientes",
-    // url: "/seller/clients",
-    onClick: () => showDevelopmentToast("Clientes"),
-    icon: IconUsers,
-  },
-  {
-    title: "Mi QR",
-    url: "/seller/qr",
-    icon: IconQrcode,
-    onClick: () => showDevelopmentToast("Mi QR"),
-  },
-  {
-    title: "Calculadora de cotizaciones",
-    url: "/seller/calculator",
-    icon: IconCalculator,
-    onClick: () => showDevelopmentToast("Calculadora de cotizaciones"),
-  },
-];
 
 const navSecondary = [
   {
@@ -70,31 +42,57 @@ const navSecondary = [
 ];
 
 export default function SellerLayout() {
+  // const [openCalculatorDialog, setOpenCalculatorDialog] = useState(false);
   const [openLeadDialog, setOpenLeadDialog] = useState(false);
-  const { user, role, isActive, status } = useAuth();
-  console.log(
-    "object SellerLayout -> user, role, isActive, status",
-    user,
-    role,
-    isActive,
-    status
-  );
-  console.log("id", user?.id);
+  const { user } = useAuth();
+
+  const location = useLocation();
+
+  // 🔹 Rutas → Títulos automáticos
+  const pageTitles = {
+    "/seller/products": "Productos",
+    "/seller/sales": "Mis ventas",
+    "/seller/orders": "Mis pedidos",
+    "/seller/clients": "Clientes",
+    "/seller/top-sellers": "Mis ventas",
+    "/seller/settings": "Configuración",
+  };
+
+  const tituloActual = pageTitles[location.pathname] || "Panel del vendedor";
+
+  const navMain = [
+    { title: "Inicio", url: "/seller/products", icon: IconHome },
+    // {
+    //   title: "Mis ventas",
+    //   url: "/seller/sales",
+    //   icon: IconShoppingCart,
+    //   onClick: () => showDevelopmentToast("Mis ventas"),
+    // },
+    { title: "Mis pedidos", url: "/seller/orders", icon: IconList },
+    { title: "Clientes", url: "/seller/customers", icon: IconUsers },
+    { title: "Mis ventas", url: "/seller/my-sales", icon: IconMedal },
+    {
+      title: "Calculadora de cotizaciones",
+      icon: IconCalculator,
+      url: "/seller/payment-calculator",
+      // onClick: () => setOpenCalculatorDialog(true),
+    },
+  ];
 
   return (
     <SidebarProvider>
       <AppSidebar
-        title="Panel de Ventas"
+        title="Toexi Tech"
         navMain={navMain}
         navSecondary={navSecondary}
         actionButtonLabel="Nuevo pedido"
-        // onActionClick={() => setOpenLeadDialog(true)}
-        onActionClick={() => showDevelopmentToast("Crear pedido")}
+        onActionClick={() => setOpenLeadDialog(true)}
       />
 
       <SidebarInset>
-        <Header />
-        <main className="p-6 mx-auto max-w-6xl w-full">
+        <SiteHeader titulo={tituloActual} />
+
+        <main className="p-6 mx-auto max-w-6xl w-full pt-[var(--header-height)]">
           <Outlet />
         </main>
       </SidebarInset>
@@ -104,6 +102,15 @@ export default function SellerLayout() {
         onOpenChange={setOpenLeadDialog}
         sellerId={user?.id}
       />
+
+      {/* <PaymentCalculatorDialog
+        open={openCalculatorDialog}
+        onOpenChange={setOpenCalculatorDialog}
+        paymentMethods={paymentMethods}
+        getInstallmentsForMethod={getInstallmentsForMethod}
+        initialSubtotalUSD={0}
+        initialExchangeRate={1440}
+      /> */}
     </SidebarProvider>
   );
 }

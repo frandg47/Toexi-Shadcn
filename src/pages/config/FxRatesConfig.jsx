@@ -153,10 +153,10 @@ const FxRatesConfig = () => {
   const formatDate = (dateString) =>
     dateString
       ? new Intl.DateTimeFormat("es-AR", {
-          dateStyle: "short",
-          timeStyle: "short",
-          timeZone: "America/Argentina/Buenos_Aires",
-        }).format(new Date(dateString))
+        dateStyle: "short",
+        timeStyle: "short",
+        timeZone: "America/Argentina/Buenos_Aires",
+      }).format(new Date(dateString))
       : "-";
 
   // 🆕 FUNCIÓN: Inserta la nueva cotización y desactiva las anteriores
@@ -322,47 +322,76 @@ const FxRatesConfig = () => {
 
   return (
     <>
-      <SiteHeader titulo="Configuración de Cotizaciones" />
+      {/* <SiteHeader titulo="Configuración de Cotizaciones" /> */}
 
-      <div className="mt-6 space-y-6">
+      <div className="@container/main flex flex-1 flex-col gap-4 py-6">
         {/* Filtros globales */}
-        <div className="flex flex-wrap items-center gap-3 justify-between">
-          <div className="flex gap-3">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2">
-                  <IconCalendar className="h-4 w-4" />
-                  {dateRange?.from
-                    ? `${dateRange.from.toLocaleDateString("es-AR")} → ${
-                        dateRange.to
-                          ? dateRange.to.toLocaleDateString("es-AR")
-                          : "..."
+        <div
+          className="
+    flex flex-col gap-3 
+    lg:flex-row lg:items-center lg:justify-between
+  "
+        >
+          {/* ------- IZQUIERDA ------- */}
+          <div
+            className="
+      flex w-full 
+      gap-3 
+      /* mobile-first: 1ra fila */
+      /* rango ocupa espacio restante */
+    "
+          >
+            {/* RANGO DE FECHA → flex-1 en mobile */}
+            <div className="flex-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full lg:w-auto flex items-center gap-2"
+                  >
+                    <IconCalendar className="h-4 w-4" />
+                    {dateRange?.from
+                      ? `${dateRange.from.toLocaleDateString("es-AR")} → ${dateRange.to
+                        ? dateRange.to.toLocaleDateString("es-AR")
+                        : "..."
                       }`
-                    : "Seleccionar rango"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="p-2">
-                <Calendar
-                  mode="range"
-                  selected={dateRange}
-                  onSelect={setDateRange}
-                  className="rounded-lg border shadow-sm"
-                />
-              </PopoverContent>
-            </Popover>
+                      : "Seleccionar rango"}
+                  </Button>
+                </PopoverTrigger>
 
+                <PopoverContent align="start" className="p-2">
+                  <Calendar
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    className="rounded-lg border shadow-sm"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* SEMANA ACTUAL → auto-size siempre, stays on first row */}
             <Button
               variant="outline"
               onClick={() => setDateRange(getDefaultWeekRange())}
+              className="whitespace-nowrap"
             >
               Semana actual
             </Button>
           </div>
-          <div className="flex gap-3">
+
+          {/* ------- DERECHA ------- */}
+          <div
+            className="
+      flex gap-3 justify-end 
+      /* mobile: 2da fila */
+      /* lg: misma fila pero a la derecha */
+    "
+          >
             <Button
               variant="outline"
               onClick={() => {
-                setDateRange(getDefaultMonthRange()); // fuerza rango del mes actual
+                setDateRange(getDefaultMonthRange());
                 fetchFxRates();
               }}
               disabled={refreshing}
@@ -390,6 +419,8 @@ const FxRatesConfig = () => {
             </Button>
           </div>
         </div>
+
+
         {/* 📈 Gráfico de variación de cotizaciones */}
         {rates.length > 0 && (
           <Card className="border shadow-sm">

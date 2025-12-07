@@ -275,7 +275,7 @@ const InventoryConfig = () => {
 
   return (
     <>
-      <SiteHeader titulo="Configuración de Inventario" />
+      {/* <SiteHeader titulo="Configuración de Inventario" /> */}
       <div className="flex flex-wrap justify-between items-center mt-4 gap-2">
         <div className="flex gap-2 flex-wrap items-center">
           <Input

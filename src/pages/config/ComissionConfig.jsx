@@ -247,8 +247,8 @@ const ComissionConfig = () => {
 
   return (
     <>
-      <SiteHeader titulo="Configuración de Comisiones" />
-      <div className="mt-6 space-y-6">
+      {/* <SiteHeader titulo="Configuración de Comisiones" /> */}
+      <div className="@container/main flex flex-1 flex-col gap-4 py-6">
         <div className="flex justify-end gap-3">
           <Button variant="outline" onClick={fetchData}>
             <IconRefresh className="h-4 w-4" /> Refrescar
@@ -266,7 +266,7 @@ const ComissionConfig = () => {
               setOpenDialog(true);
             }}
           >
-            <IconPlus className="h-4 w-4" /> Nueva Regla
+            <IconPlus className="h-4 w-4" /> Nueva
           </Button>
         </div>
 

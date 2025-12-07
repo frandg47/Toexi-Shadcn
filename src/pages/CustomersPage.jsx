@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { IconPlus } from "@tabler/icons-react";
 import { useAuth } from "@/context/AuthContextProvider";
 
-const CustomersPage = ({ titulo }) => {
+const CustomersPage = () => {
   const [refreshToken, setRefreshToken] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -19,7 +19,6 @@ const CustomersPage = ({ titulo }) => {
 
   return (
     <>
-      <SiteHeader titulo={titulo || "Clientes"} />
       <div className="mt-6">
         <CustomersTable
           isSellerView={isSellerView}

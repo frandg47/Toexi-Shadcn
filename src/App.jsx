@@ -17,6 +17,9 @@ import UnauthorizedPage from "./pages/UnauthorizedPage";
 import ConcentricLoader from "./components/ui/loading";
 import ConfigurationPage from "./pages/ConfigurationPage";
 import AuthCallback from "./pages/AuthCallback";
+import TopSellersPage from "./pages/TopSellersPage";
+import PaymentCalculator from "./pages/PaymentCalculator";
+import SellersPayments from "./pages/SellersPayments";
 
 // ⚙️ Configuración
 import ComissionConfig from "./pages/config/ComissionConfig";
@@ -106,6 +109,8 @@ export default function App() {
             <Route path="customers" element={<CustomersPage />} />
             <Route path="team" element={<TeamPage />} />
             <Route path="orders" element={<OrdersPage />} />
+            <Route path="top-sellers" element={<TopSellersPage />} />
+            <Route path="sellers-payments" element={<SellersPayments />} />
 
             {/* ⚙️ CONFIGURACIONES */}
             <Route
@@ -132,8 +137,10 @@ export default function App() {
             }
           >
             <Route path="products" element={<Products />} />
-            <Route path="clients" element={<CustomersPage />} />
+            <Route path="customers" element={<CustomersPage />} />
             <Route path="orders" element={<OrdersPage />} />
+            <Route path="my-sales" element={<TopSellersPage titulo="Mis ventas" />} />
+            <Route path="payment-calculator" element={<PaymentCalculator />} />
             {/* Agregá más rutas específicas del vendedor aquí */}
           </Route>
 

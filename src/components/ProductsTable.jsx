@@ -373,79 +373,107 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
 
   return (
     <TooltipProvider>
-      <div className="space-y-4 rounded-lg border bg-card p-4 shadow-sm">
+      <div className="gap-4">
         {/* 🔹 Filtros y acciones (SIN CAMBIOS) */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <Input
-              placeholder="Buscar por producto o marca..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full sm:w-64"
-            />
+        <div
+          className="
+    flex flex-col gap-3
+    xl:flex-row xl:items-center xl:justify-between
+  "
+        >
+          {/* 🟩 FILA 1 (sm–lg: full width, xl: queda a la izquierda) */}
+          <Input
+            placeholder="Buscar por producto o marca..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full xl:w-80"
+          />
 
-            <Select
-              value={selectedBrand || "all"}
-              onValueChange={(v) => setSelectedBrand(v === "all" ? "" : v)}
+          {/* Contenedor de filtros + botones (stack en sm–lg, inline en xl) */}
+          <div
+            className="
+      flex flex-col gap-3 w-full
+      xl:flex-row xl:items-center xl:justify-end
+    "
+          >
+
+            {/* 🟦 FILA 2 — Filtros (marca + categoría) */}
+            <div
+              className="
+        flex flex-wrap gap-2 justify-end
+        w-full
+      "
             >
-              <SelectTrigger className="w-full sm:w-auto min-w-[180px]">
-                <SelectValue placeholder="Todas las marcas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las marcas</SelectItem>
-                {brands.map((b) => (
-                  <SelectItem key={b.id} value={b.id.toString()}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select
+                value={selectedBrand || "all"}
+                onValueChange={(v) => setSelectedBrand(v === "all" ? "" : v)}
+              >
+                <SelectTrigger className="w-auto min-w-[180px]">
+                  <SelectValue placeholder="Todas las marcas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las marcas</SelectItem>
+                  {brands.map((b) => (
+                    <SelectItem key={b.id} value={b.id.toString()}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select
-              value={selectedCategory || "all"}
-              onValueChange={(v) => setSelectedCategory(v === "all" ? "" : v)}
+              <Select
+                value={selectedCategory || "all"}
+                onValueChange={(v) => setSelectedCategory(v === "all" ? "" : v)}
+              >
+                <SelectTrigger className="w-auto min-w-[180px]">
+                  <SelectValue placeholder="Todas las categorías" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* 🟨 FILA 3 — Botones (sm–lg alineados al final, xl también pero en la misma fila única) */}
+            <div
+              className="
+        flex flex-row gap-2 justify-end
+        w-full xl:w-auto
+      "
             >
-              <SelectTrigger className="w-full sm:w-auto min-w-[180px]">
-                <SelectValue placeholder="Todas las categorías" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las categorías</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id.toString()}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-wrap gap-2 justify-end">
-            <Button
-              variant="outline"
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="flex items-center gap-1"
-            >
-              <IconRefresh
-                className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
-              />
-              <span className="hidden sm:inline">Refrescar</span>
-            </Button>
-
-            {!isSellerView && (
               <Button
-                onClick={() => setProductDialog({ open: true, product: null })}
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={refreshing}
                 className="flex items-center gap-1"
               >
-                <IconPlus className="h-4 w-4" />
-                <span className="hidden sm:inline">Agregar</span>
+                <IconRefresh
+                  className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
+                />
+                <span className="sm:inline">Refrescar</span>
               </Button>
-            )}
+
+              {!isSellerView && (
+                <Button
+                  onClick={() => setProductDialog({ open: true, product: null })}
+                  className="flex items-center gap-1"
+                >
+                  <IconPlus className="h-4 w-4" />
+                  <span className="sm:inline">Agregar</span>
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
+
         {/* 🔹 NUEVO: Vista tipo CARD para móviles */}
-        <div className="block md:hidden">
+        <div className="mt-2 block md:hidden">
           {loading ? (
             <div className="grid gap-2">
               {[...Array(10)].map((_, i) => (
@@ -501,8 +529,8 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                             {p.commissionPct
                               ? formatPercentage(p.commissionPct)
                               : p.commissionFixed
-                              ? formatCurrencyUSD(p.commissionFixed)
-                              : "-"}
+                                ? formatCurrencyUSD(p.commissionFixed)
+                                : "-"}
                           </span>
                           <IconInfoCircle className="h-4 w-4 text-muted-foreground" />
                         </div>
@@ -560,7 +588,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
         </div>
 
         {/* 🔹 Tabla original SOLO visible en escritorio */}
-        <div className="hidden md:block overflow-x-auto rounded-md border">
+        <div className="mt-4 hidden md:block overflow-x-auto rounded-md border">
           <Table className="min-w-full text-sm">
             <TableHeader>
               <TableRow>
@@ -645,8 +673,8 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                               {p.commissionPct
                                 ? formatPercentage(p.commissionPct)
                                 : p.commissionFixed
-                                ? formatCurrencyUSD(p.commissionFixed)
-                                : "-"}
+                                  ? formatCurrencyUSD(p.commissionFixed)
+                                  : "-"}
                             </span>
                             <IconInfoCircle className="h-4 w-4 text-muted-foreground" />
                           </div>

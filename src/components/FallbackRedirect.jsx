@@ -8,7 +8,7 @@ export default function FallbackRedirect() {
   // Mientras se carga la sesión o el rol
   if (status === "loading") {
     return (
-      <div className="grid h-screen w-full items-center justify-center">
+      <div className="flex h-[100svh] w-full items-center justify-center">
         <ConcentricLoader />
       </div>
     );

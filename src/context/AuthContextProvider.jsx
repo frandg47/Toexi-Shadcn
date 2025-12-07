@@ -17,7 +17,7 @@ const AuthContext = createContext({
   status: "loading",
   error: null,
   profile: null,
-  refreshProfile: async () => {},
+  refreshProfile: async () => { },
 });
 
 export const AuthContextProvider = ({ children }) => {
@@ -57,7 +57,7 @@ export const AuthContextProvider = ({ children }) => {
 
       const { data, error: queryError } = await supabase
         .from("users")
-        .select("id, name, last_name, role, is_active, email")
+        .select("id, name, last_name, role, is_active, email, phone")
         .eq("id_auth", sessionUser.id)
         .maybeSingle();
 
@@ -88,8 +88,11 @@ export const AuthContextProvider = ({ children }) => {
               email: sessionUser.email,
               role: "seller",
               is_active: false,
+              avatar_url: sessionUser.user_metadata?.picture || null, // 🆕 FOTO DE GOOGLE
             },
           ]);
+
+
 
           if (insertError && insertError.code !== "23505") {
             console.error("Error al insertar usuario:", insertError.message);
@@ -191,6 +194,7 @@ export const AuthContextProvider = ({ children }) => {
     () => ({
       user,
       role: profile?.role || role,
+      id_auth: profile?.id_auth || user?.id,
       isActive,
       status,
       error,
