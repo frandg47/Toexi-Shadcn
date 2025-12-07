@@ -83,7 +83,7 @@ export default function SellersTop({ role }) {
       .eq("period_end", monthFilter)
       .limit(1)
       .single();
-    
+
     if (periodError || !periodData) {
       setTopSales([]);
       return;
@@ -103,7 +103,7 @@ export default function SellersTop({ role }) {
     const { data: users, error: usersError } = await supabase
       .from("users")
       .select("id_auth, name, last_name, avatar_url");
-    
+
     if (usersError) return console.error(usersError);
 
     // Crear mapa de usuarios
@@ -150,14 +150,14 @@ export default function SellersTop({ role }) {
       .from("commission_payments")
       .select("seller_id, total_amount")
       .eq("period_end", monthFilter);
-    
+
     if (paymentsError) return console.error(paymentsError);
 
     // Obtener datos de usuarios
     const { data: users, error: usersError } = await supabase
       .from("users")
       .select("id_auth, name, last_name, avatar_url");
-    
+
     if (usersError) return console.error(usersError);
 
     // Crear mapa de usuarios
@@ -203,18 +203,18 @@ export default function SellersTop({ role }) {
       setLoading(true);
       await loadTopSales();
       await loadTopCommission();
-      
+
       // Obtener todos los meses disponibles
       const { data: allPayments, error } = await supabase
         .from("commission_payments")
         .select("period_end")
         .order("period_end", { ascending: false });
-      
+
       if (!error && allPayments) {
         const uniqueMonths = [...new Set(allPayments.map(p => p.period_end))];
         setAvailableMonths(uniqueMonths);
       }
-      
+
       setLoading(false);
     };
 
@@ -260,7 +260,7 @@ export default function SellersTop({ role }) {
   // --------------------------
   if (loading) {
     return (
-      <div className="w-full flex justify-center py-12">
+      <div className="flex items-center justify-center h-100">
         <ConcentricLoader />
       </div>
     );

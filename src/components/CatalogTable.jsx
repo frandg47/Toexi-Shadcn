@@ -182,7 +182,7 @@ export default function CatalogTable({ tipo }) {
 
   if (loading)
     return (
-      <div className="flex items-center justify-center min-h-[360px]">
+      <div className="flex items-center justify-center h-100">
         <ConcentricLoader />
       </div>
     );
