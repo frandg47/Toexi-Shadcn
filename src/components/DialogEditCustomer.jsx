@@ -130,7 +130,7 @@ export default function DialogEditCustomer({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl w-[90vw] max-h-[85svh] overflow-y-auto p-4 sm:p-6 rounded-xl">
+      <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Editar cliente</DialogTitle>
         </DialogHeader>
