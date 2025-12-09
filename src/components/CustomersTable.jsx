@@ -250,6 +250,13 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
                     <IconMapPin size={14} /> {c.city}
                   </p>
                 )}
+                {
+                  c.notes && (
+                    <p className="flex items-center gap-1">
+                      <IconEdit size={14} /> {c.notes}
+                    </p>
+                  )
+                }
                 <p className="text-xs mt-1">
                   Creado:{" "}
                   <span className="text-foreground">

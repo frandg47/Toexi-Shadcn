@@ -291,7 +291,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     const fetchCustomers = async () => {
       const { data } = await supabase
         .from("customers")
-        .select("id, name, last_name, dni, phone, email")
+        .select("id, name, last_name, dni, phone, email, notes")
         .or(
           `name.ilike.%${q}%,last_name.ilike.%${q}%,dni.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`
         )
@@ -578,7 +578,8 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                             </div>
                             <div className="text-xs text-muted-foreground">
                               DNI: {c.dni || "N/D"} •{" "}
-                              {c.phone || c.email || "Sin contacto"}
+                              Contacto: {c.phone || c.email || "Sin contacto"} •{" "}
+                              Nota: {c.notes ? `${c.notes}` : "Sin notas"}
                             </div>
                           </button>
                         ))
@@ -830,24 +831,26 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                         p.payment_method_id ? String(p.payment_method_id) : ""
                       }
                       onValueChange={(val) => {
-                        const chosen = paymentMethods.find(
-                          (m) => String(m.id) === val
+                        // 🔥 1. Verificar si ya existe este método en otra fila
+                        const alreadyUsed = payments.some(
+                          (p, idx) => idx !== i && String(p.payment_method_id) === val
                         );
+
+                        if (alreadyUsed) {
+                          toast.error("Ese método de pago ya está agregado.");
+                          return; // ❌ No actualizar
+                        }
+
+                        // 🔥 2. Si no está repetido, actualizar normalmente:
+                        const chosen = paymentMethods.find((m) => String(m.id) === val);
 
                         updatePaymentField(i, "payment_method_id", val);
                         updatePaymentField(i, "method_name", chosen?.name);
-                        updatePaymentField(
-                          i,
-                          "method",
-                          chosen?.name.toLowerCase()
-                        );
+                        updatePaymentField(i, "method", chosen?.name.toLowerCase());
                         updatePaymentField(i, "installments", "");
-                        updatePaymentField(
-                          i,
-                          "multiplier",
-                          chosen?.multiplier || 1
-                        );
+                        updatePaymentField(i, "multiplier", chosen?.multiplier || 1);
                       }}
+
                     >
                       <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Método de pago..." />

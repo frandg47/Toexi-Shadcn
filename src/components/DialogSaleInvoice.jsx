@@ -153,8 +153,9 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
     // =============================
     const vendedorNombre =
       safeSale.seller_name && safeSale.seller_name.trim()
-        ? `${safeSale.seller_name}${safeSale.seller_last_name ? " " + safeSale.seller_last_name : ""}`
+        ? `${safeSale.seller_name}${safeSale.seller_last_name ? ' ' + safeSale.seller_last_name : ''} (Tel: ${safeSale.seller_phone || "3816783617"})`
         : "Toexi Tech";
+
 
     doc.setFontSize(11);
     doc.rect(margin, y, 180, 16);

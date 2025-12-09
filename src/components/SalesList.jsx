@@ -138,7 +138,7 @@ export function SalesList() {
 
             // Vendedor
             const vendedorNombre = sale.seller_name && sale.seller_name.trim() 
-                ? `${sale.seller_name}${sale.seller_last_name ? ' ' + sale.seller_last_name : ''}`
+                ? `${sale.seller_name}${sale.seller_last_name ? ' ' + sale.seller_last_name : ''} (Tel: ${sale.seller_phone || "3816783617"}) `
                 : "Toexi Tech";
             
             doc.setFontSize(11);
@@ -372,14 +372,16 @@ export function SalesList() {
                             <p>
                                 <strong>Cliente:</strong> {s.customer_name}{" "}
                                 {s.customer_last_name}
+                                <strong>{" | "}Tel:</strong> {" "} {s.customer_phone ?? "-"}
                             </p>
                             <p>
                                 <strong>Vendedor:</strong> {s.seller_name}{" "}
                                 {s.seller_last_name}
+                                <strong>{" | "}Tel:</strong> {" "} {s.seller_phone ?? "3816783617"}
                             </p>
-                            <p>
+                            {/* <p>
                                 <strong>Tel:</strong> {s.customer_phone ?? "-"}
-                            </p>
+                            </p> */}
                         </div>
 
                         {/* Items */}
