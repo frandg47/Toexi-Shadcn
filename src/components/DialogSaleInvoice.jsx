@@ -277,16 +277,29 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
 
     y += 4;
 
-    // Footer
-    doc.setFontSize(9);
-    doc.setTextColor(120);
+    // =============================
+    //  FOOTER LEGAL + DATOS EMPRESA
+    // =============================
     const pageHeight = doc.internal.pageSize.getHeight();
-    const footerY = pageHeight - 14;
+    const footerCenter = pageWidth / 2;
 
-    const text1 = "Gracias por su compra - Toexi Tech ©";
-    const text1Width = doc.getTextWidth(text1);
+    let fY = pageHeight - 24;
 
-    doc.text(text1, (pageWidth - text1Width) / 2, footerY);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(60);
+    doc.text("TOEXI TECH", footerCenter, fY, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+
+    doc.text("Teléfono: 381 364 5246", footerCenter, fY + 5, { align: "center" });
+    doc.text("Instagram: @toexi.tech", footerCenter, fY + 10, { align: "center" });
+
+    // Legal
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    doc.text("Gracias por su compra", footerCenter, fY + 17, { align: "center" });
 
     doc.save(`venta_${savedSale.id}.pdf`);
   };

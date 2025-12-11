@@ -137,10 +137,10 @@ export function SalesList() {
             y += 30;
 
             // Vendedor
-            const vendedorNombre = sale.seller_name && sale.seller_name.trim() 
-                ? `${sale.seller_name}${sale.seller_last_name ? ' ' + sale.seller_last_name : ''} (Tel: ${sale.seller_phone || "3816783617"}) `
+            const vendedorNombre = sale.seller_name && sale.seller_name.trim()
+                ? `${sale.seller_name}${sale.seller_last_name ? ' ' + sale.seller_last_name : ''} (Tel: ${sale.seller_phone || "-"}) `
                 : "Toexi Tech";
-            
+
             doc.setFontSize(11);
             doc.rect(margin, y, 180, 16);
 
@@ -188,7 +188,7 @@ export function SalesList() {
                     const { table, row, column } = data;
                     const totalRows = table.body.length;
                     const totalCols = table.columns.length;
-                    
+
                     if (row.index === 0 && column.index === 0) {
                         data.cell.styles.lineWidth = [0, 0.3, 0.3, 0];
                     } else if (row.index === 0 && column.index === totalCols - 1) {
@@ -253,19 +253,34 @@ export function SalesList() {
 
             y += 4;
 
-            // Footer
-            doc.setFontSize(9);
-            doc.setTextColor(120);
+
+            // =============================
+            //  FOOTER LEGAL + DATOS EMPRESA
+            // =============================
             const pageHeight = doc.internal.pageSize.getHeight();
-            const footerY = pageHeight - 14;
-            
-            const text1 = "Gracias por su compra - Toexi Tech ©";
-            const text1Width = doc.getTextWidth(text1);
-            
-            doc.text(text1, (pageWidth - text1Width) / 2, footerY);
+            const footerCenter = pageWidth / 2;
+
+            let fY = pageHeight - 24;
+
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(60);
+            doc.text("TOEXI TECH", footerCenter, fY, { align: "center" });
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+
+            doc.text("Teléfono: 381 364 5246", footerCenter, fY + 5, { align: "center" });
+            doc.text("Instagram: @toexi.tech", footerCenter, fY + 10, { align: "center" });
+
+            // Legal
+            doc.setFontSize(8);
+            doc.setTextColor(120);
+            doc.text("Gracias por su compra", footerCenter, fY + 17, { align: "center" });
 
             doc.save(`venta_${sale.sale_id}.pdf`);
             toast.success("PDF descargado correctamente");
+
         } catch (err) {
             console.error("Error generando PDF:", err);
             toast.error("Error al generar PDF");
@@ -353,8 +368,8 @@ export function SalesList() {
           />
         </div>
       </div> */}
-      
-            {/* 🧾 LISTA DE TICKETS */}            
+
+            {/* 🧾 LISTA DE TICKETS */}
             <div className="space-y-6">
                 {sales.length !== 0 ? sales.map((s) => (
                     <Card key={s.sale_id} className="p-5 shadow-md w-full">
@@ -434,9 +449,9 @@ export function SalesList() {
                         </div>
                     </Card>
                 )) :
-                (
-                    <p className="text-center text-muted-foreground">No se encontraron ventas para los filtros seleccionados.</p>
-                )}
+                    (
+                        <p className="text-center text-muted-foreground">No se encontraron ventas para los filtros seleccionados.</p>
+                    )}
             </div>
 
             {/* 📄 Paginación */}

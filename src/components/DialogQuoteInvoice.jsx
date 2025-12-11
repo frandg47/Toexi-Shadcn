@@ -79,7 +79,7 @@ export default function DialogQuoteInvoice({ open, onClose, quote }) {
         // =============================
         //  INFORMACIÓN VENDEDOR
         // =============================
-        const vendedorNombre = quote.seller_name && quote.seller_name.trim() 
+        const vendedorNombre = quote.seller_name && quote.seller_name.trim()
             ? `${quote.seller_name}${quote.seller_last_name ? ' ' + quote.seller_last_name : ''}`
             : "Toexi Tech";
 
@@ -143,7 +143,7 @@ export default function DialogQuoteInvoice({ open, onClose, quote }) {
                 const { table, row, column } = data;
                 const totalRows = table.body.length;
                 const totalCols = table.columns.length;
-                
+
                 // Remover bordes externos
                 if (row.index === 0 && column.index === 0) {
                     // Top-left
@@ -239,15 +239,42 @@ export default function DialogQuoteInvoice({ open, onClose, quote }) {
         doc.setTextColor(120);
         const pageHeight = doc.internal.pageSize.getHeight();
         const footerY = pageHeight - 14;
-        
+
         const text1 = "Este presupuesto tiene validez de 3 días desde su emisión.";
         const text2 = "Sujeto a disponibilidad de stock y cambios en la cotización.";
-        
+
         const text1Width = doc.getTextWidth(text1);
         const text2Width = doc.getTextWidth(text2);
-        
+
         doc.text(text1, (pageWidth - text1Width) / 2, footerY);
         doc.text(text2, (pageWidth - text2Width) / 2, footerY + 5);
+
+        // =============================
+        //  DATOS DE LA EMPRESA
+        // =============================
+        const empresaY = footerY - 20; // un poco más arriba para que entre todo
+
+        doc.setFontSize(10);
+        doc.setTextColor(60);
+        doc.setFont("helvetica", "bold");
+
+        const empresaNombre = "TOEXI TECH";
+        const empresaNombreWidth = doc.getTextWidth(empresaNombre);
+        doc.text(empresaNombre, (pageWidth - empresaNombreWidth) / 2, empresaY);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+
+        // Teléfono
+        const empresaTel = "Teléfono: 3816 78-3617";
+        const empresaTelWidth = doc.getTextWidth(empresaTel);
+        doc.text(empresaTel, (pageWidth - empresaTelWidth) / 2, empresaY + 6);
+
+        // Redes
+        const empresaIg = "Instagram: @toexi.tech";
+        const empresaIgWidth = doc.getTextWidth(empresaIg);
+        doc.text(empresaIg, (pageWidth - empresaIgWidth) / 2, empresaY + 11);
+
 
         // =============================
         //  DESCARGA
