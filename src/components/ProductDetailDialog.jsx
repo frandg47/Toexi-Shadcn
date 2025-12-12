@@ -44,27 +44,41 @@ export default function ProductDetailDialog({
 }) {
   if (!product) return null;
 
+  console.log("producto", product);
+  function cleanName(name) {
+    return name?.replace(/\s+/g, "").trim();
+  }
+
+
   // 🔹 Variantes reales
-  const realVariants = useMemo(
-    () =>
-      (product.variants || []).filter(
-        (v) => v.storage || v.ram || (v.color && v.color.trim() !== "")
-      ),
-    [product.variants]
-  );
+  const realVariants = useMemo(() => {
+    return (product.variants || []).filter((v) => {
+      // incluir si tiene nombre de variante
+      if (v.variant_name?.trim()) return true;
+
+      // o si tiene storage/ram/color como antes
+      return v.storage || v.ram || (v.color && v.color.trim() !== "");
+    });
+  }, [product.variants]);
+
 
   // 🔹 Agrupar variantes por Storage / RAM
   const grouped = useMemo(() => {
     const map = new Map();
+
     for (const v of realVariants) {
-      const key =
-        [v.storage || "", v.ram || ""].filter(Boolean).join(" / ").trim() ||
-        "Modelo Base";
+      const cleaned = cleanName(v.variant_name || "");
+
+      const key = cleaned !== "" ? cleaned : "Modelo Base";
+
       if (!map.has(key)) map.set(key, { key, variants: [] });
       map.get(key).variants.push(v);
     }
+
     return [...map.values()];
   }, [realVariants]);
+
+
 
   const [activeTab, setActiveTab] = useState(grouped[0]?.key || "");
   const selectedGroup = grouped.find((g) => g.key === activeTab);
@@ -85,155 +99,18 @@ export default function ProductDetailDialog({
     }));
   }, [paymentMethods, paymentInstallments]);
 
-  // 🔹 Función para exportar el producto a PDF (con imagen y estructura)
-  // const handleExportPDF = async () => {
-  //   const doc = new jsPDF();
-  //   const pageWidth = doc.internal.pageSize.getWidth();
-  //   let currentY = 10;
+  // Campos que queremos mostrar dinámicamente en las variantes
+  const VARIANT_DISPLAY_FIELDS = {
+    storage: "Almacenamiento",
+    ram: "RAM",
+    color: "Color",
+    processor: "Procesador",
+    graphics_card: "Tarjeta gráfica",
+    screen_size: "Pantalla",
+    resolution: "Resolución",
+    battery: "Batería",
+  };
 
-  //   // 🔹 Si hay imagen, convertir a Base64 y agregarla
-  //   if (product.coverImageUrl) {
-  //     try {
-  //       const img = await fetch(product.coverImageUrl);
-  //       const blob = await img.blob();
-  //       const reader = new FileReader();
-  //       const imagePromise = new Promise((resolve) => {
-  //         reader.onloadend = () => resolve(reader.result);
-  //       });
-  //       reader.readAsDataURL(blob);
-  //       const imageData = await imagePromise;
-
-  //       const imgWidth = 60;
-  //       const imgHeight = 60;
-  //       const imgX = (pageWidth - imgWidth) / 2;
-  //       doc.addImage(imageData, "JPEG", imgX, currentY, imgWidth, imgHeight);
-  //       currentY += imgHeight + 10;
-  //     } catch (error) {
-  //       console.warn("No se pudo cargar la imagen para el PDF:", error);
-  //     }
-  //   }
-
-  //   // 🔹 Encabezado principal
-  //   doc.setFontSize(16);
-  //   doc.setTextColor(40, 40, 40);
-  //   doc.text(product.name, pageWidth / 2, currentY, { align: "center" });
-
-  //   doc.setFontSize(12);
-  //   doc.setTextColor(100, 100, 100);
-  //   doc.text(
-  //     `${product.brandName} — ${product.categoryName}`,
-  //     pageWidth / 2,
-  //     currentY + 8,
-  //     { align: "center" }
-  //   );
-
-  //   currentY += 18;
-
-  //   // 🔹 Datos generales
-  //   doc.setFontSize(11);
-  //   doc.setTextColor(60, 60, 60);
-  //   doc.text(`Cotización actual: ${formatCurrencyARS(fxRate)}`, 14, currentY);
-  //   if (product.allowBackorder) {
-  //     doc.setTextColor(200, 120, 0);
-  //     doc.text(
-  //       "Producto con posibilidad de encargo en caso de no haber stock" +
-  //         (product.leadTimeLabel
-  //           ? ` (Disponible a partir de ${product.leadTimeLabel})`
-  //           : ""),
-  //       14,
-  //       currentY + 6
-  //     );
-  //     doc.text(
-  //       "Seña para reservar: " +
-  //         (product.depositAmount
-  //           ? formatCurrencyARS(product.depositAmount)
-  //           : "—"),
-  //       14,
-  //       currentY + 12
-  //     );
-  //   }
-
-  //   currentY += 24;
-
-  //   // 🔹 Tabla de variantes
-  //   const variantRows = realVariants.map((v) => [
-  //     v.color || "—",
-  //     v.storage || "—",
-  //     v.ram || "—",
-  //     formatCurrencyUSD(v.usd_price),
-  //     formatCurrencyARS(v.usd_price * fxRate),
-  //     v.stock ?? 0,
-  //   ]);
-
-  //   autoTable(doc, {
-  //     startY: currentY,
-  //     head: [
-  //       ["Color", "Almacenamiento", "RAM", "Precio USD", "Precio ARS", "Stock"],
-  //     ],
-  //     body: variantRows,
-  //     styles: { fontSize: 10 },
-  //     headStyles: {
-  //       fillColor: [25, 118, 210],
-  //       textColor: 255,
-  //       fontStyle: "bold",
-  //     },
-  //     alternateRowStyles: { fillColor: [245, 245, 245] },
-  //   });
-
-  //   currentY = doc.lastAutoTable.finalY + 10;
-
-  //   // 🔹 Tabla de métodos de pago
-  //   const methodRows = enrichedMethods.flatMap((m) => {
-  //     const basePriceUSD = product.usdPrice;
-  //     if (m.installments.length === 0) {
-  //       return [
-  //         [m.name, "1 pago", formatCurrencyARS(basePriceUSD * fxRate), "—"],
-  //       ];
-  //     }
-
-  //     return m.installments.map((i) => {
-  //       const total = basePriceUSD * fxRate * i.multiplier;
-  //       const cuota = total / i.installments;
-  //       const extra = (i.multiplier - 1) * 100;
-  //       return [
-  //         m.name,
-  //         `${i.installments} cuotas`,
-  //         formatCurrencyARS(cuota),
-  //         `+${extra.toFixed(1)}%`,
-  //       ];
-  //     });
-  //   });
-
-  //   autoTable(doc, {
-  //     startY: currentY,
-  //     head: [["Método", "Cuotas", "Monto por cuota", "Recargo"]],
-  //     body: methodRows,
-  //     styles: { fontSize: 10 },
-  //     headStyles: {
-  //       fillColor: [46, 125, 50],
-  //       textColor: 255,
-  //       fontStyle: "bold",
-  //     },
-  //     alternateRowStyles: { fillColor: [245, 245, 245] },
-  //   });
-
-  //   currentY = doc.lastAutoTable.finalY + 15;
-
-  //   // 🔹 Pie con cotización
-  //   doc.setFontSize(10);
-  //   doc.setTextColor(80, 80, 80);
-  //   doc.text(
-  //     `Cotización utilizada: ${formatCurrencyARS(
-  //       fxRate
-  //     )} — Generado automáticamente`,
-  //     pageWidth / 2,
-  //     currentY,
-  //     { align: "center" }
-  //   );
-
-  //   // 🔹 Guardar PDF
-  //   doc.save(`Producto_${product.name}.pdf`);
-  // };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -289,6 +166,23 @@ export default function ProductDetailDialog({
                 <span className="font-semibold text-foreground">Variante:</span>{" "}
                 {activeTab || "—"}
               </p>
+
+              {/* Información técnica del modelo seleccionado */}
+              {firstVariant && (
+                <div className="mt-3 space-y-1">
+                  {Object.entries(VARIANT_DISPLAY_FIELDS).map(([field, label]) => {
+                    const value = firstVariant[field];
+                    if (!value) return null;
+
+                    return (
+                      <p key={field} className="text-xs sm:text-sm">
+                        <span className="font-semibold">{label}:</span> {value}
+                      </p>
+                    );
+                  })}
+                </div>
+              )}
+
 
               {colors.length > 0 && (
                 <div>
@@ -374,11 +268,10 @@ export default function ProductDetailDialog({
                   <TabsTrigger
                     key={g.key}
                     value={g.key}
-                    className={`py-2 px-4 rounded-md border transition-all text-xs sm:text-sm  ${
-                      activeTab === g.key
-                        ? "bg-primary border-primary  shadow-sm"
-                        : "hover:bg-muted"
-                    }`}
+                    className={`py-2 px-4 rounded-md border transition-all text-xs sm:text-sm  ${activeTab === g.key
+                      ? "bg-primary border-primary  shadow-sm"
+                      : "hover:bg-muted"
+                      }`}
                   >
                     {g.key}
                   </TabsTrigger>
@@ -397,29 +290,29 @@ export default function ProductDetailDialog({
                     {g.variants.map((v) => (
                       <div
                         key={v.id}
-                        className={`relative rounded-xl border bg-card p-4 shadow-sm hover:shadow-md transition-all ${
-                          v.stock === 0
-                            ? "opacity-60 border-destructive/60"
-                            : "hover:border-primary/70"
-                        }`}
+                        className={`relative rounded-xl border bg-card p-4 shadow-sm hover:shadow-md transition-all ${v.stock === 0
+                          ? "opacity-60 border-destructive/60"
+                          : "hover:border-primary/70"
+                          }`}
                       >
                         <div className="flex flex-col items-center text-center p-3 gap-1">
                           {v.color && (
                             <p className="text-sm font-semibold">{v.color}</p>
                           )}
+
                           <p className="text-sm text-muted-foreground">
                             {formatCurrencyUSD(v.usd_price)}
                           </p>
+
                           <p
-                            className={`text-xs font-medium ${
-                              v.stock === 0
-                                ? "text-destructive"
-                                : "text-green-600"
-                            }`}
+                            className={`text-xs font-medium ${v.stock === 0 ? "text-destructive" : "text-green-600"
+                              }`}
                           >
                             Stock: {v.stock}
                           </p>
                         </div>
+
+
 
                         {v.stock === 0 && (
                           <span className="absolute top-2 right-2 text-[10px] bg-destructive px-2 py-0.5 rounded-md uppercase shadow-sm">
@@ -469,9 +362,9 @@ export default function ProductDetailDialog({
                                     <span>
                                       {i.installments} cuotas de{" "}
                                       {formatCurrencyARS(cuota)}{" "}
-                                      <span className="text-amber-600">
-                                        (+{extra.toFixed(1)}%)
-                                      </span>
+                                      {/* <span className="text-amber-600">
+                                        (+extra.toFixed(1)%)
+                                      </span> */}
                                     </span>
                                     <span className="font-medium text-foreground">
                                       {formatCurrencyARS(total)}
@@ -496,6 +389,26 @@ export default function ProductDetailDialog({
                 </TabsContent>
               ))}
             </Tabs>
+          </div>
+
+        )}
+        {/* 🔹 Especificaciones técnicas completas */}
+        {firstVariant && (
+          <div className="mt-6 p-4 border rounded-lg bg-muted/20">
+            <h3 className="text-lg font-semibold mb-3">Características técnicas</h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {Object.entries(VARIANT_DISPLAY_FIELDS).map(([field, label]) => {
+                const value = firstVariant[field];
+                if (!value) return null;
+
+                return (
+                  <div key={field} className="text-sm">
+                    <span className="font-semibold">{label}:</span> {value}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

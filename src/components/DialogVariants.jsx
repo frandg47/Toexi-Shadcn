@@ -37,13 +37,47 @@ export default function DialogVariants({ open, onClose, productId }) {
 
   // Configuración de campos visibles según categoría
   const VARIANT_FIELDS_BY_CATEGORY = {
-    Celulares: ["storage", "ram", "color", "usd_price", "stock"],
-    Tablets: ["storage", "ram", "color", "usd_price", "stock"],
+    Celulares: [
+      "storage",
+      "ram",
+      "color",
+      "processor",
+      "screen_size",
+      "resolution",
+      "battery",
+      "usd_price",
+      "stock",
+    ],
+
+    Tablets: [
+      "storage",
+      "ram",
+      "color",
+      "screen_size",
+      "resolution",
+      "usd_price",
+      "stock",
+    ],
+
     Auriculares: ["color", "usd_price", "stock"],
-    Accesorios: ["color", "usd_price", "stock"],
-    Notebooks: ["storage", "ram", "usd_price", "stock"],
+
+    Accesorios: ["color", "usd_price", "stock", "potency"],
+
+    Notebooks: [
+      "processor",
+      "graphics_card",
+      "ram",
+      "storage",
+      "screen_size",
+      "resolution",
+      "usd_price",
+      "stock",
+      "color",
+    ],
+
     default: ["color", "usd_price", "stock"],
   };
+
 
   // Determinar qué campos mostrar
   const visibleFields = useMemo(() => {
@@ -98,6 +132,11 @@ export default function DialogVariants({ open, onClose, productId }) {
         storage: "",
         ram: "",
         color: "",
+        processor: "",
+        screen_size: "",
+        resolution: "",
+        battery: "",
+        graphics_card: "",
         usd_price: "",
         stock: 0,
         image_url: "",
@@ -106,27 +145,28 @@ export default function DialogVariants({ open, onClose, productId }) {
     ]);
   };
 
+
   // Se refactoriza para manejar la lógica de eliminación sin el await Swal.fire
   const handleDeleteVariant = useCallback(async (index, variant) => {
     // Si la variante ya tiene ID, es decir, existe en la BD
     if (variant.id) {
-        // Se encapsula la eliminación de la base de datos en una promesa para toast.
-        const deletePromise = supabase
-            .from("product_variants")
-            .delete()
-            .eq("id", variant.id)
-            .then(({ error }) => {
-                if (error) {
-                    throw new Error("No se pudo eliminar la variante.");
-                }
-            });
-        
-        // 🔁 Reemplazo 2: Manejo de éxito/error de eliminación con toast.promise
-        await toast.promise(deletePromise, {
-            loading: "Eliminando variante...",
-            success: "Variante eliminada correctamente",
-            error: "No se pudo eliminar la variante",
+      // Se encapsula la eliminación de la base de datos en una promesa para toast.
+      const deletePromise = supabase
+        .from("product_variants")
+        .delete()
+        .eq("id", variant.id)
+        .then(({ error }) => {
+          if (error) {
+            throw new Error("No se pudo eliminar la variante.");
+          }
         });
+
+      // 🔁 Reemplazo 2: Manejo de éxito/error de eliminación con toast.promise
+      await toast.promise(deletePromise, {
+        loading: "Eliminando variante...",
+        success: "Variante eliminada correctamente",
+        error: "No se pudo eliminar la variante",
+      });
     }
 
     // Si la variante no tiene ID (es nueva) o fue eliminada de la BD, la quitamos del estado local
@@ -149,41 +189,41 @@ export default function DialogVariants({ open, onClose, productId }) {
 
     // Se refactoriza la lógica de guardado dentro de una función para usar toast.promise
     const savePromise = async () => {
-        const { error: insertError } =
-            inserts.length > 0
-            ? await supabase.from("product_variants").insert(inserts)
-            : { error: null };
+      const { error: insertError } =
+        inserts.length > 0
+          ? await supabase.from("product_variants").insert(inserts)
+          : { error: null };
 
-        if (insertError) {
-            throw new Error("Error al insertar nuevas variantes.");
-        }
+      if (insertError) {
+        throw new Error("Error al insertar nuevas variantes.");
+      }
 
-        const updatePromises = updates.map((v) =>
-            supabase.from("product_variants").update(v).eq("id", v.id)
-        );
+      const updatePromises = updates.map((v) =>
+        supabase.from("product_variants").update(v).eq("id", v.id)
+      );
 
-        const updateResults = updates.length > 0 ? await Promise.all(updatePromises) : [];
+      const updateResults = updates.length > 0 ? await Promise.all(updatePromises) : [];
 
-        const updateError = updateResults.find(r => r.error)?.error;
-        
-        if (updateError) {
-             throw new Error("Error al actualizar variantes existentes.");
-        }
+      const updateError = updateResults.find(r => r.error)?.error;
+
+      if (updateError) {
+        throw new Error("Error al actualizar variantes existentes.");
+      }
     };
-    
+
     // 🔁 Reemplazo 3: Manejo de guardado con toast.promise
     try {
-        await toast.promise(savePromise(), {
-            loading: "Guardando cambios...",
-            success: "Variantes guardadas correctamente",
-            error: "No se pudieron guardar los cambios",
-        });
+      await toast.promise(savePromise(), {
+        loading: "Guardando cambios...",
+        success: "Variantes guardadas correctamente",
+        error: "No se pudieron guardar los cambios",
+      });
 
-        onClose();
+      onClose();
 
     } catch (e) {
-        // El error ya fue notificado por toast.promise
-        console.error("Error al guardar variantes:", e);
+      // El error ya fue notificado por toast.promise
+      console.error("Error al guardar variantes:", e);
     }
 
     // ❌ ELIMINADO: Lógica de error y éxito de Swal
@@ -278,7 +318,7 @@ export default function DialogVariants({ open, onClose, productId }) {
                     </div>
 
                     {/* Campos dinámicos */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-3">
                       {visibleFields.includes("storage") && (
                         <div className="grid gap-2">
                           <Label>Almacenamiento</Label>
@@ -301,6 +341,61 @@ export default function DialogVariants({ open, onClose, productId }) {
                             onChange={(e) =>
                               handleChange(index, "ram", e.target.value)
                             }
+                          />
+                        </div>
+                      )}
+
+                      {visibleFields.includes("processor") && (
+                        <div className="grid gap-2">
+                          <Label>Procesador</Label>
+                          <Input
+                            placeholder="Snapdragon 8 Gen 2 / Intel i7"
+                            value={v.processor || ""}
+                            onChange={(e) => handleChange(index, "processor", e.target.value)}
+                          />
+                        </div>
+                      )}
+
+                      {visibleFields.includes("screen_size") && (
+                        <div className="grid gap-2">
+                          <Label>Pantalla</Label>
+                          <Input
+                            placeholder='6.7" / 15.6"'
+                            value={v.screen_size || ""}
+                            onChange={(e) => handleChange(index, "screen_size", e.target.value)}
+                          />
+                        </div>
+                      )}
+
+                      {visibleFields.includes("resolution") && (
+                        <div className="grid gap-2">
+                          <Label>Resolución</Label>
+                          <Input
+                            placeholder="1080x2400 / Full HD"
+                            value={v.resolution || ""}
+                            onChange={(e) => handleChange(index, "resolution", e.target.value)}
+                          />
+                        </div>
+                      )}
+
+                      {visibleFields.includes("battery") && (
+                        <div className="grid gap-2">
+                          <Label>Batería</Label>
+                          <Input
+                            placeholder="5000 mAh / 60 Wh"
+                            value={v.battery || ""}
+                            onChange={(e) => handleChange(index, "battery", e.target.value)}
+                          />
+                        </div>
+                      )}
+
+                      {visibleFields.includes("graphics_card") && (
+                        <div className="grid gap-2">
+                          <Label>Gráfica</Label>
+                          <Input
+                            placeholder="RTX 3050 / Radeon"
+                            value={v.graphics_card || ""}
+                            onChange={(e) => handleChange(index, "graphics_card", e.target.value)}
                           />
                         </div>
                       )}
@@ -369,7 +464,7 @@ export default function DialogVariants({ open, onClose, productId }) {
                           {v.active ? "Activa" : "Inactiva"}
                         </span>
                       </div>
-                      
+
                       {/* 🔄 REEMPLAZO 1: SweetAlert a AlertDialog para confirmación */}
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -377,7 +472,7 @@ export default function DialogVariants({ open, onClose, productId }) {
                             size="icon"
                             variant="ghost"
                             className="hover:bg-destructive/10 hover:text-destructive"
-                            // Ya no llama a removeVariant directamente
+                          // Ya no llama a removeVariant directamente
                           >
                             <IconTrash className="h-4 w-4" />
                           </Button>
@@ -395,7 +490,7 @@ export default function DialogVariants({ open, onClose, productId }) {
                             <AlertDialogCancel>
                               Cancelar
                             </AlertDialogCancel>
-                            <AlertDialogAction 
+                            <AlertDialogAction
                               // Llama a la lógica de eliminación al confirmar
                               onClick={() => handleDeleteVariant(index, v)}
                               className="bg-destructive hover:bg-destructive/90"
@@ -406,7 +501,7 @@ export default function DialogVariants({ open, onClose, productId }) {
                         </AlertDialogContent>
                       </AlertDialog>
                       {/* FIN REEMPLAZO 1 */}
-                      
+
                     </div>
                   </div>
                 ))}

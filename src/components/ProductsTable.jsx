@@ -170,14 +170,26 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
              brands (id, name),
              categories (id, name),
              product_variants (
-               id,
-               storage,
-               ram,
-               color,
-               usd_price,
-               stock,
-               image_url
-             )
+                id,
+                storage,
+                ram,
+                color,
+                usd_price,
+                stock,
+                image_url,
+                variant_name,
+                processor,
+                graphics_card,
+                screen_size,
+                resolution,
+                storage_type,
+                storage_capacity,
+                ram_type,
+                ram_frequency,
+                battery,
+                weight,
+                operating_system
+              )
            `
           )
           .order("name"),
