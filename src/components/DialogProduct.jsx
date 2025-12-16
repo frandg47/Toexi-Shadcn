@@ -168,7 +168,12 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog
+      open={open}
+      onOpenChange={(openState) => {
+        if (!openState && isEditing) onSave(); // 👈 REFRESCA SI ES EDICIÓN
+        onClose();
+      }}>
       <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl font-semibold text-center sm:text-left">

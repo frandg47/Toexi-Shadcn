@@ -4,6 +4,7 @@
 import { toast } from "sonner";
 
 import { supabase } from "../lib/supabaseClient";
+import { Switch } from "@/components/ui/switch";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +74,7 @@ const TABLE_COLUMNS = [
   // { id: "usd_price", label: "Precio USD" },
   // { id: "cash_price", label: "Efec/Transf" },
   // { id: "payment_methods", label: "Métodos de pago" },
+  { id: "active", label: "Activo" },
   { id: "commission", label: "Comisión" },
   { id: "actions", label: "Acciones" },
 ];
@@ -188,7 +190,9 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                 ram_frequency,
                 battery,
                 weight,
-                operating_system
+                operating_system,
+                camera_main,
+                camera_front
               )
            `
           )
@@ -316,6 +320,36 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
     }
   }, []);
 
+  const handleToggleActive = useCallback(
+    async (product) => {
+      try {
+        setRefreshing(true);
+
+        const { error } = await supabase
+          .from("products")
+          .update({ active: !product.active })
+          .eq("id", product.id);
+
+        if (error) throw error;
+
+        await fetchProducts(false);
+
+        toast.success("Estado actualizado", {
+          description: `${product.name} ahora está ${!product.active ? "activo" : "inactivo"
+            }.`,
+        });
+      } catch (error) {
+        console.error(error);
+        toast.error("No se pudo actualizar el estado", {
+          description: error.message,
+        });
+      } finally {
+        setRefreshing(false);
+      }
+    },
+    [fetchProducts]
+  );
+
   useEffect(() => {
     fetchProducts(refreshToken === 0);
   }, [fetchProducts, refreshToken]);
@@ -370,6 +404,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   const filteredProducts = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return products.filter((p) => {
+      if (isSellerView && !p.active) return false;
       const matchesSearch =
         !term ||
         p.name.toLowerCase().includes(term) ||
@@ -524,6 +559,13 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                       )}
                     </span>
 
+                    {!p.active && (
+                      <span className="text-xs text-red-600 font-medium uppercase">
+                        Inactivo
+                      </span>
+                    )}
+
+
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div className="flex items-center gap-1">
@@ -668,6 +710,19 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                         p.stock
                       )}
                     </TableCell>
+
+                    {/* 🆕 Columna Activo */}
+                    {!isSellerView && (
+                      <TableCell>
+                        <Switch
+                          onClick={(e) => e.stopPropagation()}
+                          checked={Boolean(p.active)}
+                          onCheckedChange={() => handleToggleActive(p)}
+                          aria-label={"Cambiar estado de " + p.name}
+                        />
+                      </TableCell>
+                    )}
+
 
                     {/* ❌ Se elimina el precio USD y ARS */}
                     <TableCell>

@@ -30,7 +30,7 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 
-export default function DialogVariants({ open, onClose, productId }) {
+export default function DialogVariants({ open, onClose, productId, onSave }) {
   const [variants, setVariants] = useState([]);
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState(null);
@@ -38,45 +38,62 @@ export default function DialogVariants({ open, onClose, productId }) {
   // Configuración de campos visibles según categoría
   const VARIANT_FIELDS_BY_CATEGORY = {
     Celulares: [
-      "storage",
-      "ram",
-      "color",
       "processor",
+      "ram",
+      "ram_type",
+      "storage_capacity",
+      "storage_type",
       "screen_size",
       "resolution",
       "battery",
+      "color",
       "usd_price",
       "stock",
+      "camera_main",
+      "camera_front",
+      "operating_system",
     ],
 
     Tablets: [
-      "storage",
+      "processor",
       "ram",
-      "color",
+      "storage_capacity",
       "screen_size",
       "resolution",
+      "battery",
+      "color",
       "usd_price",
       "stock",
+      "camera_main",
+      "camera_front",
+      "operating_system",
     ],
-
-    Auriculares: ["color", "usd_price", "stock"],
-
-    Accesorios: ["color", "usd_price", "stock", "potency"],
 
     Notebooks: [
       "processor",
       "graphics_card",
       "ram",
-      "storage",
+      "ram_type",
+      "ram_frequency",
+      "storage_capacity",
+      "storage_type",
       "screen_size",
       "resolution",
+      "battery",
+      "weight",
+      "operating_system",
+      "color",
       "usd_price",
       "stock",
-      "color",
     ],
+
+    Auriculares: ["color", "usd_price", "stock", "potency"],
+
+    Accesorios: ["color", "usd_price", "stock", "potency"],
 
     default: ["color", "usd_price", "stock"],
   };
+
 
 
   // Determinar qué campos mostrar
@@ -167,6 +184,8 @@ export default function DialogVariants({ open, onClose, productId }) {
         success: "Variante eliminada correctamente",
         error: "No se pudo eliminar la variante",
       });
+
+      if (onSave) onSave();
     }
 
     // Si la variante no tiene ID (es nueva) o fue eliminada de la BD, la quitamos del estado local
@@ -221,6 +240,7 @@ export default function DialogVariants({ open, onClose, productId }) {
 
       onClose();
 
+      if (onSave) onSave();
     } catch (e) {
       // El error ya fue notificado por toast.promise
       console.error("Error al guardar variantes:", e);
@@ -332,6 +352,20 @@ export default function DialogVariants({ open, onClose, productId }) {
                         </div>
                       )}
 
+                      {visibleFields.includes("storage_type") && (
+                        <div className="grid gap-2">
+                          <Label>Tipo de almacenamiento</Label>
+                          <Input
+                            placeholder="SSD / NVMe / UFS 3.1"
+                            value={v.storage_type || ""}
+                            onChange={(e) =>
+                              handleChange(index, "storage_type", e.target.value)
+                            }
+                          />
+                        </div>
+                      )}
+
+
                       {visibleFields.includes("ram") && (
                         <div className="grid gap-2">
                           <Label>RAM</Label>
@@ -344,6 +378,20 @@ export default function DialogVariants({ open, onClose, productId }) {
                           />
                         </div>
                       )}
+
+                      {visibleFields.includes("ram_type") && (
+                        <div className="grid gap-2">
+                          <Label>Tipo de RAM</Label>
+                          <Input
+                            placeholder="DDR4 / LPDDR5"
+                            value={v.ram_type || ""}
+                            onChange={(e) =>
+                              handleChange(index, "ram_type", e.target.value)
+                            }
+                          />
+                        </div>
+                      )}
+
 
                       {visibleFields.includes("processor") && (
                         <div className="grid gap-2">
@@ -399,6 +447,47 @@ export default function DialogVariants({ open, onClose, productId }) {
                           />
                         </div>
                       )}
+
+                      {visibleFields.includes("camera_main") && (
+                        <div className="grid gap-2">
+                          <Label>Cámara principal</Label>
+                          <Input
+                            placeholder="50MP f/1.8"
+                            value={v.camera_main || ""}
+                            onChange={(e) =>
+                              handleChange(index, "camera_main", e.target.value)
+                            }
+                          />
+                        </div>
+                      )}
+
+                      {visibleFields.includes("camera_front") && (
+                        <div className="grid gap-2">
+                          <Label>Cámara frontal</Label>
+                          <Input
+                            placeholder="12MP"
+                            value={v.camera_front || ""}
+                            onChange={(e) =>
+                              handleChange(index, "camera_front", e.target.value)
+                            }
+                          />
+                        </div>
+                      )}
+
+
+                      {visibleFields.includes("operating_system") && (
+                        <div className="grid gap-2">
+                          <Label>Sistema operativo</Label>
+                          <Input
+                            placeholder="Windows 11 / Android 14"
+                            value={v.operating_system || ""}
+                            onChange={(e) =>
+                              handleChange(index, "operating_system", e.target.value)
+                            }
+                          />
+                        </div>
+                      )}
+
 
                       {visibleFields.includes("color") && (
                         <div className="grid gap-2">

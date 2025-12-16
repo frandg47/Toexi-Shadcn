@@ -102,14 +102,22 @@ export default function ProductDetailDialog({
   // Campos que queremos mostrar dinámicamente en las variantes
   const VARIANT_DISPLAY_FIELDS = {
     storage: "Almacenamiento",
+    storage_capacity: "Capacidad de almacenamiento",
+    storage_type: "Tipo de almacenamiento",
     ram: "RAM",
-    color: "Color",
+    ram_type: "Tipo de RAM",
+    ram_frequency: "Frecuencia de RAM",
     processor: "Procesador",
     graphics_card: "Tarjeta gráfica",
     screen_size: "Pantalla",
     resolution: "Resolución",
     battery: "Batería",
+    weight: "Peso",
+    operating_system: "Sistema operativo",
+    camera_main: "Cámara principal",
+    camera_front: "Cámara frontal",
   };
+
 
 
   return (
@@ -168,7 +176,7 @@ export default function ProductDetailDialog({
               </p>
 
               {/* Información técnica del modelo seleccionado */}
-              {firstVariant && (
+              {/* {firstVariant && (
                 <div className="mt-3 space-y-1">
                   {Object.entries(VARIANT_DISPLAY_FIELDS).map(([field, label]) => {
                     const value = firstVariant[field];
@@ -181,7 +189,7 @@ export default function ProductDetailDialog({
                     );
                   })}
                 </div>
-              )}
+              )} */}
 
 
               {colors.length > 0 && (
