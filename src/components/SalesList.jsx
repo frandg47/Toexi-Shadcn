@@ -79,6 +79,7 @@ export function SalesList() {
             setRefreshing(true);
             const { data, count } = await getAdminSales(page, filters);
             setSales(data || []);
+            console.log("Sales loaded:", data);
             setCount(count || 0);
         } catch (err) {
             toast.error("Error al cargar ventas");
@@ -163,13 +164,13 @@ export function SalesList() {
                     lineWidth: 0.3,
                     lineColor: [0, 0, 0],
                 },
-                head: [["Producto", "Variante", "Color", "IMEI", "Cant", "Subtotal USD", "Subtotal ARS"]],
+                head: [["Producto", "Variante", "Color", "Cant", "IMEI/s", "Subtotal USD", "Subtotal ARS"]],
                 body: sale.items?.map((i) => [
                     i.product_name,
-                    i.variant_name,
+                    i.variant_name || "Modelo Base",
                     i.color || "-",
-                    i.imei ? String(i.imei).trim() : "-",
                     i.quantity,
+                    (i.imeis || []).join("\n"),
                     `USD ${(i.subtotal_usd || i.usd_price * i.quantity).toFixed(2)}`,
                     `$ ${Number(i.subtotal_ars).toLocaleString("es-AR")}`,
                 ]) || [],
@@ -177,8 +178,8 @@ export function SalesList() {
                     0: { cellWidth: 32 },
                     1: { cellWidth: 32 },
                     2: { cellWidth: 18 },
-                    3: { cellWidth: 30 },
-                    4: { halign: "center", cellWidth: 12 },
+                    3: { cellWidth: 12 },
+                    4: { cellWidth: 30 },
                     5: { halign: "right", cellWidth: 30 },
                     6: { halign: "right", cellWidth: 26 },
                 },
@@ -244,7 +245,7 @@ export function SalesList() {
             doc.setFontSize(10);
             sale.payments?.forEach((p) => {
                 doc.text(
-                    `• ${p.method}${p.card_brand ? ` (${p.card_brand})` : ""}${p.installments > 1 ? ` · ${p.installments} cuotas` : ""}: $ ${Number(p.amount_ars).toLocaleString("es-AR")}`,
+                    `• ${p.payment_method_name}${p.installments ? ` (${p.installments} cuotas)` : ""}: $ ${Number(p.amount_ars).toLocaleString("es-AR")}`,
                     margin,
                     y
                 );
@@ -408,7 +409,10 @@ export function SalesList() {
                                         <span>
                                             {i.product_name} {i.variant_name} {i.color ? `(${i.color})` : ""} — {i.quantity}u
                                         </span>
-                                        <span>${i.subtotal_ars.toLocaleString("es-AR")}</span>
+                                        <span>
+                                            ${Number(i.subtotal_ars ?? 0).toLocaleString("es-AR")}
+                                        </span>
+
                                     </div>
                                     {i.imei && i.imei.toString().trim() !== "" && <div className="text-xs text-muted-foreground">IMEI: {i.imei}</div>}
                                 </div>
@@ -421,16 +425,20 @@ export function SalesList() {
                             {s.payments?.map((p, idx) => (
                                 <div key={idx} className="flex justify-between border-b last:border-0 py-1">
                                     <span>
-                                        {p.method}
-                                        {p.card_brand ? ` (${p.card_brand})` : ""}
-                                        {p.installments > 1
-                                            ? ` · ${p.installments} cuotas`
-                                            : ""}
+                                        {p.payment_method_name}
+                                        {p.installments > 1 ? ` · ${p.installments} cuotas` : ""}
                                     </span>
                                     <span>${Number(p.amount_ars).toLocaleString("es-AR")}</span>
                                 </div>
                             ))}
                         </div>
+
+                        {s.notes && (
+                            <div className="text-sm border rounded p-3 mt-3 bg-muted/40">
+                                <strong>Notas: </strong>
+                                {s.notes}
+                            </div>
+                        )}
 
                         <p className="font-bold text-right text-xl mt-3 text-primary">
                             Total: ${Number(s.total_ars).toLocaleString("es-AR")}

@@ -52,6 +52,7 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
       "camera_main",
       "camera_front",
       "operating_system",
+      "wholesale_price"
     ],
 
     Tablets: [
@@ -67,6 +68,7 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
       "camera_main",
       "camera_front",
       "operating_system",
+      "wholesale_price"
     ],
 
     Notebooks: [
@@ -85,13 +87,14 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
       "color",
       "usd_price",
       "stock",
+      "wholesale_price"
     ],
 
-    Auriculares: ["color", "usd_price", "stock", "potency"],
+    Auriculares: ["color", "usd_price", "stock", "potency", "wholesale_price"],
 
-    Accesorios: ["color", "usd_price", "stock", "potency"],
+    Accesorios: ["color", "usd_price", "stock", "potency", "wholesale_price"],
 
-    default: ["color", "usd_price", "stock"],
+    default: ["color", "usd_price", "stock", "wholesale_price"],
   };
 
 
@@ -158,6 +161,10 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
         stock: 0,
         image_url: "",
         active: true,
+        wholesale_price: "",
+        camera_main: "",
+        camera_front: "",
+        operating_system: "",
       },
     ]);
   };
@@ -514,6 +521,25 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
                               handleChange(
                                 index,
                                 "usd_price",
+                                parseFloat(e.target.value)
+                              )
+                            }
+                          />
+                        </div>
+                      )}
+
+                      {visibleFields.includes("wholesale_price") && (
+                        <div className="grid gap-2">
+                          <Label>Precio Mayorista USD</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={v.wholesale_price || ""}
+                            onChange={(e) =>
+                              handleChange(
+                                index,
+                                "wholesale_price",
                                 parseFloat(e.target.value)
                               )
                             }

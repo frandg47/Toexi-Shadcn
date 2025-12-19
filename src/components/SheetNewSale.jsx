@@ -84,6 +84,10 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentInstallments, setPaymentInstallments] = useState([]);
 
+  // Tipo de precio: "normal" o "mayorista"
+  const [priceType, setPriceType] = useState("normal");
+
+
   // const navigate = useNavigate();
   // const setCustomer = useSaleStore((s) => s.setCustomer);
   // const setItems = useSaleStore((s) => s.setItems);
@@ -91,6 +95,16 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   // const setNotes = useSaleStore((s) => s.setNotes);
 
   // ========== HELPERS ==========
+
+
+  const getPriceUSD = (variant) => {
+    if (priceType === "mayorista" && variant.wholesale_price) {
+      return variant.wholesale_price;
+    }
+    console.log("v", variant);
+    return variant.usd_price;
+  };
+
   const formatARS = (n) =>
     new Intl.NumberFormat("es-AR", {
       style: "currency",
@@ -102,10 +116,12 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   const baseTotal = useMemo(() => {
     if (!exchangeRate) return 0;
     return selectedVariants.reduce(
-      (acc, v) => acc + v.usd_price * v.quantity * exchangeRate,
+      (acc, v) => acc + getPriceUSD(v) * (v.imeis?.length ?? 0) * exchangeRate,
       0
     );
-  }, [selectedVariants, exchangeRate]);
+
+
+  }, [selectedVariants, exchangeRate, priceType]);
 
   // pagos sin interés (efectivo/transfer/macro)
   const paidNoInterest = useMemo(() => {
@@ -170,10 +186,10 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   // Total USD original
   const subtotalUSD = useMemo(() => {
     return selectedVariants.reduce(
-      (acc, v) => acc + v.usd_price * v.quantity,
+      (acc, v) => acc + getPriceUSD(v) * v.imeis.length,
       0
     );
-  }, [selectedVariants]);
+  }, [selectedVariants, priceType]);
 
   const methodIcon = (m) => {
     if (m === "efectivo") return <IconCash className="h-4 w-4" />;
@@ -220,13 +236,16 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   // Si viene de un lead, auto-completar
   useEffect(() => {
     if (lead) {
+      console.log("leaddd", lead);
       setSelectedCustomer(lead.customers || null);
-      setSelectedVariants(lead.interested_variants || []);
-      setStep(1); // arrancamos en 1 y permitimos avanzar
+      // ❌ YA NO cargamos variantes desde lead (están incompletas)
+      setStep(1);
     } else {
       setStep(1);
     }
   }, [lead]);
+
+
 
   const resetFormData = () => {
     // Paso del wizard
@@ -267,18 +286,25 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   useEffect(() => {
     const enrichVariants = async () => {
       if (!lead || !lead.interested_variants) return;
+      console.log("lead", lead);
       const ids = lead.interested_variants.map((v) => v.id).filter(Boolean);
       if (ids.length === 0) return;
 
       const { data, error } = await supabase
         .from("product_variants")
         .select(
-          "id, variant_name, color, storage, ram, usd_price, stock, products(name)"
+          "id, variant_name, color, storage, ram, usd_price, wholesale_price, stock, products(name)"
         )
         .in("id", ids);
 
       if (!error && data) {
-        setSelectedVariants(data.map((v) => ({ ...v, quantity: 1 })));
+        setSelectedVariants(
+          data.map((v) => ({
+            ...v,
+            imeis: [""] // 1 unidad por defecto, con 1 IMEI vacío
+          }))
+        );
+
       }
     };
     enrichVariants();
@@ -324,7 +350,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       const { data } = await supabase
         .from("product_variants")
         .select(
-          "id, variant_name, color, storage, ram, usd_price, stock, products(name)"
+          "id, variant_name, color, storage, ram, usd_price, wholesale_price, stock, products(name)"
         )
         .eq("product_id", selectedProduct.id)
         .gt("stock", 0)
@@ -344,12 +370,53 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
   // ========== CART HANDLERS ==========
   const handleAddVariant = (variant) => {
-    if (selectedVariants.some((v) => v.id === variant.id)) {
-      toast("Ya está en el carrito");
-      return;
-    }
-    setSelectedVariants([...selectedVariants, { ...variant, quantity: 1 }]);
-    setSearchVariant("");
+    setSelectedVariants(prev => {
+      // Si ya existe, no agregar otro: solo agregar un nuevo IMEI vacío
+      const existing = prev.find(v => v.id === variant.id);
+      if (existing) {
+        return prev.map(v =>
+          v.id === variant.id
+            ? { ...v, imeis: [...v.imeis, ""] }
+            : v
+        );
+      }
+
+      // Si es nuevo, agregamos un item con un IMEI vacío
+      return [...prev, { ...variant, imeis: [""] }];
+    });
+  };
+
+  const handleIMEIChange = (variantId, index, value) => {
+    setSelectedVariants(prev =>
+      prev.map(v =>
+        v.id === variantId
+          ? {
+            ...v,
+            imeis: v.imeis.map((imei, i) => (i === index ? value : imei)),
+          }
+          : v
+      )
+    );
+  };
+
+  const addIMEIField = (variantId) => {
+    setSelectedVariants(prev =>
+      prev.map(v =>
+        v.id === variantId
+          ? { ...v, imeis: [...v.imeis, ""] }
+          : v
+      )
+    );
+  };
+
+  const removeIMEIField = (variantId, index) => {
+    setSelectedVariants(prev =>
+      prev.map(v =>
+        v.id === variantId
+          ? { ...v, imeis: v.imeis.filter((_, i) => i !== index) }
+          : v
+      )
+    );
   };
 
   const handleRemoveVariant = (variantId) => {
@@ -358,22 +425,8 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     );
   };
 
-  const handleQuantityChange = (id, newQty, stock) => {
-    if (newQty < 1) return;
-    if (newQty > stock) {
-      toast.warning(`Solo hay ${stock} unidades disponibles.`);
-      return;
-    }
-    setSelectedVariants((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, quantity: newQty } : v))
-    );
-  };
 
-  const handleIMEIChange = (id, imei) => {
-    setSelectedVariants((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, imei: imei } : v))
-    );
-  };
+
 
   // ========== PAYMENTS HANDLERS ==========
   const addPaymentRow = () =>
@@ -424,26 +477,34 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
     const stockMap = Object.fromEntries(fresh.map((f) => [f.id, f.stock]));
     const insufficient = selectedVariants.find(
-      (v) => (v.quantity || 1) > (stockMap[v.id] ?? 0)
+      (v) => v.imeis.length > (stockMap[v.id] ?? 0)
     );
     if (insufficient) {
-      return toast.error(`Sin stock para ${insufficient.variant_name}`);
+      console.log("insuf", insufficient);
+      return toast.error(`Sin stock para ${insufficient.products.name}`);
     }
 
     // ✅ Armamos los datos que irá al modal
-    const items = selectedVariants.map((v) => ({
-      variant_id: v.id,
-      product_name: v.products?.name,
-      variant_name: v.variant_name,
-      color: v.color,
-      storage: v.storage,
-      ram: v.ram,
-      usd_price: v.usd_price,
-      quantity: v.quantity,
-      imei: v.imei || null,
-      subtotal_usd: v.usd_price * v.quantity,
-      subtotal_ars: v.usd_price * v.quantity * exchangeRate,
-    }));
+    const items = selectedVariants.map((v) => {
+      const quantity = v.imeis.length;
+
+      return {
+        variant_id: v.id,
+        product_name: v.products?.name,
+        variant_name: v.variant_name,
+        color: v.color,
+        storage: v.storage,
+        ram: v.ram,
+        usd_price: getPriceUSD(v),
+
+        quantity, // ← AHORA VIENE DE IMEIs
+        imeis: v.imeis, // ← ENVIAMOS TODOS LOS IMEIs
+
+        subtotal_usd: getPriceUSD(v) * quantity,
+        subtotal_ars: getPriceUSD(v) * quantity * exchangeRate,
+      };
+    });
+
 
     const salePreview = {
       customer_id: selectedCustomer.id,
@@ -695,77 +756,95 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
               {selectedVariants.length > 0 && (
                 <div className="space-y-3 border-t pt-3">
                   <h4 className="text-sm font-semibold">Carrito de venta</h4>
-                  {selectedVariants.map((v) => (
-                    <div
-                      key={v.id}
-                      className="border rounded-lg p-3 space-y-2 bg-muted/20"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-sm">
-                            {v.products?.name} - {v.variant_name}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {v.color} • Stock: {v.stock}
-                            {v.storage ? ` • ${v.storage}GB` : ""}
-                            {v.ram ? ` • ${v.ram} RAM` : ""}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveVariant(v.id)}
-                          className="p-1 rounded hover:bg-red-50 text-red-600"
-                          title="Quitar"
-                        >
-                          <IconTrash className="h-4 w-4" />
-                        </button>
-                      </div>
 
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <label className="text-xs text-muted-foreground">Cantidad</label>
-                          <Input
-                            type="number"
-                            value={v.quantity}
-                            onChange={(e) =>
-                              handleQuantityChange(
-                                v.id,
-                                parseInt(e.target.value || "0", 10),
-                                v.stock
-                              )
-                            }
-                            className="w-full text-center"
-                            min={1}
-                            max={v.stock}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">IMEI/Código</label>
-                          <Input
-                            type="text"
-                            placeholder="IMEI o código único"
-                            value={v.imei || ""}
-                            onChange={(e) => handleIMEIChange(v.id, e.target.value)}
-                            className="w-full text-sm"
-                          />
-                        </div>
-                      </div>
+                  {selectedVariants.map((v) => {
+                    const quantity = v.imeis?.length ?? 0;
 
-                      <div className="flex justify-between pt-2 border-t">
-                        <div className="text-xs text-muted-foreground">Subtotal</div>
-                        <div className="text-right">
-                          <div className="text-sm font-semibold">
-                            {formatARS(
-                              v.usd_price * (exchangeRate || 0) * v.quantity
-                            )}
+                    return (
+                      <div
+                        key={v.id}
+                        className="border rounded-lg p-3 space-y-3 bg-muted/20"
+                      >
+                        {/* Header del item */}
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-medium text-sm">
+                              {v.products?.name} — {v.variant_name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {v.color} • Stock: {v.stock}
+                              {v.storage ? ` • ${v.storage}GB` : ""}
+                              {v.ram ? ` • ${v.ram} RAM` : ""}
+                            </div>
                           </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveVariant(v.id)}
+                            className="p-1 rounded hover:bg-red-50 text-red-600"
+                            title="Quitar"
+                          >
+                            <IconTrash className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        {/* Campos IMEI dinámicos */}
+                        <div>
+                          <label className="text-xs text-muted-foreground">
+                            Cantidad ({quantity})
+                          </label>
+
+                          <div className="space-y-2 mt-1">
+                            {(v.imeis || []).map((imei, idx) => (
+                              <div key={idx} className="flex gap-2 items-center">
+                                <Input
+                                  placeholder={`IMEI/código único ${idx + 1}`}
+                                  value={imei}
+                                  onChange={(e) =>
+                                    handleIMEIChange(v.id, idx, e.target.value)
+                                  }
+                                />
+
+                                {v.imeis.length > 1 && (
+                                  <Button
+                                    variant="destructive"
+                                    size="icon"
+                                    onClick={() => removeIMEIField(v.id, idx)}
+                                  >
+                                    <IconTrash className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addIMEIField(v.id)}
+                            >
+                              + Agregar IMEI/cod
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Subtotal */}
+                        <div className="flex justify-between pt-2 border-t">
                           <div className="text-xs text-muted-foreground">
-                            USD {v.usd_price} × {v.quantity}
+                            Subtotal ({quantity}u)
+                          </div>
+
+                          <div className="text-right">
+                            <div className="text-sm font-semibold">
+                              {formatARS(getPriceUSD(v) * quantity * exchangeRate)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              USD {getPriceUSD(v)} × {quantity}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   <div className="flex justify-between border-t pt-3 text-sm font-medium">
                     <span>Total:</span>
@@ -775,7 +854,6 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                   <div className="flex justify-end gap-2 mt-4">
                     <Button
                       variant="outline"
-                      className=""
                       disabled={selectedVariants.length === 0}
                       onClick={() => setStep((s) => s - 1)}
                     >
@@ -784,37 +862,50 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                     </Button>
 
                     <Button
-                      className=""
                       disabled={selectedVariants.length === 0}
                       onClick={() => {
-                        // Validar IMEI obligatorio
-                        const missingIMEI = selectedVariants.find(
-                          (v) => !v.imei || v.imei.trim() === ""
+                        // Validar IMEI vacío
+                        const missing = selectedVariants.find((v) =>
+                          v.imeis.some((i) => !i.trim())
                         );
-
-                        if (missingIMEI) {
-                          toast.error(
-                            `Los productos requieren IMEI/Código.`
-                          );
+                        if (missing) {
+                          toast.error("Todos los IMEIs deben estar completos");
                           return;
                         }
-
-                        setStep((s) => (s < 3 ? s + 1 : s));
+                        setStep(3);
                       }}
                     >
                       Siguiente
                       <IconChevronRight className="h-4 w-4" />
                     </Button>
-
                   </div>
                 </div>
               )}
+
             </div>
           )}
 
           {/* ========== PASO 3: PAGO ========== */}
           {step === 3 && (
             <div className="space-y-4">
+              <div className="border p-3 rounded-md bg-muted/20 space-y-2">
+                <label className="text-sm font-medium">Tipo de precio</label>
+
+                <Select
+                  value={priceType}
+                  onValueChange={(v) => setPriceType(v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar tipo de precio" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    <SelectItem value="normal">Precio Normal</SelectItem>
+                    <SelectItem value="mayorista">Precio Mayorista</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <h3 className="font-medium">Métodos de Pago</h3>
 
               {payments.map((p, i) => (

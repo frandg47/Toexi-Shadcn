@@ -15,6 +15,7 @@ import { toast } from "sonner";
 export default function DialogSaleInvoice({ open, onClose, sale }) {
   if (!sale) return null;
 
+  console.log("sale ne dialog", sale);
   // Convertimos datos a seguros
   const safeSale = {
     ...sale,
@@ -22,6 +23,7 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
     payments: Array.isArray(sale?.payments) ? sale.payments : [],
   };
 
+  console.log("safe", safeSale);
   const resetSale = () => {
     if (typeof safeSale.reset === "function") safeSale.reset();
   };
@@ -31,73 +33,49 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
   // ==============================
   const handleConfirmSale = async () => {
     try {
-      const { data: savedSale, error } = await supabase
-        .from("sales")
-        .insert([
-          {
-            customer_id: safeSale.customer_id,
-            seller_id: safeSale.seller_id,
-            lead_id: safeSale.lead_id,
-            total_usd: safeSale.total_usd,
-            total_ars: safeSale.total_final_ars ?? safeSale.total_ars,
-            fx_rate_used: safeSale.fx_rate_used,
-            notes: safeSale.notes,
-          },
-        ])
-        .select()
-        .single();
+      // Preparamos la estructura EXACTA que recibe la función SQL.
+      const payload = {
+        p_customer_id: safeSale.customer_id,
+        p_seller_id: safeSale.seller_id || null,
+        p_lead_id: safeSale.lead_id,
+        p_fx_rate: safeSale.fx_rate_used,
+        p_notes: safeSale.notes,
+
+        p_items: safeSale.variants.map(v => ({
+          variant_id: v.variant_id ?? v.id,
+          quantity: v.quantity,
+          imeis: v.imeis,
+          usd_price: v.usd_price,
+        })),
+
+        p_payments: safeSale.payments.map(p => ({
+          payment_method_id: p.payment_method_id, // 🔑 clave
+          amount: Number(p.amount),
+          installments: p.installments ? Number(p.installments) : null,
+          reference: p.reference || null,
+        })),
+
+
+        p_total_ars: safeSale.total_final_ars,
+        p_total_usd: safeSale.total_usd,
+      };
+
+      const { data, error } = await supabase.rpc("create_sale_with_imeis", payload);
 
       if (error) throw error;
 
-      // Ítems
-      const items = safeSale.variants.map((v) => ({
-        sale_id: savedSale.id,
-        variant_id: v.variant_id ?? v.id,
-        product_name: v.product_name,
-        variant_name: v.variant_name,
-        color: v.color,
-        storage: v.storage,
-        ram: v.ram,
-        usd_price: v.usd_price,
-        quantity: v.quantity,
-        imei: v.imei || null,
-        subtotal_usd: v.subtotal_usd,
-        subtotal_ars: v.subtotal_ars,
-      }));
-
-      await supabase.from("sale_items").insert(items);
-
-      // Pagos
-      const paymentsToInsert = safeSale.payments.map((p) => ({
-        sale_id: savedSale.id,
-        method: (() => {
-          if (p.method_name?.toLowerCase().includes("efectivo")) return "efectivo";
-          if (p.method_name?.toLowerCase().includes("transfer")) return "transferencia";
-          return "tarjeta";
-        })(),
-        amount_ars: Number(p.amount) || 0,
-        amount_usd: null,
-        reference: p.reference || null,
-        card_brand: p.method_name.replace(/tarjeta/i, "").trim() || null,
-        installments: p.installments ? Number(p.installments) : null,
-      }));
-
-      const { error: payErr } = await supabase
-        .from("sale_payments")
-        .insert(paymentsToInsert);
-
-      if (payErr) throw payErr;
-
       toast.success("Venta registrada con éxito");
 
-      handleDownloadPDF(savedSale);
+      handleDownloadPDF({ id: data.sale_id });
       resetSale();
       onClose();
+
     } catch (err) {
-      console.error("❌ Error guardando venta:", err);
+      console.error("❌ Error al confirmar venta:", err);
       toast.error("Error procesando venta");
     }
   };
+
 
   // ========================================
   // PDF – GENERACIÓN ESTABLE (VERSIÓN ORIGINAL)
@@ -183,22 +161,24 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
         lineWidth: 0.3,
         lineColor: [0, 0, 0],
       },
-      head: [["Producto", "Variante", "Color", "IMEI", "Cant", "Subtotal USD", "Subtotal ARS"]],
+      head: [["Producto", "Variante", "Color", "Cant", "IMEI/s", "Subtotal USD", "Subtotal ARS"]],
       body: safeSale.variants.map((v) => [
         v.product_name,
-        v.variant_name,
+        v.variant_name ? v.variant_name : "Modelo Base",
         v.color || "-",
-        v.imei || "-",
-        v.quantity,
+        v.imeis.length,                      // 📌 cantidad = largo del array
+        (v.imeis || []).join("\n"),          // 📌 IMEIs separados por saltos de línea
         `USD ${v.usd_price.toFixed(2)}`,
-        `$ ${v.subtotal_ars.toLocaleString("es-AR")}`,
+        `$ ${(v.usd_price * v.imeis.length * safeSale.fx_rate_used)
+          .toLocaleString("es-AR")}`,
       ]),
+
       columnStyles: {
         0: { cellWidth: 32 },
         1: { cellWidth: 32 },
         2: { cellWidth: 18 },
-        3: { cellWidth: 30 },
-        4: { halign: "center", cellWidth: 12 },
+        3: { cellWidth: 12 },
+        4: { cellWidth: 30 },
         5: { halign: "right", cellWidth: 30 },
         6: { halign: "right", cellWidth: 26 },
       },
@@ -327,8 +307,16 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
           <div className="border rounded p-2 max-h-40 overflow-y-auto">
             {safeSale.variants.map((v, i) => (
               <div key={i} className="text-xs border-b py-1">
-                <div className="font-medium">{v.product_name} {v.variant_name} — {v.quantity}u · USD {v.usd_price}</div>
-                {v.imei && <div className="text-muted-foreground">IMEI: {v.imei}</div>}
+                <div className="font-medium">
+                  {v.product_name} {v.variant_name} — {v.imeis.length}u · USD {v.usd_price}
+                </div>
+
+                {v.imeis?.length > 0 && (
+                  <div className="text-muted-foreground">
+                    IMEIs: {v.imeis.join(", ")}
+                  </div>
+                )}
+
               </div>
             ))}
           </div>

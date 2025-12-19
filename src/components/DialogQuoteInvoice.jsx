@@ -123,7 +123,7 @@ export default function DialogQuoteInvoice({ open, onClose, quote }) {
             head: [["Producto", "Variante", "Cant", "USD", "Subtotal USD", "Subtotal ARS"]],
             body: quote.items.map((item) => [
                 item.name,
-                item.variant,
+                item.variant ?? "Modelo Base",
                 item.quantity,
                 formatCurrencyUSD(item.usd_price),
                 formatCurrencyUSD(item.subtotal_usd),
