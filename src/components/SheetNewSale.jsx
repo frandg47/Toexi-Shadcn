@@ -68,6 +68,13 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   // --- Notes ---
   const [form, setForm] = useState({ notes: "" });
 
+  // --- Discount ---
+  const [discount, setDiscount] = useState({
+    type: "none", // none | percent | fixed
+    value: 0
+  });
+
+
   // --- Payments (mixto) ---
   const [payments, setPayments] = useState([
     { method: "", amount: "", reference: "", installments: "" },
@@ -112,6 +119,9 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       minimumFractionDigits: 2,
     }).format(n || 0);
 
+
+
+
   // Total base en ARS (sin recargos)
   const baseTotal = useMemo(() => {
     if (!exchangeRate) return 0;
@@ -123,6 +133,15 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
   }, [selectedVariants, exchangeRate, priceType]);
 
+  const discountAmount = useMemo(() => {
+    if (discount.type === "percent") {
+      return baseTotal * (discount.value / 100);
+    }
+    if (discount.type === "fixed") {
+      return discount.value;
+    }
+    return 0;
+  }, [discount, baseTotal]);
   // pagos sin interés (efectivo/transfer/macro)
   const paidNoInterest = useMemo(() => {
     return payments
@@ -138,10 +157,9 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       .reduce((acc, p) => acc + Number(p.amount || 0), 0);
   }, [payments, paymentInstallments]);
 
-  // saldo después de pagos sin interés
-  const saldo = useMemo(() => {
-    return Math.max(baseTotal - paidNoInterest, 0);
-  }, [baseTotal, paidNoInterest]);
+  const totalAfterDiscount = useMemo(() => {
+    return Math.max(baseTotal - discountAmount, 0);
+  }, [baseTotal, discountAmount]);
 
   // buscar método con interés (si existe)
   const interestMethod = useMemo(() => {
@@ -165,13 +183,19 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     )?.multiplier || 1
     : 1;
 
+
+  // saldo después de pagos sin interés
+  const saldo = useMemo(() => {
+    return Math.max(totalAfterDiscount - paidNoInterest, 0);
+  }, [totalAfterDiscount, paidNoInterest]);
+
   // total final con recargo
   const totalWithSurcharge = useMemo(() => {
-    if (!interestMethod) return baseTotal;
+    if (!interestMethod) return totalAfterDiscount;
 
     const interestPart = saldo * (multiplier - 1);
-    return baseTotal + interestPart;
-  }, [baseTotal, saldo, multiplier, interestMethod]);
+    return totalAfterDiscount + interestPart;
+  }, [totalAfterDiscount, saldo, multiplier, interestMethod]);
 
   // cuánto lleva pagado el cliente
   const paidARS = useMemo(() => {
@@ -191,11 +215,16 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     );
   }, [selectedVariants, priceType]);
 
+
+  const subtotalWithSurcharge = useMemo(() => {
+    return totalWithSurcharge + discountAmount;
+  }, [totalWithSurcharge, discountAmount]);
+
   const methodIcon = (m) => {
     if (m === "efectivo") return <IconCash className="h-4 w-4" />;
     if (m === "transferencia") return <IconBuildingBank className="h-4 w-4" />;
     if (m === "tarjeta") return <IconCreditCard className="h-4 w-4" />;
-    return null;
+    return <IconCreditCard className="h-4 w-4" />;
   };
 
   // ========== EFFECTS ==========
@@ -522,6 +551,9 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       seller_name: `${lead?.seller?.user?.name ?? ""} ${lead?.seller?.user?.last_name ?? ""
         }`,
       seller_email: lead?.seller?.user?.email ?? "",
+      discount_type: discount.type,
+      discount_value: discount.value,
+      discount_amount: discountAmount,
       total_final_ars: totalWithSurcharge,
     };
 
@@ -906,6 +938,41 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                 </Select>
               </div>
 
+              <div className="border p-3 rounded-md bg-muted/20 space-y-2">
+                <label className="text-sm font-medium">Descuento</label>
+
+                <div className="flex gap-2">
+                  <Select
+                    value={discount.type}
+                    onValueChange={(v) =>
+                      setDiscount((d) => ({ ...d, type: v, value: 0 }))
+                    }
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin descuento</SelectItem>
+                      <SelectItem value="percent">Porcentaje (%)</SelectItem>
+                      <SelectItem value="fixed">Monto fijo ($)</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {discount.type !== "none" && (
+                    <Input
+                      type="number"
+                      placeholder={discount.type === "percent" ? "% descuento" : "$ descuento"}
+                      value={discount.value}
+                      onChange={(e) =>
+                        setDiscount((d) => ({ ...d, value: Number(e.target.value) }))
+                      }
+                      className="flex-1"
+                    />
+                  )}
+                </div>
+              </div>
+
+
               <h3 className="font-medium">Métodos de Pago</h3>
 
               {payments.map((p, i) => (
@@ -1076,12 +1143,32 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                   );
                 })}
 
+                {/* Subtotal real con recargos */}
+                <div className="text-muted-foreground">
+                  Subtotal con recargos:
+                </div>
+                <div className="text-right font-semibold">
+                  {formatARS(subtotalWithSurcharge)}
+                </div>
+
+                {/* Descuento */}
+                {discount.type !== "none" && discountAmount > 0 && (
+                  <>
+                    <div className="text-muted-foreground">Descuento aplicado:</div>
+                    <div className="text-right text-green-600 font-semibold">
+                      − {formatARS(discountAmount)}
+                    </div>
+                  </>
+                )}
+
+                {/* Total final */}
                 <div className="text-muted-foreground font-medium border-t mt-2 pt-2">
-                  Total Final ARS:
+                  Total a pagar:
                 </div>
                 <div className="text-right font-bold text-primary border-t mt-2 pt-2">
                   {formatARS(totalWithSurcharge)}
                 </div>
+
 
                 <div className="text-muted-foreground">Pagado:</div>
                 <div
@@ -1138,6 +1225,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
           open={invoiceOpen}
           onClose={() => setInvoiceOpen(false)}
           sale={{ ...invoiceData, reset: resetFormData }}
+          subtotalWithSurcharge={subtotalWithSurcharge}
         />
       )}
 

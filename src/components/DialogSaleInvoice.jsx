@@ -12,7 +12,7 @@ import autoTable from "jspdf-autotable";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 
-export default function DialogSaleInvoice({ open, onClose, sale }) {
+export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSurcharge }) {
   if (!sale) return null;
 
   console.log("sale ne dialog", sale);
@@ -40,6 +40,10 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
         p_lead_id: safeSale.lead_id,
         p_fx_rate: safeSale.fx_rate_used,
         p_notes: safeSale.notes,
+
+        p_discount_type: safeSale.discount_type || null,
+        p_discount_value: safeSale.discount_value || 0,
+        p_discount_amount: safeSale.discount_amount || 0,
 
         p_items: safeSale.variants.map(v => ({
           variant_id: v.variant_id ?? v.id,
@@ -219,11 +223,26 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
     doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
 
-    doc.text(`Subtotal USD: USD ${safeSale.total_usd.toFixed(2)}`, margin, y);
+    // doc.text(`Subtotal USD: USD ${safeSale.total_usd.toFixed(2)}`, margin, y);
+    // y += 6;
+    doc.text(
+      `Subtotal: $ ${subtotalWithSurcharge.toLocaleString("es-AR")}`,
+      margin,
+      y
+    );
     y += 6;
 
-    doc.text(`Subtotal ARS: $ ${safeSale.total_ars.toLocaleString("es-AR")}`, margin, y);
+    if (safeSale.discount_amount > 0) {
+      doc.text(
+        `Descuento: -$ ${safeSale.discount_amount.toLocaleString("es-AR")}`,
+        margin,
+        y
+      );
+      y += 6;
+    }
+
     y += 6;
+
 
     doc.text(`Cotización aplicada: $ ${safeSale.fx_rate_used}`, margin, y);
     y += 6;
@@ -232,6 +251,7 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 100, 200);
     doc.text(`TOTAL: $ ${safeSale.total_final_ars.toLocaleString("es-AR")}`, margin, y);
+
 
     y += 14;
 
@@ -255,6 +275,7 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
       y += 5;
     });
 
+    doc.text(`Nota: ${safeSale.notes || "-"}`, margin, y + 8);
     y += 4;
 
     // =============================
@@ -334,9 +355,22 @@ export default function DialogSaleInvoice({ open, onClose, sale }) {
             ))}
           </div>
 
-          <p className="font-bold text-right text-lg text-primary mt-2">
-            Total: ${safeSale.total_final_ars.toLocaleString("es-AR")}
-          </p>
+          <div className="text-right space-y-1 mt-2">
+            <div className="text-sm text-muted-foreground">
+              Subtotal con recargos: ${Number(subtotalWithSurcharge).toLocaleString("es-AR")}
+            </div>
+
+            {safeSale.discount_amount > 0 && (
+              <div className="text-sm text-green-600">
+                Descuento: −${safeSale.discount_amount.toLocaleString("es-AR")}
+              </div>
+            )}
+
+            <div className="font-bold text-lg text-primary">
+              Total a pagar: ${safeSale.total_final_ars.toLocaleString("es-AR")}
+            </div>
+          </div>
+
         </div>
 
         <DialogFooter>

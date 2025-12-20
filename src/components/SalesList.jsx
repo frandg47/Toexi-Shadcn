@@ -218,14 +218,40 @@ export function SalesList() {
             doc.setFontSize(11);
             doc.setFont("helvetica", "normal");
 
-            doc.text(`Subtotal USD: USD ${sale.total_usd?.toFixed(2) || "0.00"}`, margin, y);
+            // doc.text(`Subtotal USD: USD ${sale.total_usd?.toFixed(2) || "0.00"}`, margin, y);
+            // y += 6;
+
+            const subtotalWithSurcharge =
+                Number(sale.total_ars) + Number(sale.discount_amount || 0);
+
+            doc.text(
+                `Subtotal: $ ${subtotalWithSurcharge.toLocaleString("es-AR")}`,
+                margin,
+                y
+            );
             y += 6;
 
-            doc.text(`Subtotal ARS: $ ${Number(sale.total_ars).toLocaleString("es-AR")}`, margin, y);
-            y += 6;
+            if (Number(sale.discount_amount) > 0) {
+                doc.text(
+                    `Descuento aplicado: -$ ${Number(sale.discount_amount).toLocaleString("es-AR")}`,
+                    margin,
+                    y
+                );
+                y += 6;
+            }
+
+            // doc.setFontSize(14);
+            // doc.setFont("helvetica", "bold");
+            // doc.setTextColor(0, 100, 200);
+            // doc.text(
+            //     `TOTAL: $ ${Number(sale.total_ars).toLocaleString("es-AR")}`,
+            //     margin,
+            //     y
+            // );
+            // y += 14;
 
             doc.text(`Cotización aplicada: $ ${sale.fx_rate_used}`, margin, y);
-            y += 6;
+            y += 14;
 
             doc.setFontSize(14);
             doc.setFont("helvetica", "bold");
@@ -252,6 +278,7 @@ export function SalesList() {
                 y += 5;
             });
 
+            doc.text(`Nota: ${sale.notes || "-"}`, margin, y += 8);
             y += 4;
 
 
@@ -440,9 +467,25 @@ export function SalesList() {
                             </div>
                         )}
 
-                        <p className="font-bold text-right text-xl mt-3 text-primary">
-                            Total: ${Number(s.total_ars).toLocaleString("es-AR")}
-                        </p>
+                        <div className="text-right mt-3 space-y-1">
+                            <div className="text-sm text-muted-foreground">
+                                Subtotal: $
+                                {(Number(s.total_ars) + Number(s.discount_amount || 0)).toLocaleString("es-AR")}
+                            </div>
+
+                            {Number(s.discount_amount) > 0 && (
+                                <div className="text-sm text-green-600">
+                                    Descuento: −$
+                                    {Number(s.discount_amount).toLocaleString("es-AR")}
+                                </div>
+                            )}
+
+                            <div className="font-bold text-xl text-primary">
+                                Total a pagar: $
+                                {Number(s.total_ars).toLocaleString("es-AR")}
+                            </div>
+                        </div>
+
 
                         {/* Botón descargar PDF */}
                         <div className="mt-4 flex justify-end">
