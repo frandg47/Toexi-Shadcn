@@ -161,7 +161,7 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
         stock: 0,
         image_url: "",
         active: true,
-        wholesale_price: "",
+        wholesale_price: 0,
         camera_main: "",
         camera_front: "",
         operating_system: "",
@@ -533,7 +533,7 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
                           <Label>Precio Mayorista USD</Label>
                           <Input
                             type="number"
-                            step="0.01"
+                            step="1"
                             placeholder="0.00"
                             value={v.wholesale_price || ""}
                             onChange={(e) =>

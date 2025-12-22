@@ -79,7 +79,6 @@ export function SalesList() {
             setRefreshing(true);
             const { data, count } = await getAdminSales(page, filters);
             setSales(data || []);
-            console.log("Sales loaded:", data);
             setCount(count || 0);
         } catch (err) {
             toast.error("Error al cargar ventas");

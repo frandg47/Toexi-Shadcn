@@ -15,7 +15,6 @@ import { toast } from "sonner";
 export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSurcharge }) {
   if (!sale) return null;
 
-  console.log("sale ne dialog", sale);
   // Convertimos datos a seguros
   const safeSale = {
     ...sale,
@@ -23,7 +22,6 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
     payments: Array.isArray(sale?.payments) ? sale.payments : [],
   };
 
-  console.log("safe", safeSale);
   const resetSale = () => {
     if (typeof safeSale.reset === "function") safeSale.reset();
   };

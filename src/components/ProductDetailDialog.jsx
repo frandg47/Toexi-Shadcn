@@ -44,7 +44,6 @@ export default function ProductDetailDialog({
 }) {
   if (!product) return null;
 
-  console.log("producto", product);
   function cleanName(name) {
     return name?.replace(/\s+/g, "").trim();
   }

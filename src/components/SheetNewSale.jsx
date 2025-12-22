@@ -49,19 +49,23 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
   // --- Lookups ---
   const [customers, setCustomers] = useState([]);
+  const [sellers, setSellers] = useState([]);
   const [products, setProducts] = useState([]);
   const [variants, setVariants] = useState([]);
 
   // --- Search fields / focus controllers ---
   const [searchCustomer, setSearchCustomer] = useState("");
+  const [searchSeller, setSearchSeller] = useState("");
   const [searchProduct, setSearchProduct] = useState("");
   const [searchVariant, setSearchVariant] = useState("");
   const [focusCustomer, setFocusCustomer] = useState(false);
+  const [focusSeller, setFocusSeller] = useState(false);
   const [focusProduct, setFocusProduct] = useState(false);
   const [focusVariant, setFocusVariant] = useState(false);
 
   // --- Selected entities / cart ---
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [selectedSeller, setSelectedSeller] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedVariants, setSelectedVariants] = useState([]); // each: {...variant, quantity}
 
@@ -108,7 +112,6 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     if (priceType === "mayorista" && variant.wholesale_price) {
       return variant.wholesale_price;
     }
-    console.log("v", variant);
     return variant.usd_price;
   };
 
@@ -220,6 +223,18 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     return totalWithSurcharge + discountAmount;
   }, [totalWithSurcharge, discountAmount]);
 
+  const filteredSellers = useMemo(() => {
+    const q = searchSeller.trim().toLowerCase();
+    if (!q) return sellers.slice(0, 30);
+    return sellers
+      .filter((s) =>
+        [s.name, s.last_name, s.email, s.phone]
+          .filter(Boolean)
+          .some((field) => field.toLowerCase().includes(q))
+      )
+      .slice(0, 30);
+  }, [sellers, searchSeller]);
+
   const methodIcon = (m) => {
     if (m === "efectivo") return <IconCash className="h-4 w-4" />;
     if (m === "transferencia") return <IconBuildingBank className="h-4 w-4" />;
@@ -244,6 +259,22 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     fetchExchangeRate();
   }, []);
 
+  // Vendedores disponibles (rol seller)
+  useEffect(() => {
+    const fetchSellers = async () => {
+      const { data, error } = await supabase
+        .from("users")
+        .select("id, id_auth, name, last_name, phone, email, role")
+        .eq("role", "seller")
+        .order("name", { ascending: true });
+
+      if (error) console.error("Error obteniendo vendedores:", error);
+      setSellers(data || []);
+    };
+
+    fetchSellers();
+  }, []);
+
   // Obtener métodos de pago y cuotas
   useEffect(() => {
     const fetchPayments = async () => {
@@ -262,10 +293,23 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     fetchPayments();
   }, []);
 
+  useEffect(() => {
+    if (lead?.seller) {
+      setSelectedSeller({
+        id_auth: lead.seller.id_auth,
+        name: lead.seller.user?.name,
+        last_name: lead.seller.user?.last_name,
+        phone: lead.seller.user?.phone,
+        email: lead.seller.user?.email,
+      });
+    } else {
+      setSelectedSeller(null);
+    }
+  }, [lead]);
+
   // Si viene de un lead, auto-completar
   useEffect(() => {
     if (lead) {
-      console.log("leaddd", lead);
       setSelectedCustomer(lead.customers || null);
       // ❌ YA NO cargamos variantes desde lead (están incompletas)
       setStep(1);
@@ -282,8 +326,11 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
     // Cliente
     setSelectedCustomer(null);
+    setSelectedSeller(null);
     setSearchCustomer("");
+    setSearchSeller("");
     setFocusCustomer(false);
+    setFocusSeller(false);
 
     // Producto y variantes
     setSelectedProduct(null);
@@ -315,7 +362,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   useEffect(() => {
     const enrichVariants = async () => {
       if (!lead || !lead.interested_variants) return;
-      console.log("lead", lead);
+      // console.log("lead", lead);
       const ids = lead.interested_variants.map((v) => v.id).filter(Boolean);
       if (ids.length === 0) return;
 
@@ -509,7 +556,6 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       (v) => v.imeis.length > (stockMap[v.id] ?? 0)
     );
     if (insufficient) {
-      console.log("insuf", insufficient);
       return toast.error(`Sin stock para ${insufficient.products.name}`);
     }
 
@@ -535,9 +581,20 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     });
 
 
+    const sellerData = lead?.seller
+      ? {
+        id_auth: lead.seller.id_auth,
+        name: lead.seller.user?.name,
+        last_name: lead.seller.user?.last_name,
+        phone: lead.seller.user?.phone,
+        email: lead.seller.user?.email,
+      }
+      : selectedSeller;
+
+
     const salePreview = {
       customer_id: selectedCustomer.id,
-      seller_id: lead?.seller?.id_auth ?? null,
+      seller_id: sellerData?.id_auth ?? null,
       lead_id: lead?.id ?? null,
       total_usd: items.reduce((acc, it) => acc + it.subtotal_usd, 0),
       total_ars: items.reduce((acc, it) => acc + it.subtotal_ars, 0),
@@ -548,9 +605,10 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       customer_name: `${selectedCustomer.name} ${selectedCustomer.last_name ?? ""
         }`,
       customer_phone: selectedCustomer.phone ?? "",
-      seller_name: `${lead?.seller?.user?.name ?? ""} ${lead?.seller?.user?.last_name ?? ""
+      seller_name: `${sellerData?.name ?? ""} ${sellerData?.last_name ?? ""
         }`,
-      seller_email: lead?.seller?.user?.email ?? "",
+      seller_email: sellerData?.email ?? "",
+      seller_phone: sellerData?.phone ?? "",
       discount_type: discount.type,
       discount_value: discount.value,
       discount_amount: discountAmount,
@@ -683,6 +741,65 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                       )}
                     </ScrollArea>
                   </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="mb-3 font-medium">Asignar vendedor (opcional)</h3>
+                <div className="relative">
+                  <Input
+                    placeholder={lead ? "Asignado desde el lead" : "Buscar vendedor..."}
+                    disabled={!!lead}
+                    value={
+                      selectedSeller
+                        ? `${selectedSeller.name ?? ""} ${selectedSeller.last_name ?? ""}`.trim()
+                        : searchSeller
+                    }
+                    onChange={(e) => {
+                      if (lead) return;
+                      setSelectedSeller(null);
+                      setSearchSeller(e.target.value);
+                    }}
+                    onFocus={() => !lead && setFocusSeller(true)}
+                    onBlur={() => !lead && setTimeout(() => setFocusSeller(false), 150)}
+                  />
+
+                  {focusSeller && !lead && (
+                    <div className="absolute z-[50] mt-1 w-full rounded-md border bg-background shadow">
+                      <ScrollArea className="max-h-[240px] overflow-y-auto">
+                        {filteredSellers.length > 0 ? (
+                          filteredSellers.map((s) => (
+                            <button
+                              type="button"
+                              key={s.id_auth || s.id}
+                              onClick={() => {
+                                setSelectedSeller(s);
+                                setSearchSeller("");
+                                setFocusSeller(false);
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-muted"
+                            >
+                              <div className="font-medium">
+                                {[s.name, s.last_name].filter(Boolean).join(" ") || "Sin nombre"}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {s.phone || s.email || "Sin contacto"}
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-muted-foreground">
+                            Sin coincidencias
+                          </div>
+                        )}
+                      </ScrollArea>
+                    </div>
+                  )}
+                </div>
+                {lead && (
+                  <p className="text-xs text-muted-foreground">
+                    Vendedor asignado automáticamente por el lead.
+                  </p>
                 )}
               </div>
 
