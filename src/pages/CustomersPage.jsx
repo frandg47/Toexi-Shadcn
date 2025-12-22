@@ -19,7 +19,7 @@ const CustomersPage = () => {
 
   return (
     <>
-      <div className="mt-6">
+      <div className="@container/main flex flex-1 flex-col gap-4 py-6">
         <CustomersTable
           isSellerView={isSellerView}
           refreshToken={refreshToken}
