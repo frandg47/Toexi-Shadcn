@@ -16,6 +16,8 @@ import {
   IconUsersGroup,
   IconReport,
   IconCash,
+  IconCalculator,
+  IconFileDollar
 } from "@tabler/icons-react";
 
 import SheetNewSale from "@/components/SheetNewSale";
@@ -42,6 +44,8 @@ const navMain = [
   { title: "Equipo", url: "/dashboard/team", icon: IconUsersGroup },
   { title: "Top Vendedores", url: "/dashboard/top-sellers", icon: IconMedal },
   { title: "Pagos a Vendedores", url: "/dashboard/sellers-payments", icon: IconCash },
+  { title: "Presupuestos", url: "/dashboard/payment-calculator", icon: IconFileDollar },
+  { title: "Cotizador", url: "/dashboard/quick-payment-calculator", icon: IconCalculator },
 ];
 
 const navSecondary = [

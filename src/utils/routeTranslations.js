@@ -13,6 +13,7 @@ export const ROUTE_TRANSLATIONS = {
   "sellers-payments": "Pagos a Vendedores",
   "s-payments": "Pagos a Vendedores",
   "my-sales": "Mis Ventas",
+  "quick-payment-calculator": "Cotizador",
 
   // ⚙️ Configuración
   settings: "Configuraciones",

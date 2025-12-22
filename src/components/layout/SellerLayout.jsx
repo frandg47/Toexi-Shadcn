@@ -21,6 +21,7 @@ import {
   IconMedal,
   IconSettings,
   IconCalculator,
+  IconFileDollar,
 } from "@tabler/icons-react";
 
 import { toast } from "sonner";
@@ -72,11 +73,17 @@ export default function SellerLayout() {
     { title: "Clientes", url: "/seller/customers", icon: IconUsers },
     { title: "Mis ventas", url: "/seller/my-sales", icon: IconMedal },
     {
-      title: "Calculadora de cotizaciones",
-      icon: IconCalculator,
+      title: "Presupuestos",
+      icon: IconFileDollar,
       url: "/seller/payment-calculator",
       // onClick: () => setOpenCalculatorDialog(true),
     },
+    {
+      title: "Cotizador",
+      icon: IconCalculator,
+      url: "/seller/quick-payment-calculator",
+      // onClick: () => setOpenCalculatorDialog(true),
+    }
   ];
 
   return (

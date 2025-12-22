@@ -20,6 +20,7 @@ import AuthCallback from "./pages/AuthCallback";
 import TopSellersPage from "./pages/TopSellersPage";
 import PaymentCalculator from "./pages/PaymentCalculator";
 import SellersPayments from "./pages/SellersPayments";
+import QuickPaymentCalculator from "./pages/QuickPaymentCalculator";
 
 // ⚙️ Configuración
 import ComissionConfig from "./pages/config/ComissionConfig";
@@ -111,6 +112,8 @@ export default function App() {
             <Route path="orders" element={<OrdersPage />} />
             <Route path="top-sellers" element={<TopSellersPage />} />
             <Route path="sellers-payments" element={<SellersPayments />} />
+            <Route path="payment-calculator" element={<PaymentCalculator />} />
+            <Route path="quick-payment-calculator" element={<QuickPaymentCalculator />} />
 
             {/* ⚙️ CONFIGURACIONES */}
             <Route
@@ -141,6 +144,7 @@ export default function App() {
             <Route path="orders" element={<OrdersPage />} />
             <Route path="my-sales" element={<TopSellersPage titulo="Mis ventas" />} />
             <Route path="payment-calculator" element={<PaymentCalculator />} />
+            <Route path="quick-payment-calculator" element={<QuickPaymentCalculator />} />
             {/* Agregá más rutas específicas del vendedor aquí */}
           </Route>
 
