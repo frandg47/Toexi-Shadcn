@@ -39,8 +39,20 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
 
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
 
-  // 🔹 Cargar datos al editar
+  // Mostrar imagen existente al abrir y limpiar selección previa
+  useEffect(() => {
+    if (product?.cover_image_url || product?.coverImageUrl) {
+      setImagePreview(product.cover_image_url || product.coverImageUrl);
+    } else {
+      setImagePreview(null);
+    }
+    setImageFile(null);
+  }, [product]);
+
+  // Cargar datos al editar
   useEffect(() => {
     if (product) {
       setForm({
@@ -78,7 +90,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
     }
   }, [product]);
 
-  // 🔹 Cargar opciones de marca y categoría
+  // Cargar opciones de marca y categoría
   useEffect(() => {
     const fetchOptions = async () => {
       const [{ data: br }, { data: cat }] = await Promise.all([
@@ -118,11 +130,16 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
 
   const handleSubmit = async () => {
     if (!form.name || !form.brand_id || !form.category_id) {
-      // ⚠️ Reemplazo 1: SweetAlert Warning por toast.warning
       toast.warning(
         "Campos requeridos: Completa al menos nombre, marca y categoría"
       );
       return;
+    }
+
+    let imageUrl = form.cover_image_url;
+
+    if (imageFile) {
+      imageUrl = await uploadImage(imageFile);
     }
 
     const payload = {
@@ -136,7 +153,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
       commission_fixed: form.commission_fixed
         ? parseFloat(form.commission_fixed)
         : null,
-      cover_image_url: form.cover_image_url || null,
+      cover_image_url: imageUrl || null,
       allow_backorder: form.allow_backorder,
       lead_time_label: form.allow_backorder
         ? form.lead_time_label || null
@@ -153,13 +170,13 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
       ? "Producto actualizado correctamente"
       : "Producto creado correctamente";
 
-    // 🔁 Reemplazo 2: Flujo con loading, éxito y error usando toast.promise
     try {
       await toast.promise(saveProduct(payload), {
         loading: "Guardando producto...",
         success: successMessage,
         error: (err) => err.message || "No se pudo guardar el producto",
       });
+      setImagePreview(null);
       onClose();
       onSave();
     } catch (e) {
@@ -167,13 +184,35 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
     }
   };
 
+  const uploadImage = async (file) => {
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${crypto.randomUUID()}.${fileExt}`;
+    const filePath = `covers/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from("products")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from("products")
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
   return (
     <Dialog
       open={open}
       onOpenChange={(openState) => {
-        if (!openState && isEditing) onSave(); // 👈 REFRESCA SI ES EDICIÓN
+        if (!openState && isEditing) onSave(); // refresca si es edición
         onClose();
-      }}>
+      }}
+    >
       <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl font-semibold text-center sm:text-left">
@@ -182,7 +221,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
-          {/* 🧾 Nombre */}
+          {/* Nombre */}
           <div className="flex flex-col gap-2">
             <Label>Nombre</Label>
             <Input
@@ -193,7 +232,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
             />
           </div>
 
-          {/* 🏷️ Marca y categoría */}
+          {/* Marca y categoría */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
               <Label>Marca</Label>
@@ -238,18 +277,8 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
             </div>
           </div>
 
-          {/* 💵 Precios y comisiones */}
+          {/* Precios y comisiones */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* <div className="flex flex-col gap-2">
-              <Label>Precio (USD)</Label>
-              <Input
-                name="usd_price"
-                type="number"
-                step="0.01"
-                value={form.usd_price}
-                onChange={handleChange}
-              />
-            </div> */}
             <div className="flex flex-col gap-2">
               <Label>Comisión fija (USD)</Label>
               <Input
@@ -275,19 +304,37 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
             </div>
           </div>
 
-          {/* 🖼️ Imagen */}
+          {/* Imagen */}
           <div className="flex flex-col gap-2">
-            <Label>Imagen (URL)</Label>
-            <Textarea
-              name="cover_image_url"
-              placeholder="https://..."
-              value={form.cover_image_url || ""}
-              onChange={handleChange}
-              className="min-h-[70px] resize-none break-words max-w-xl"
+            <Label>Imagen del producto</Label>
+
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+
+                if (file.size > 5 * 1024 * 1024) {
+                  toast.error("La imagen no puede superar 5 MB");
+                  return;
+                }
+
+                setImageFile(file);
+                setImagePreview(URL.createObjectURL(file));
+              }}
             />
+
+            {imagePreview && (
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="w-32 h-32 object-cover rounded border"
+              />
+            )}
           </div>
 
-          {/* 🔁 Switches */}
+          {/* Switches */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
             <div className="flex items-center justify-between border rounded-md p-3">
               <Label className="text-sm">Permitir backorder</Label>
@@ -308,7 +355,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
             </div>
           </div>
 
-          {/* ⏱️ Tiempo de entrega (solo si backorder activo) */}
+          {/* Tiempo de entrega (solo si backorder activo) */}
           {form.allow_backorder && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex flex-col gap-2 mt-2">
@@ -337,7 +384,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
           <Button
             variant="outline"
             onClick={onClose}
-            className="w-full sm:w-auto"
+            className="w-full mr-2 sm:w-auto"
           >
             Cancelar
           </Button>
@@ -349,4 +396,3 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
     </Dialog>
   );
 }
-
