@@ -74,7 +74,7 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
 
     } catch (err) {
       console.error("❌ Error al confirmar venta:", err);
-      toast.error("Error procesando venta");
+      toast.error("Error procesando venta", err.message);
     }
   };
 
