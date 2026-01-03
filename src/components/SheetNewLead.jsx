@@ -68,6 +68,7 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
       const { data, error } = await supabase
         .from("products")
         .select("id, name")
+        .eq("active", true)
         .ilike("name", `%${q}%`)
         .limit(30);
       if (!error) setProducts(data || []);
@@ -84,6 +85,7 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
         .from("product_variants")
         .select("id, variant_name, color, storage, ram, stock, products(name)")
         .eq("product_id", selectedProduct.id)
+        .eq("active", true)
         .ilike("variant_name", `%${q}%`)
         .limit(40);
       if (!error) setVariants(data || []);

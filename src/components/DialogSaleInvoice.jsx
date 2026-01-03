@@ -74,8 +74,26 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
 
     } catch (err) {
       console.error("❌ Error al confirmar venta:", err);
-      toast.error("Error procesando venta", err.message);
+
+      // Error de IMEI duplicado
+      if (err?.code === "23505" && err?.details?.includes("imei")) {
+        const imei = err.details.match(/\((.*?)\)/)?.[1];
+
+        toast.error(
+          `El IMEI ${imei} ya fue utilizado en otra venta`,
+          {
+            description: "No se puede registrar la venta con un equipo ya vendido",
+          }
+        );
+        return;
+      }
+
+      // Error genérico
+      toast.error("Error procesando la venta", {
+        description: err.message || "Ocurrió un error inesperado",
+      });
     }
+
   };
 
 

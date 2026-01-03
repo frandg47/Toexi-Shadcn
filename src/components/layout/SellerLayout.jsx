@@ -29,13 +29,13 @@ import { useAuth } from "../../context/AuthContextProvider";
 // import { url } from "inspector";
 
 const showDevelopmentToast = (feature) =>
-  toast("Funcionalidad en desarrollo", {
+  toast.info("Funcionalidad en desarrollo", {
     description: `El módulo de ${feature} estará disponible próximamente.`,
   });
 
 const navSecondary = [
   {
-    title: "Configuración",
+    title: "Configuraciones",
     url: "/seller/settings",
     icon: IconSettings,
     onClick: () => showDevelopmentToast("Configuración"),
@@ -56,7 +56,7 @@ export default function SellerLayout() {
     "/seller/orders": "Mis pedidos",
     "/seller/clients": "Clientes",
     "/seller/top-sellers": "Mis ventas",
-    "/seller/settings": "Configuración",
+    "/seller/settings": "Configuraciones",
   };
 
   const tituloActual = pageTitles[location.pathname] || "Panel del vendedor";

@@ -411,6 +411,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       const { data } = await supabase
         .from("products")
         .select("id, name")
+        .eq("active", true)
         .ilike("name", `%${q}%`)
         .limit(30);
       setProducts(data || []);
@@ -423,17 +424,18 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     if (!selectedProduct || !focusVariant) return;
     const q = searchVariant.trim();
     const fetchVariants = async () => {
-      const { data } = await supabase
-        .from("product_variants")
-        .select(
-          "id, variant_name, color, storage, ram, usd_price, wholesale_price, stock, products(name)"
-        )
-        .eq("product_id", selectedProduct.id)
-        .gt("stock", 0)
-        .ilike("variant_name", `%${q}%`)
-        .limit(40);
-      setVariants(data || []);
-    };
+        const { data } = await supabase
+          .from("product_variants")
+          .select(
+            "id, variant_name, color, storage, ram, usd_price, wholesale_price, stock, products(name)"
+          )
+          .eq("product_id", selectedProduct.id)
+          .eq("active", true)
+          .gt("stock", 0)
+          .ilike("variant_name", `%${q}%`)
+          .limit(40);
+        setVariants(data || []);
+      };
     fetchVariants();
   }, [selectedProduct, focusVariant, searchVariant]);
 

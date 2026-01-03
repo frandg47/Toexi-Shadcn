@@ -49,7 +49,7 @@ const navMain = [
 ];
 
 const navSecondary = [
-  { title: "Configuración", url: "/dashboard/settings", icon: IconSettings },
+  { title: "Configuraciones", url: "/dashboard/settings", icon: IconSettings },
 ];
 
 export default function DashboardLayout() {
