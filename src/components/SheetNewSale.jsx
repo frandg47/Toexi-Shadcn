@@ -861,7 +861,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar canal de venta" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[9999]">
                     {salesChannels.map((channel) => (
                       <SelectItem key={channel.id} value={String(channel.id)}>
                         {channel.name}
@@ -1136,7 +1136,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                     <SelectTrigger className="w-40">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[9999]">
                       <SelectItem value="none">Sin descuento</SelectItem>
                       <SelectItem value="percent">Porcentaje (%)</SelectItem>
                       <SelectItem value="fixed">Monto fijo ($)</SelectItem>
@@ -1198,7 +1198,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                       <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Método de pago..." />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="z-[9999]">
                         {paymentMethods.map((m) => (
                           <SelectItem key={m.id} value={String(m.id)}>
                             {m.name}
@@ -1226,7 +1226,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                           <SelectTrigger className="w-28">
                             <SelectValue placeholder="Cuotas" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="z-[9999]">
                             {getInstallmentsForMethod(p.payment_method_id).map(
                               (inst) => (
                                 <SelectItem
