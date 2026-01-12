@@ -22,4 +22,5 @@ export const ROUTE_TRANSLATIONS = {
   "payment-methods": "Métodos de Pago",
   inventory: "Inventario",
   sales: "Ventas",
+  "sales-channels": "Canales de Venta",
 };

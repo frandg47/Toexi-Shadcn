@@ -1269,6 +1269,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                         <Button
                           variant="outline"
                           size="sm"
+                          disabled={!p.payment_method_id}
                           onClick={() => {
                             if (isUSDMethod(p.method_name) && exchangeRate) {
                               // Si es USD, convertir el remaining (ARS) a USD
