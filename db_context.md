@@ -119,6 +119,7 @@ CREATE TABLE public.product_variants (
   camera_main text,
   camera_front text,
   wholesale_price numeric,
+  stock_defective integer NOT NULL DEFAULT 0,
   CONSTRAINT product_variants_pkey PRIMARY KEY (id),
   CONSTRAINT product_variants_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
 );
@@ -139,6 +140,14 @@ CREATE TABLE public.products (
   CONSTRAINT products_pkey PRIMARY KEY (id),
   CONSTRAINT products_brand_id_fkey FOREIGN KEY (brand_id) REFERENCES public.brands(id),
   CONSTRAINT products_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id)
+);
+CREATE TABLE public.sale_item_imeis (
+  id integer NOT NULL DEFAULT nextval('sale_item_imeis_id_seq'::regclass),
+  sale_item_id integer NOT NULL,
+  imei text NOT NULL,
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT sale_item_imeis_pkey PRIMARY KEY (id),
+  CONSTRAINT sale_item_imeis_sale_item_id_fkey FOREIGN KEY (sale_item_id) REFERENCES public.sale_items(id)
 );
 CREATE TABLE public.sale_items (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -161,15 +170,17 @@ CREATE TABLE public.sale_items (
 CREATE TABLE public.sale_payments (
   id bigint NOT NULL DEFAULT nextval('sale_payments_id_seq'::regclass),
   sale_id integer NOT NULL,
-  method text NOT NULL CHECK (method = ANY (ARRAY['efectivo'::text, 'transferencia'::text, 'tarjeta'::text])),
+  method text CHECK (method = ANY (ARRAY['efectivo'::text, 'transferencia'::text, 'tarjeta'::text])),
   amount_ars numeric NOT NULL,
   amount_usd numeric,
   reference text,
   card_brand text,
   installments integer,
   created_at timestamp without time zone DEFAULT now(),
+  payment_method_id integer,
   CONSTRAINT sale_payments_pkey PRIMARY KEY (id),
-  CONSTRAINT sale_payments_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id)
+  CONSTRAINT sale_payments_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id),
+  CONSTRAINT sale_payments_payment_method_fk FOREIGN KEY (payment_method_id) REFERENCES public.payment_methods(id)
 );
 CREATE TABLE public.sales (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -183,14 +194,31 @@ CREATE TABLE public.sales (
   sale_date timestamp without time zone DEFAULT now(),
   status text DEFAULT '''vendido''::text'::text,
   payments jsonb,
+  discount_type text,
+  discount_value numeric,
+  discount_amount numeric,
+  voided_at timestamp with time zone,
+  voided_by uuid,
+  void_reason text,
+  void_stock_bucket text CHECK (void_stock_bucket IS NULL OR (void_stock_bucket = ANY (ARRAY['available'::text, 'defective'::text]))),
+  sales_channel_id integer,
   CONSTRAINT sales_pkey PRIMARY KEY (id),
   CONSTRAINT sales_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
   CONSTRAINT sales_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES public.user_roles(id_auth),
-  CONSTRAINT sales_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id)
+  CONSTRAINT sales_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id),
+  CONSTRAINT sales_sales_channel_id_fkey FOREIGN KEY (sales_channel_id) REFERENCES public.sales_channels(id)
+);
+CREATE TABLE public.sales_channels (
+  id integer GENERATED ALWAYS AS IDENTITY NOT NULL,
+  name text NOT NULL UNIQUE,
+  description text,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT sales_channels_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.user_roles (
   id_auth uuid NOT NULL,
-  role text,
+  role text CHECK (role = ANY (ARRAY['superadmin'::text, 'owner'::text, 'seller'::text])),
   CONSTRAINT user_roles_pkey PRIMARY KEY (id_auth)
 );
 CREATE TABLE public.users (
@@ -200,7 +228,7 @@ CREATE TABLE public.users (
   dni text,
   phone text,
   email text,
-  role text,
+  role text CHECK (role = ANY (ARRAY['superadmin'::text, 'owner'::text, 'seller'::text])),
   last_name text,
   adress text,
   is_active boolean DEFAULT false,

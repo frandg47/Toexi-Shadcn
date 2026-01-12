@@ -26,6 +26,7 @@ import QuickPaymentCalculator from "./pages/QuickPaymentCalculator";
 import ComissionConfig from "./pages/config/ComissionConfig";
 import FxRatesConfig from "./pages/config/FxRatesConfig";
 import PaymentMethodsConfig from "./pages/config/PaymentMethodsConfig";
+import SalesChannelsConfig from "./pages/config/SalesChannelsConfig";
 import InventoryConfig from "./pages/config/InventoryConfig";
 import SalesConfig from "./pages/config/SalesConfig";
 
@@ -92,11 +93,11 @@ export default function App() {
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
 
-          {/* 🧭 DASHBOARD (solo superadmin) */}
+          {/* 🧭 DASHBOARD (solo superadmin/owner) */}
           <Route
             path="/dashboard/*"
             element={
-              <ProtectedRoute allowedRoles={["superadmin"]}>
+              <ProtectedRoute allowedRoles={["superadmin", "owner"]}>
                 <DashboardLayout />
               </ProtectedRoute>
             }
@@ -126,6 +127,10 @@ export default function App() {
               path="settings/payment-methods"
               element={<PaymentMethodsConfig />}
             />
+            <Route
+              path="settings/sales-channels"
+              element={<SalesChannelsConfig />}
+            />
             <Route path="settings/inventory" element={<InventoryConfig />} />
             <Route path="settings/sales" element={<SalesConfig />} />
           </Route>
@@ -134,7 +139,7 @@ export default function App() {
           <Route
             path="/seller/*"
             element={
-              <ProtectedRoute allowedRoles={["seller", "superadmin"]}>
+              <ProtectedRoute allowedRoles={["seller", "superadmin", "owner"]}>
                 <SellerLayout />
               </ProtectedRoute>
             }

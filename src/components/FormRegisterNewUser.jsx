@@ -46,13 +46,14 @@ const schema = yup.object({
     .required("La contrasena es obligatoria"),
   role: yup
     .string()
-    .oneOf(["seller", "superadmin"], "Selecciona un rol valido"),
+    .oneOf(["seller", "superadmin", "owner"], "Selecciona un rol valido"),
   state: yup.boolean(),
 });
 
 const roleOptions = [
   { value: "seller", label: "Vendedor" },
   { value: "superadmin", label: "Super administrador" },
+  { value: "owner", label: "Owner" },
 ];
 
 const FormRegisterNewUser = ({ onSuccess }) => {

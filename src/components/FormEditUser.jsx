@@ -19,6 +19,10 @@ import { useAuth } from "../context/AuthContextProvider"
 export default function FormEditUser({ userId, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const { role } = useAuth();
+  const normalizedRole = role?.toLowerCase();
+  const isOwner = normalizedRole === "owner";
+  const canManageActive =
+    normalizedRole === "superadmin" || normalizedRole === "owner";
   const [user, setUser] = useState({
     name: "",
     last_name: "",
@@ -139,7 +143,7 @@ export default function FormEditUser({ userId, onClose, onSuccess }) {
           />
         </div>
 
-        {role === "superadmin" && (
+        {isOwner && (
           <div className="space-y-2">
             <Label htmlFor="role">Rol</Label>
             <Select
@@ -152,6 +156,7 @@ export default function FormEditUser({ userId, onClose, onSuccess }) {
               <SelectContent>
                 <SelectItem value="superadmin">Administrador</SelectItem>
                 <SelectItem value="seller">Vendedor</SelectItem>
+                <SelectItem value="owner">Owner</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -166,7 +171,7 @@ export default function FormEditUser({ userId, onClose, onSuccess }) {
           />
         </div>
 
-        {role === "superadmin" && (
+        {canManageActive && (
           <div className="flex items-center space-x-2 sm:col-span-2">
             <Switch
               id="is_active"

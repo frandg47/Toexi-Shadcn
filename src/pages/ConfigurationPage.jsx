@@ -8,6 +8,7 @@ import {
   IconCreditCard,
   IconBox,
   IconChartBar,
+  IconRoute2,
   IconInfoCircle,
 } from "@tabler/icons-react";
 
@@ -32,6 +33,12 @@ const ConfigurationPage = () => {
       label: "Métodos de pago",
       icon: <IconCreditCard className="h-10 w-10 text-purple-600" />,
       path: "/dashboard/settings/payment-methods",
+    },
+    {
+      id: "sales_channels",
+      label: "Canales de venta",
+      icon: <IconRoute2 className="h-10 w-10 text-cyan-600" />,
+      path: "/dashboard/settings/sales-channels",
     },
     // {
     //   id: "inventory",

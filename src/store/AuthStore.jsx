@@ -5,6 +5,8 @@ const determineRedirect = (role) => {
   switch (role) {
     case "superadmin":
       return "/dashboard";
+    case "owner":
+      return "/dashboard";
     case "seller":
       return "/seller/products";
     default:

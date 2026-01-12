@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 .env
+
+db_context.md
+policiesdb_context.md

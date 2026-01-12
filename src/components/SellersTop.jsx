@@ -98,6 +98,7 @@ export default function SellersTop({ role }) {
       .eq("status", "vendido");
 
     if (salesError) return console.error(salesError);
+    
 
     // Obtener datos de usuarios
     const { data: users, error: usersError } = await supabase
@@ -183,9 +184,11 @@ export default function SellersTop({ role }) {
       commissionsByVendor[payment.seller_id].total_commission += Number(payment.total_amount || 0);
     });
 
-    const sorted = Object.values(commissionsByVendor).sort(
-      (a, b) => b.total_commission - a.total_commission
-    );
+    const sorted = Object.values(commissionsByVendor)
+      .filter(commission => commission.total_commission > 0)
+      .sort(
+        (a, b) => b.total_commission - a.total_commission
+      );
 
     const formatted = sorted.map((s, i) => ({
       ...s,
@@ -296,8 +299,16 @@ export default function SellersTop({ role }) {
       {/* -------------------------------------------------- */}
       <Card>
         <CardHeader>
-          <CardTitle>{role === "superadmin" ? "Ranking: Cantidad de ventas" : "Mis Ventas"}</CardTitle>
-          <CardDescription>{role === "superadmin" ? "Vendedores con más ventas completadas" : "Ventas completadas en el mes actual"}</CardDescription>
+          <CardTitle>
+            {role === "superadmin" || role === "owner"
+              ? "Ranking: Cantidad de ventas"
+              : "Mis Ventas"}
+          </CardTitle>
+          <CardDescription>
+            {role === "superadmin" || role === "owner"
+              ? "Vendedores con más ventas completadas"
+              : "Ventas completadas en el mes actual"}
+          </CardDescription>
         </CardHeader>
 
         <CardContent>
@@ -339,7 +350,9 @@ export default function SellersTop({ role }) {
 
         <CardFooter className="flex-col items-start gap-2 text-sm">
           <div className="flex gap-2 leading-none font-medium">
-            {role === "superadmin" ? "Cantidad de ventas completadas por vendedor en el mes filtrado" : "Ventas completadas en el mes filtrado"}
+            {role === "superadmin" || role === "owner"
+              ? "Cantidad de ventas completadas por vendedor en el mes filtrado"
+              : "Ventas completadas en el mes filtrado"}
             <IconTrendingUp className="h-4 w-4" />
           </div>
           <div className="text-muted-foreground leading-none">
@@ -353,8 +366,16 @@ export default function SellersTop({ role }) {
       {/* -------------------------------------------------- */}
       <Card>
         <CardHeader>
-          <CardTitle>{role === "superadmin" ? "Ranking: Comisiones Ganadas" : "Mis Comisiones"}</CardTitle>
-          <CardDescription>{role === "superadmin" ? "Vendedores que más dinero generaron" : "Comisiones generadas en el mes actual"}</CardDescription>
+          <CardTitle>
+            {role === "superadmin" || role === "owner"
+              ? "Ranking: Comisiones Ganadas"
+              : "Mis Comisiones"}
+          </CardTitle>
+          <CardDescription>
+            {role === "superadmin" || role === "owner"
+              ? "Vendedores que más dinero generaron"
+              : "Comisiones generadas en el mes actual"}
+          </CardDescription>
         </CardHeader>
 
         <CardContent>
@@ -396,7 +417,9 @@ export default function SellersTop({ role }) {
 
         <CardFooter className="flex-col items-start gap-2 text-sm">
           <div className="flex gap-2 leading-none font-medium">
-            {role === "superadmin" ? "Cantidad de comisiones generadas por vendedor en el mes filtrado" : "Comisiones generadas en el mes filtrado"}
+            {role === "superadmin" || role === "owner"
+              ? "Cantidad de comisiones generadas por vendedor en el mes filtrado"
+              : "Comisiones generadas en el mes filtrado"}
             <IconTrendingUp className="h-4 w-4" />
           </div>
           <div className="text-muted-foreground leading-none">

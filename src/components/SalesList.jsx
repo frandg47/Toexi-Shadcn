@@ -17,7 +17,25 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContextProvider";
+import { supabase } from "@/lib/supabaseClient";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectTrigger,
+    SelectValue,
+    SelectContent,
+    SelectItem,
+} from "@/components/ui/select";
 
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -34,8 +52,27 @@ export function SalesList() {
     const [sales, setSales] = useState([]);
     const [page, setPage] = useState(1);
     const [count, setCount] = useState(0);
+    const { role } = useAuth();
+    const isOwner = role?.toLowerCase() === "owner";
+    const [sellerOptions, setSellerOptions] = useState([]);
+    const [editOpen, setEditOpen] = useState(false);
+    const [editingSale, setEditingSale] = useState(null);
+    const [editDate, setEditDate] = useState(null);
+    const [editTime, setEditTime] = useState("09:00");
+    const [editSellerId, setEditSellerId] = useState("");
+    const [editChannelId, setEditChannelId] = useState("");
+    const [savingEdit, setSavingEdit] = useState(false);
+    const [channels, setChannels] = useState([]);
 
-    // 📌 Filtros unificados
+    // �️ Estados para anulación
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const [cancelingSale, setCancelingS] = useState(null);
+    const [cancelReason, setCancelReason] = useState("");
+    const [bucketOpen, setBucketOpen] = useState(false);
+    const [selectedBucket, setSelectedBucket] = useState("available");
+    const [cancelingProcess, setCancelingProcess] = useState(false);
+
+    // �📌 Filtros unificados
     const [filters, setFilters] = useState({
         start_date: "",
         end_date: "",
@@ -64,15 +101,55 @@ export function SalesList() {
     // 📌 Actualiza filtros cuando cambia el calendario
     useEffect(() => {
         if (dateRange?.from) {
+            // Sumar 1 día a la fecha final para incluir todo el último día
+            const endDate = dateRange.to ? new Date(dateRange.to) : new Date(dateRange.from);
+            endDate.setDate(endDate.getDate() + 1);
+
             setFilters((f) => ({
                 ...f,
                 start_date: dateRange.from.toISOString().split("T")[0],
-                end_date: dateRange.to
-                    ? dateRange.to.toISOString().split("T")[0]
-                    : dateRange.from.toISOString().split("T")[0],
+                end_date: endDate.toISOString().split("T")[0],
             }));
         }
     }, [dateRange]);
+
+    useEffect(() => {
+        if (!isOwner) return;
+
+        const fetchSellers = async () => {
+            const { data, error } = await supabase
+                .from("users")
+                .select("id_auth, name, last_name, email")
+                .eq("role", "seller")
+                .eq("is_active", true)
+                .order("name", { ascending: true });
+
+            if (error) {
+                console.error(error);
+                return;
+            }
+
+            setSellerOptions(data || []);
+        };
+
+        const fetchChannels = async () => {
+            const { data, error } = await supabase
+                .from("sales_channels")
+                .select("id, name")
+                .eq("is_active", true)
+                .order("name", { ascending: true });
+
+            if (error) {
+                console.error(error);
+                return;
+            }
+
+            setChannels(data || []);
+        };
+
+        fetchSellers();
+        fetchChannels();
+    }, [isOwner]);
 
     const load = useCallback(async () => {
         try {
@@ -92,6 +169,133 @@ export function SalesList() {
     }, [load]);
 
     const totalPages = Math.ceil(count / 10);
+    const openEditSale = (sale) => {
+        const saleDate = sale?.sale_date ? new Date(sale.sale_date) : new Date();
+        const hh = String(saleDate.getHours()).padStart(2, "0");
+        const mm = String(saleDate.getMinutes()).padStart(2, "0");
+
+        setEditingSale(sale);
+        setEditDate(saleDate);
+        setEditTime(`${hh}:${mm}`);
+        setEditSellerId(sale?.seller_id || "");
+        setEditChannelId(sale?.sales_channel_id ? String(sale.sales_channel_id) : "");
+        setEditOpen(true);
+    };
+
+    const closeEditSale = () => {
+        setEditOpen(false);
+        setEditingSale(null);
+        setEditChannelId("");
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingSale) return;
+
+        // Validar que no sea una venta anulada
+        if (editingSale.status === "anulado") {
+            toast.error("No se puede editar una venta anulada");
+            return;
+        }
+
+        if (!editDate || !editTime) {
+            toast.error("Selecciona fecha y hora");
+            return;
+        }
+
+        const [hh, mm] = editTime.split(":");
+        const nextDate = new Date(editDate);
+        nextDate.setHours(Number(hh), Number(mm), 0, 0);
+
+        const payload = {
+            sale_date: nextDate.toISOString(),
+        };
+
+        if (editSellerId) {
+            payload.seller_id = editSellerId;
+        }
+
+        if (editChannelId) {
+            payload.sales_channel_id = editChannelId;
+        }
+
+        try {
+            setSavingEdit(true);
+            const { error } = await supabase
+                .from("sales")
+                .update(payload)
+                .eq("id", editingSale.sale_id);
+
+            if (error) throw error;
+
+            toast.success("Venta actualizada");
+            closeEditSale();
+            load();
+        } catch (err) {
+            toast.error("No se pudo actualizar la venta", {
+                description: err?.message,
+            });
+        } finally {
+            setSavingEdit(false);
+        }
+    };
+
+    const startCancelSale = (sale) => {
+        if (!isOwner) {
+            toast.error("Solo el owner puede anular ventas");
+            return;
+        }
+        setCancelingS(sale);
+        setCancelReason("");
+        setCancelOpen(true);
+    };
+
+    const closeCancelDialog = () => {
+        setCancelOpen(false);
+        setCancelingS(null);
+        setCancelReason("");
+    };
+
+    const proceedToBucketSelection = () => {
+        if (!cancelReason.trim()) {
+            toast.error("Debes ingresar un motivo de anulación");
+            return;
+        }
+        setCancelOpen(false);
+        setBucketOpen(true);
+    };
+
+    const closeBucketDialog = () => {
+        setBucketOpen(false);
+        setSelectedBucket("available");
+    };
+
+    const completeCancelSale = async () => {
+        if (!cancelingSale) return;
+
+        try {
+            setCancelingProcess(true);
+            const { error } = await supabase.rpc("void_sale", {
+                p_sale_id: cancelingSale.sale_id,
+                p_reason: cancelReason,
+                p_bucket: selectedBucket,
+            });
+
+            if (error) throw error;
+
+            toast.success("Venta anulada correctamente");
+            closeBucketDialog();
+            setCancelingS(null);
+            setCancelReason("");
+            load();
+        } catch (err) {
+            toast.error("No se pudo anular la venta", {
+                description: err?.message,
+            });
+        } finally {
+            setCancelingProcess(false);
+        }
+    };
+
 
     // 📄 Generar PDF de venta
     const handleDownloadSalePDF = (sale) => {
@@ -406,6 +610,32 @@ export function SalesList() {
                                 {new Date(s.sale_date).toLocaleString()}
                             </span>
                         </div>
+                        <div className="flex items-center gap-3 mt-2 flex-wrap">
+                            {s.status && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">
+                                        Estado:
+                                    </span>
+                                    <Badge
+                                        variant={
+                                            s.status === "anulado" ? "destructive" : "default"
+                                        }
+                                    >
+                                        {s.status === "anulado" ? "ANULADA" : s.status}
+                                    </Badge>
+                                </div>
+                            )}
+                            {s.sales_channel_name && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">
+                                        Origen:
+                                    </span>
+                                    <Badge variant="outline">
+                                        {s.sales_channel_name}
+                                    </Badge>
+                                </div>
+                            )}
+                        </div>
 
                         <hr className="my-3" />
 
@@ -421,9 +651,6 @@ export function SalesList() {
                                 {s.seller_last_name}
                                 <strong>{" | "}Tel:</strong> {" "} {s.seller_phone ?? "3816783617"}
                             </p>
-                            {/* <p>
-                                <strong>Tel:</strong> {s.customer_phone ?? "-"}
-                            </p> */}
                         </div>
 
                         {/* Items */}
@@ -466,6 +693,33 @@ export function SalesList() {
                             </div>
                         )}
 
+                        {s.status === "anulado" && (
+                            <div className="text-xs border-l-2 border-red-500 rounded p-3 mt-3 bg-red-50 dark:bg-red-950/20">
+                                <div className="font-semibold text-red-700 dark:text-red-300 mb-2">
+                                    📋 Información de Anulación
+                                </div>
+                                <div className="space-y-1 text-red-700 dark:text-red-300">
+                                    <p>
+                                        <strong>Motivo:</strong> {s.void_reason || "-"}
+                                    </p>
+                                    <p>
+                                        <strong>Anulado el:</strong>{" "}
+                                        {s.voided_at
+                                            ? new Date(s.voided_at).toLocaleString("es-AR")
+                                            : "-"}
+                                    </p>
+                                    <p>
+                                        <strong>Stock devuelto a:</strong>{" "}
+                                        {s.void_stock_bucket === "available"
+                                            ? "Disponible"
+                                            : s.void_stock_bucket === "defective"
+                                                ? "Defectuoso"
+                                                : "-"}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="text-right mt-3 space-y-1">
                             <div className="text-sm text-muted-foreground">
                                 Subtotal: $
@@ -487,7 +741,27 @@ export function SalesList() {
 
 
                         {/* Botón descargar PDF */}
-                        <div className="mt-4 flex justify-end">
+                        <div className="mt-4 flex flex-wrap justify-end gap-2">
+                            {isOwner && (
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => openEditSale(s)}
+                                        disabled={s.status === "anulado"}
+                                    >
+                                        Editar venta
+                                    </Button>
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => startCancelSale(s)}
+                                        disabled={s.status === "anulado"}
+                                    >
+                                        Anular venta
+                                    </Button>
+                                </>
+                            )}
                             <Button
                                 onClick={() => handleDownloadSalePDF(s)}
                                 size="sm"
@@ -503,6 +777,249 @@ export function SalesList() {
                         <p className="text-center text-muted-foreground">No se encontraron ventas para los filtros seleccionados.</p>
                     )}
             </div>
+
+            <Dialog
+                open={editOpen}
+                onOpenChange={(open) => {
+                    if (!open) closeEditSale();
+                }}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Editar venta</DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>Fecha de venta</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="w-full justify-start text-left"
+                                    >
+                                        {editDate
+                                            ? editDate.toLocaleDateString("es-AR")
+                                            : "Seleccionar fecha"}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent align="start" className="p-0">
+                                    <Calendar
+                                        mode="single"
+                                        selected={editDate}
+                                        onSelect={setEditDate}
+                                        className="m-auto"
+                                        initialFocus
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Hora</Label>
+                            <Input
+                                type="time"
+                                value={editTime}
+                                onChange={(e) => setEditTime(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Vendedor</Label>
+                            <Select
+                                value={editSellerId || ""}
+                                onValueChange={setEditSellerId}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar vendedor" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {editingSale?.seller_id &&
+                                        !sellerOptions.some(
+                                            (seller) =>
+                                                seller.id_auth === editingSale.seller_id
+                                        ) && (
+                                            <SelectItem value={editingSale.seller_id}>
+                                                {[editingSale.seller_name, editingSale.seller_last_name]
+                                                    .filter(Boolean)
+                                                    .join(" ") || "Vendedor actual"}
+                                            </SelectItem>
+                                        )}
+                                    {sellerOptions.length === 0 ? (
+                                        <SelectItem value="none" disabled>
+                                            Sin vendedores activos
+                                        </SelectItem>
+                                    ) : (
+                                        sellerOptions.map((seller) => (
+                                            <SelectItem
+                                                key={seller.id_auth}
+                                                value={seller.id_auth}
+                                            >
+                                                {[seller.name, seller.last_name]
+                                                    .filter(Boolean)
+                                                    .join(" ") || seller.email}
+                                            </SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Canal de venta</Label>
+                            <Select
+                                value={editChannelId || ""}
+                                onValueChange={setEditChannelId}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar canal" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {editingSale?.sales_channel_id &&
+                                        !channels.some(
+                                            (ch) =>
+                                                ch.id === editingSale.sales_channel_id
+                                        ) && (
+                                            <SelectItem value={String(editingSale.sales_channel_id)}>
+                                                {editingSale.sales_channel_name || "Canal actual"}
+                                            </SelectItem>
+                                        )}
+                                    {channels.length === 0 ? (
+                                        <SelectItem value="none" disabled>
+                                            Sin canales activos
+                                        </SelectItem>
+                                    ) : (
+                                        channels.map((channel) => (
+                                            <SelectItem
+                                                key={channel.id}
+                                                value={channel.id.toString()}
+                                            >
+                                                {channel.name}
+                                            </SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={closeEditSale}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleSaveEdit} disabled={savingEdit}>
+                            {savingEdit ? "Guardando..." : "Guardar"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* 🗑️ Dialog para ingresar motivo de anulación */}
+            <Dialog open={cancelOpen} onOpenChange={(open) => {
+                if (!open) closeCancelDialog();
+            }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Anular venta #{cancelingSale?.sale_id}</DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="cancel-reason">Motivo de anulación</Label>
+                            <Input
+                                id="cancel-reason"
+                                placeholder="Ej: Error de carga, cliente cambió de idea..."
+                                value={cancelReason}
+                                onChange={(e) => setCancelReason(e.target.value)}
+                                className="min-h-20 resize-none"
+                                as="textarea"
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={closeCancelDialog}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={proceedToBucketSelection}
+                        >
+                            Siguiente
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* 🪣 Dialog para seleccionar bucket de stock */}
+            <Dialog open={bucketOpen} onOpenChange={(open) => {
+                if (!open) closeBucketDialog();
+            }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Destino del stock devuelto</DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                            ¿Dónde debe devolverse el stock de esta venta anulada?
+                        </p>
+
+                        <div className="space-y-3">
+                            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted transition"
+                                onClick={() => setSelectedBucket("available")}
+                            >
+                                <input
+                                    type="radio"
+                                    name="bucket"
+                                    value="available"
+                                    checked={selectedBucket === "available"}
+                                    onChange={() => setSelectedBucket("available")}
+                                    className="h-4 w-4"
+                                />
+                                <div>
+                                    <div className="font-semibold">Stock Disponible</div>
+                                    <div className="text-sm text-muted-foreground">
+                                        El producto puede venderse nuevamente
+                                    </div>
+                                </div>
+                            </label>
+
+                            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted transition"
+                                onClick={() => setSelectedBucket("defective")}
+                            >
+                                <input
+                                    type="radio"
+                                    name="bucket"
+                                    value="defective"
+                                    checked={selectedBucket === "defective"}
+                                    onChange={() => setSelectedBucket("defective")}
+                                    className="h-4 w-4"
+                                />
+                                <div>
+                                    <div className="font-semibold">Stock Defectuoso</div>
+                                    <div className="text-sm text-muted-foreground">
+                                        El producto necesita revisión/reparación
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={closeBucketDialog}>
+                            Atrás
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={completeCancelSale}
+                            disabled={cancelingProcess}
+                        >
+                            {cancelingProcess ? "Anulando..." : "Confirmar anulación"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* 📄 Paginación */}
             {/* 📄 Paginación Shadcn */}

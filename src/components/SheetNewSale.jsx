@@ -95,6 +95,10 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentInstallments, setPaymentInstallments] = useState([]);
 
+  // Canales de venta
+  const [salesChannels, setSalesChannels] = useState([]);
+  const [selectedChannel, setSelectedChannel] = useState("");
+
   // Tipo de precio: "normal" o "mayorista"
   const [priceType, setPriceType] = useState("normal");
 
@@ -119,6 +123,13 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     new Intl.NumberFormat("es-AR", {
       style: "currency",
       currency: "ARS",
+      minimumFractionDigits: 2,
+    }).format(n || 0);
+
+  const formatUSD = (n) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
       minimumFractionDigits: 2,
     }).format(n || 0);
 
@@ -200,10 +211,19 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     return totalAfterDiscount + interestPart;
   }, [totalAfterDiscount, saldo, multiplier, interestMethod]);
 
-  // cuánto lleva pagado el cliente
+  // Helper para saber si es USD
+  const isUSDMethod = (methodName) => methodName?.toUpperCase() === "USD";
+
+  // cuánto lleva pagado el cliente (en ARS, convertiendo USD si aplica)
   const paidARS = useMemo(() => {
-    return payments.reduce((acc, p) => acc + Number(p.amount || 0), 0);
-  }, [payments]);
+    return payments.reduce((acc, p) => {
+      const amount = Number(p.amount || 0);
+      if (isUSDMethod(p.method_name) && exchangeRate) {
+        return acc + (amount * exchangeRate);
+      }
+      return acc + amount;
+    }, 0);
+  }, [payments, exchangeRate]);
 
   // saldo restante
   const remaining = useMemo(() => {
@@ -293,6 +313,27 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     fetchPayments();
   }, []);
 
+  // Obtener canales de venta
+  useEffect(() => {
+    const fetchChannels = async () => {
+      const { data, error } = await supabase
+        .from("sales_channels")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name", { ascending: true });
+
+      if (error) console.error("Error obteniendo canales:", error);
+      setSalesChannels(data || []);
+      // Seleccionar "Local" por defecto si existe
+      if (data?.length > 0) {
+        const local = data.find(ch => ch.name === "Local");
+        if (local) setSelectedChannel(String(local.id));
+      }
+    };
+
+    fetchChannels();
+  }, []);
+
   useEffect(() => {
     if (lead?.seller) {
       setSelectedSeller({
@@ -344,6 +385,10 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
     // Notas
     setForm({ notes: "" });
+
+    // Canal de venta (volver a Local por defecto)
+    const local = salesChannels.find(ch => ch.name === "Local");
+    if (local) setSelectedChannel(String(local.id));
 
     // Pagos
     setPayments([
@@ -598,6 +643,8 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       customer_id: selectedCustomer.id,
       seller_id: sellerData?.id_auth ?? null,
       lead_id: lead?.id ?? null,
+      sales_channel_id: selectedChannel ? Number(selectedChannel) : null,
+      sales_channel_name: salesChannels.find(ch => String(ch.id) === selectedChannel)?.name,
       total_usd: items.reduce((acc, it) => acc + it.subtotal_usd, 0),
       total_ars: items.reduce((acc, it) => acc + it.subtotal_ars, 0),
       fx_rate_used: exchangeRate,
@@ -803,6 +850,25 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                     Vendedor asignado automáticamente por el lead.
                   </p>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="mb-3 font-medium">Canal de venta</h3>
+                <Select
+                  value={selectedChannel}
+                  onValueChange={setSelectedChannel}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar canal de venta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {salesChannels.map((channel) => (
+                      <SelectItem key={channel.id} value={String(channel.id)}>
+                        {channel.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex justify-end">
@@ -1192,7 +1258,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                     <div className="flex gap-2 items-end">
                       <Input
                         className="flex-1"
-                        placeholder="Monto (ARS)"
+                        placeholder={isUSDMethod(p.method_name) ? "Monto (USD)" : "Monto (ARS)"}
                         type="number"
                         value={p.amount}
                         onChange={(e) =>
@@ -1204,7 +1270,13 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            updatePaymentField(i, "amount", String(remaining));
+                            if (isUSDMethod(p.method_name) && exchangeRate) {
+                              // Si es USD, convertir el remaining (ARS) a USD
+                              const remainingUSD = remaining / exchangeRate;
+                              updatePaymentField(i, "amount", String(remainingUSD.toFixed(2)));
+                            } else {
+                              updatePaymentField(i, "amount", String(remaining));
+                            }
                           }}
                         >
                           Restante
@@ -1252,12 +1324,19 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                 {payments.map((p, i) => {
                   if (!p.payment_method_id) return null;
                   const amount = Number(p.amount || 0);
+                  const isUSD = isUSDMethod(p.method_name);
+                  const displayAmount = isUSD ? formatUSD(amount) : formatARS(amount);
+                  const arsEquivalent = isUSD && exchangeRate ? amount * exchangeRate : amount;
+                  
                   return (
                     <div key={i} className="col-span-2 flex justify-between">
                       <div className="text-muted-foreground">
                         {p.method_name || "Método"}:
                       </div>
-                      <div className="text-right">{formatARS(amount)}</div>
+                      <div className="text-right">
+                        <div>{displayAmount}</div>
+                        {isUSD && <div className="text-xs text-muted-foreground">≈ {formatARS(arsEquivalent)}</div>}
+                      </div>
                     </div>
                   );
                 })}
@@ -1296,7 +1375,16 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                     : "text-red-600"
                     }`}
                 >
-                  {formatARS(paidARS)}
+                  <div>{formatARS(paidARS)}</div>
+                  {payments.some(p => isUSDMethod(p.method_name)) && (
+                    <div className="text-xs text-muted-foreground">
+                      {payments.filter(p => isUSDMethod(p.method_name)).map((p, i) => (
+                        <div key={i}>
+                          {formatUSD(Number(p.amount || 0))} ({p.method_name})
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="text-muted-foreground">Restante:</div>

@@ -15,12 +15,19 @@ import { toast } from "sonner";
 export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSurcharge }) {
   if (!sale) return null;
 
+  // Helper para detectar método USD
+  const isUSDMethod = (methodName) => methodName?.toUpperCase() === "USD";
+
   // Convertimos datos a seguros
   const safeSale = {
     ...sale,
     variants: Array.isArray(sale?.variants) ? sale.variants : [],
     payments: Array.isArray(sale?.payments) ? sale.payments : [],
   };
+
+  // Detectar si hay pagos en USD
+  const hasUSDPayments = safeSale.payments.some(p => isUSDMethod(p.method_name));
+  const totalUSD = safeSale.fx_rate_used > 0 ? (safeSale.total_final_ars / safeSale.fx_rate_used).toFixed(2) : 0;
 
   const resetSale = () => {
     if (typeof safeSale.reset === "function") safeSale.reset();
@@ -36,6 +43,7 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
         p_customer_id: safeSale.customer_id,
         p_seller_id: safeSale.seller_id || null,
         p_lead_id: safeSale.lead_id,
+        p_sales_channel_id: safeSale.sales_channel_id || null,
         p_fx_rate: safeSale.fx_rate_used,
         p_notes: safeSale.notes,
 
@@ -272,7 +280,7 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
     y += 14;
 
     // =============================
-    // MÉTODOS DE PAGO (SIN CAMBIOS)
+    // MÉTODOS DE PAGO (CON SOPORTE USD)
     // =============================
     doc.setFontSize(11);
     doc.setTextColor(0);
@@ -283,8 +291,17 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     safeSale.payments.forEach((p) => {
+      const isUSD = isUSDMethod(p.method_name);
+      const amount = Number(p.amount);
+      const displayAmount = isUSD 
+        ? `USD ${amount.toFixed(2)}`
+        : `$ ${amount.toLocaleString("es-AR")}`;
+      const arsEquivalent = isUSD && safeSale.fx_rate_used 
+        ? ` (≈ $ ${(amount * safeSale.fx_rate_used).toLocaleString("es-AR")})`
+        : "";
+      
       doc.text(
-        `• ${p.method_name}${p.installments > 1 ? ` (${p.installments} cuotas)` : ""}: $ ${Number(p.amount).toLocaleString("es-AR")}`,
+        `• ${p.method_name}${p.installments > 1 ? ` (${p.installments} cuotas)` : ""}: ${displayAmount}${arsEquivalent}`,
         margin,
         y
       );
@@ -339,6 +356,7 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
           <p><strong>Cliente:</strong> {safeSale.customer_name}</p>
           <p><strong>Tel:</strong> {safeSale.customer_phone || "-"}</p>
           <p><strong>Vendedor:</strong> {safeSale.seller_name && safeSale.seller_name.trim() ? safeSale.seller_name : "Toexi Tech"}</p>
+          <p><strong>Canal de venta:</strong> {safeSale.sales_channel_name || "-"}</p>
           <p><strong>Cotización:</strong> ${safeSale.fx_rate_used}</p>
 
           <div className="border rounded p-2 max-h-40 overflow-y-auto">
@@ -360,20 +378,32 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
 
           <div className="border rounded p-2 max-h-32 overflow-y-auto text-xs">
             <strong>Métodos de pago:</strong>
-            {safeSale.payments.map((p, i) => (
-              <div key={i} className="flex justify-between border-b py-1">
-                <span>
-                  {p.method_name}
-                  {p.installments > 1 ? ` (${p.installments} cuotas)` : ""}
-                </span>
-                <span>${Number(p.amount).toLocaleString("es-AR")}</span>
-              </div>
-            ))}
+            {safeSale.payments.map((p, i) => {
+              const isUSD = isUSDMethod(p.method_name);
+              const amount = Number(p.amount);
+              const arsEquivalent = isUSD && safeSale.fx_rate_used ? (amount * safeSale.fx_rate_used).toFixed(2) : amount;
+              
+              return (
+                <div key={i} className="flex justify-between border-b py-1">
+                  <span>
+                    {p.method_name}
+                    {p.installments > 1 ? ` (${p.installments} cuotas)` : ""}
+                  </span>
+                  <div className="text-right">
+                    <div>
+                      {isUSD ? `USD ${amount.toFixed(2)}` : `$ ${amount.toLocaleString("es-AR")}`}
+                    </div>
+                    {isUSD && <div className="text-muted-foreground">≈ $ {Number(arsEquivalent).toLocaleString("es-AR")}</div>}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="text-right space-y-1 mt-2">
             <div className="text-sm text-muted-foreground">
               Subtotal con recargos: ${Number(subtotalWithSurcharge).toLocaleString("es-AR")}
+              {hasUSDPayments && <div className="text-xs">≈ USD {(subtotalWithSurcharge / safeSale.fx_rate_used).toFixed(2)}</div>}
             </div>
 
             {safeSale.discount_amount > 0 && (
@@ -384,6 +414,11 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
 
             <div className="font-bold text-lg text-primary">
               Total a pagar: ${safeSale.total_final_ars.toLocaleString("es-AR")}
+              {hasUSDPayments && (
+                <div className="text-sm text-blue-600">
+                  ≈ USD {Number(totalUSD).toLocaleString("en-US")}
+                </div>
+              )}
             </div>
           </div>
 

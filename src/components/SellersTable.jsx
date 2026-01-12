@@ -194,6 +194,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
                         .from("sales")
                         .select("id", { count: "exact", head: true })
                         .eq("seller_id", payment.seller_id)
+                        .eq("status", "vendido")
                         .gte("sale_date", payment.period_start)
                         .lte("sale_date", payment.period_end);
 
@@ -287,6 +288,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
     const filteredSellers = useMemo(() => {
         return sellers
             .filter(p => p.period_end === monthFilter) // Filtrar por mes exacto
+            .filter(p => p.sales_count > 0) // Filtrar solo vendedores con ventas
             .filter(p =>
                 buildFullName(p.seller).toLowerCase().includes(nameFilter.toLowerCase())
             );

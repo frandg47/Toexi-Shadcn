@@ -20,7 +20,7 @@ export default function FallbackRedirect() {
   // Si hay sesión y rol, redirige según corresponda
   const normalizedRole = role?.toLowerCase();
 
-  if (normalizedRole === "superadmin")
+  if (normalizedRole === "superadmin" || normalizedRole === "owner")
     return <Navigate to="/dashboard" replace />;
 
   if (normalizedRole === "seller")

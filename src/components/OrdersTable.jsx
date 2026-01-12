@@ -115,7 +115,7 @@ const OrdersTable = () => {
         .order("created_at", { ascending: false });
 
       // Si el usuario NO es superadmin (es vendedor), filtrar solo sus pedidos
-      if (role !== "superadmin") {
+      if (role !== "superadmin" && role !== "owner") {
         query.eq("referred_by", id_auth);
       }
 
@@ -468,7 +468,7 @@ const OrdersTable = () => {
 
                   {/* 📦 Estado del Producto */}
                   <TableCell>
-                    {role === "superadmin" ? (
+                    {role === "superadmin" || role === "owner" ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Badge
@@ -542,7 +542,8 @@ const OrdersTable = () => {
                               return (
                                 <>
                                   {
-                                    role === "superadmin" && (
+                                    (role === "superadmin" ||
+                                      role === "owner") && (
                                       <>
                                         <DropdownMenuItem
                                           onClick={() => handleCreateSale(o)}

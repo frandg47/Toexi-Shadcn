@@ -367,7 +367,15 @@ const UsersTable = ({ refreshToken = 0 }) => {
                   )}
                   {visibleColumns.includes("role") && (
                     <TableCell>
-                      {user.role === "superadmin" ? (
+                      {user.role === "owner" ? (
+                        <Badge
+                          variant="secondary"
+                          className="bg-amber-500 text-white dark:bg-amber-600"
+                        >
+                          <IconUserShield className="h-4 w-4" />
+                          Owner
+                        </Badge>
+                      ) : user.role === "superadmin" ? (
                         <Badge
                           variant="secondary"
                           className="bg-blue-500 text-white dark:bg-blue-600"
