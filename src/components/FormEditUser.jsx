@@ -60,25 +60,44 @@ export default function FormEditUser({ userId, onClose, onSuccess }) {
     setLoading(true);
 
     try {
-      // Validaciones
       if (!user.dni || !user.name || !user.last_name) {
         throw new Error("Los campos DNI, Nombre y Apellido son obligatorios");
       }
 
-      const { error } = await supabase
-        .from("users")
-        .update({
-          name: user.name,
-          last_name: user.last_name,
-          dni: user.dni,
-          phone: user.phone,
-          role: user.role,
-          adress: user.adress,
-          is_active: user.is_active,
-        })
-        .eq("id", userId);
+      if (isOwner) {
+        // Owner: update normal (incluye role)
+        const { error } = await supabase
+          .from("users")
+          .update({
+            name: user.name,
+            last_name: user.last_name,
+            dni: user.dni,
+            phone: user.phone,
+            role: user.role,
+            adress: user.adress,
+            is_active: user.is_active,
+          })
+          .eq("id", userId);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else if (normalizedRole === "superadmin") {
+        // Superadmin: RPC sin role
+        const { error } = await supabase.rpc("superadmin_update_user_profile", {
+          p_id_auth: user.id_auth,           // <- importantísimo
+          p_is_active: user.is_active,
+          p_name: user.name,
+          p_last_name: user.last_name,
+          p_dni: user.dni,
+          p_phone: user.phone,
+          p_adress: user.adress,
+          // p_email no hace falta (está disabled)
+          // p_avatar_url si lo manejás
+        });
+
+        if (error) throw error;
+      } else {
+        throw new Error("No autorizado");
+      }
 
       toast.success("Usuario actualizado correctamente");
       if (onSuccess) await onSuccess();
@@ -89,6 +108,7 @@ export default function FormEditUser({ userId, onClose, onSuccess }) {
       setLoading(false);
     }
   };
+
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

@@ -33,8 +33,7 @@ import {
   IconUserShield,
 } from "@tabler/icons-react";
 import DialogEditUser from "./DialogEditUser";
-
-// ✅ AGREGADO: Componentes de AlertDialog de shadcn/ui
+import { useAuth } from "../context/AuthContextProvider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -119,9 +118,7 @@ const UsersTable = ({ refreshToken = 0 }) => {
     try {
       const { data, error } = await supabase
         .from("users")
-        .select(
-          "id, name, avatar_url, last_name, email, role, is_active, phone, dni, adress, created_at"
-        )
+        .select("id, id_auth, name, avatar_url, last_name, email, role, is_active, phone, dni, adress, created_at")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -142,25 +139,70 @@ const UsersTable = ({ refreshToken = 0 }) => {
     fetchUsers(refreshToken === 0);
   }, [fetchUsers, refreshToken]);
 
+  // const handleToggleActive = useCallback(
+  //   async (user) => {
+  //     try {
+  //       setRefreshing(true);
+  //       const { error } = await supabase
+  //         .from("users")
+  //         .update({ is_active: !user.is_active })
+  //         .eq("id", user.id);
+
+  //       if (error) throw error;
+  //       await fetchUsers();
+  //       // 🔄 REEMPLAZO 2: Usar toast para la confirmación de actualización
+  //       toast.success("Estado actualizado", {
+  //         description: `La cuenta de ${user.email} ahora está ${!user.is_active ? "activa" : "inactiva"
+  //           }.`,
+  //       });
+  //     } catch (error) {
+  //       console.error(error);
+  //       // 🔄 REEMPLAZO 3: Usar toast para el error de actualización
+  //       toast.error("No se pudo actualizar el estado", {
+  //         description: error.message,
+  //       });
+  //     } finally {
+  //       setRefreshing(false);
+  //     }
+  //   },
+  //   [fetchUsers]
+  // );
+
+
+  const { role } = useAuth();
+  const normalizedRole = role?.toLowerCase();
+  const isOwner = normalizedRole === "owner";
+  const isSuperadmin = normalizedRole === "superadmin";
+
   const handleToggleActive = useCallback(
     async (user) => {
       try {
         setRefreshing(true);
-        const { error } = await supabase
-          .from("users")
-          .update({ is_active: !user.is_active })
-          .eq("id", user.id);
 
-        if (error) throw error;
+        if (isOwner) {
+          const { error } = await supabase
+            .from("users")
+            .update({ is_active: !user.is_active })
+            .eq("id", user.id);
+
+          if (error) throw error;
+        } else if (isSuperadmin) {
+          const { error } = await supabase.rpc("superadmin_update_user_profile", {
+            p_id_auth: user.id_auth,
+            p_is_active: !user.is_active,
+          });
+
+          if (error) throw error;
+        } else {
+          throw new Error("No autorizado");
+        }
+
         await fetchUsers();
-        // 🔄 REEMPLAZO 2: Usar toast para la confirmación de actualización
         toast.success("Estado actualizado", {
           description: `La cuenta de ${user.email} ahora está ${!user.is_active ? "activa" : "inactiva"
             }.`,
         });
       } catch (error) {
-        console.error(error);
-        // 🔄 REEMPLAZO 3: Usar toast para el error de actualización
         toast.error("No se pudo actualizar el estado", {
           description: error.message,
         });
@@ -168,7 +210,7 @@ const UsersTable = ({ refreshToken = 0 }) => {
         setRefreshing(false);
       }
     },
-    [fetchUsers]
+    [fetchUsers, isOwner, isSuperadmin]
   );
 
   // const fixGoogleAvatar = (url) => {
