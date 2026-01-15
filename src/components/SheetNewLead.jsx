@@ -14,6 +14,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { IconX, IconUserPlus } from "@tabler/icons-react";
@@ -46,6 +53,7 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
     notes: "",
     depositPaid: false,
     depositAmount: "",
+    depositCurrency: "ARS",
   });
 
   // 🔍 Buscar clientes
@@ -176,6 +184,7 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
         product_status: productStatus, // ✅ "disponible" o "en espera"
         deposit_paid: form.depositPaid,
         deposit_amount: form.depositPaid ? depositAmount : 0,
+        deposit_currency: form.depositPaid ? form.depositCurrency : "ARS",
       },
     ]);
 
@@ -195,6 +204,7 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
       notes: "",
       depositPaid: false,
       depositAmount: "",
+      depositCurrency: "ARS",
     });
     setSelectedCustomer(null);
     setSelectedProduct(null);
@@ -208,7 +218,7 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-md overflow-visible"
+        className="w-full sm:max-w-md overflow-auto"
       >
         <SheetHeader>
           <SheetTitle>Nuevo pedido</SheetTitle>
@@ -405,14 +415,31 @@ export default function SheetNewLead({ open, onOpenChange, sellerId }) {
             </div>
 
             {form.depositPaid && (
-              <Input
-                type="number"
-                placeholder="Monto de la seña (ARS)"
-                value={form.depositAmount}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, depositAmount: e.target.value }))
-                }
-              />
+              <div className="grid gap-2">
+                <Select
+                  value={form.depositCurrency}
+                  onValueChange={(value) =>
+                    setForm((f) => ({ ...f, depositCurrency: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Moneda de la seña" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ARS">ARS</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder={`Monto de la seña (${form.depositCurrency})`}
+                  value={form.depositAmount}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, depositAmount: e.target.value }))
+                  }
+                />
+              </div>
             )}
           </div>
 

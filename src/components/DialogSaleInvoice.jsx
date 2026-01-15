@@ -27,7 +27,14 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
 
   // Detectar si hay pagos en USD
   const hasUSDPayments = safeSale.payments.some(p => isUSDMethod(p.method_name));
-  const depositAmount = Number(safeSale.deposit_amount || 0);
+  const depositAmountUSD = Number(safeSale.deposit_amount || 0);
+  const depositCurrency = safeSale.deposit_currency || "ARS";
+  const depositAmount = Number(
+    safeSale.deposit_amount_ars ??
+      (depositCurrency === "USD"
+        ? depositAmountUSD * safeSale.fx_rate_used
+        : depositAmountUSD)
+  );
   const totalDueARS = Number(
     safeSale.total_due_ars ?? safeSale.total_final_ars ?? 0
   );
@@ -268,6 +275,10 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
         y
       );
       y += 6;
+      if (depositCurrency === "USD" && depositAmountUSD > 0) {
+        doc.text(`Seña USD: USD ${depositAmountUSD.toFixed(2)}`, margin, y);
+        y += 6;
+      }
     }
 
     if (depositAmount > 0) {
@@ -429,6 +440,12 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
             {depositAmount > 0 && (
               <div className="text-sm text-amber-600">
                 Seña aplicada: ${depositAmount.toLocaleString("es-AR")}
+              </div>
+            )}
+
+            {depositCurrency === "USD" && depositAmountUSD > 0 && (
+              <div className="text-xs text-muted-foreground">
+                Seña USD: USD {depositAmountUSD.toFixed(2)}
               </div>
             )}
 

@@ -212,15 +212,25 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     return totalAfterDiscount + interestPart;
   }, [totalAfterDiscount, saldo, multiplier, interestMethod]);
 
-  const depositAmount = useMemo(() => {
-    if (!lead?.deposit_paid) return 0;
-    const value = Number(lead.deposit_amount || 0);
-    return Number.isFinite(value) ? value : 0;
-  }, [lead]);
+  const depositData = useMemo(() => {
+    if (!lead?.deposit_paid) {
+      return { amount: 0, currency: "ARS", amountARS: 0 };
+    }
+
+    const amount = Number(lead.deposit_amount || 0);
+    const currency = lead.deposit_currency || "ARS";
+    const safeAmount = Number.isFinite(amount) ? amount : 0;
+    const amountARS =
+      currency === "USD" && exchangeRate
+        ? safeAmount * exchangeRate
+        : safeAmount;
+
+    return { amount: safeAmount, currency, amountARS };
+  }, [lead, exchangeRate]);
 
   const totalDue = useMemo(() => {
-    return Math.max(totalWithSurcharge - depositAmount, 0);
-  }, [totalWithSurcharge, depositAmount]);
+    return Math.max(totalWithSurcharge - depositData.amountARS, 0);
+  }, [totalWithSurcharge, depositData.amountARS]);
 
   const totalUsdDue = useMemo(() => {
     if (!exchangeRate) return 0;
@@ -679,7 +689,9 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       discount_value: discount.value,
       discount_amount: discountAmount,
       deposit_paid: Boolean(lead?.deposit_paid),
-      deposit_amount: depositAmount,
+      deposit_amount: depositData.amount,
+      deposit_currency: depositData.currency,
+      deposit_amount_ars: depositData.amountARS,
       total_original_ars: totalWithSurcharge,
       total_due_ars: totalDue,
       total_final_ars: totalDue,
@@ -1383,11 +1395,16 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                   </>
                 )}
 
-                {depositAmount > 0 && (
+                {depositData.amountARS > 0 && (
                   <>
                     <div className="text-muted-foreground">Seña aplicada:</div>
                     <div className="text-right text-amber-600 font-semibold">
-                      {formatARS(depositAmount)}
+                      <div>{formatARS(depositData.amountARS)}</div>
+                      {depositData.currency === "USD" && depositData.amount > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          USD {depositData.amount.toFixed(2)}
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

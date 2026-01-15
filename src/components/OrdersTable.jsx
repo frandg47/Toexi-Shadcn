@@ -110,6 +110,7 @@ const OrdersTable = () => {
                   appointment_datetime,
                   deposit_paid,
                   deposit_amount,
+                  deposit_currency,
                   notes,
                   interested_variants,
                   customers (id, name, last_name, phone),
@@ -480,7 +481,7 @@ const OrdersTable = () => {
                         className="bg-emerald-50 text-emerald-700 border-emerald-200"
                       >
                         Sí{Number(o.deposit_amount || 0) > 0
-                          ? ` · $${Number(o.deposit_amount).toLocaleString("es-AR")}`
+                          ? ` · ${o.deposit_currency === "USD" ? "USD $" : "$"}${Number(o.deposit_amount).toLocaleString("es-AR")}`
                           : ""}
                       </Badge>
                     ) : (
