@@ -19,6 +19,7 @@ export default function AppSidebar({
   title = "Toexi Tech",
   actionButtonLabel,
   onActionClick,
+  actionButtons,
 }) {
   const { user, profile } = useAuth();
 
@@ -53,6 +54,7 @@ export default function AppSidebar({
           items={navMain}
           actionButtonLabel={actionButtonLabel}
           onActionClick={onActionClick}
+          actionButtons={actionButtons}
         />
 
         <NavSecondary items={navSecondary} className="mt-auto" />

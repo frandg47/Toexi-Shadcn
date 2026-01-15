@@ -21,7 +21,9 @@ import {
 } from "@tabler/icons-react";
 
 import SheetNewSale from "@/components/SheetNewSale";
+import SheetNewLead from "@/components/SheetNewLead";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContextProvider";
 
 const showDevelopmentToast = (feature) =>
   toast("Funcionalidad en desarrollo", {
@@ -54,7 +56,9 @@ const navSecondary = [
 
 export default function DashboardLayout() {
   const [saleOpen, setSaleOpen] = useState(false);
+  const [leadOpen, setLeadOpen] = useState(false);
   const location = useLocation();
+  const { user } = useAuth();
 
   const pageTitles = {
     "/dashboard": "Panel principal",
@@ -79,8 +83,10 @@ export default function DashboardLayout() {
         title="Toexi Tech"
         navMain={navMain}
         navSecondary={navSecondary}
-        actionButtonLabel="Nueva venta"
-        onActionClick={() => setSaleOpen(true)}
+        actionButtons={[
+          { label: "Nuevo pedido", onClick: () => setLeadOpen(true) },
+          { label: "Nueva venta", onClick: () => setSaleOpen(true) },
+        ]}
       />
 
       <SidebarInset>
@@ -92,6 +98,11 @@ export default function DashboardLayout() {
       </SidebarInset>
 
       <SheetNewSale open={saleOpen} onOpenChange={setSaleOpen} lead={null} />
+      <SheetNewLead
+        open={leadOpen}
+        onOpenChange={setLeadOpen}
+        sellerId={user?.id}
+      />
     </SidebarProvider>
   );
 }

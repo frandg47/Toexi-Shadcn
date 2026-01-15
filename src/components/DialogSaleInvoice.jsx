@@ -27,7 +27,12 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
 
   // Detectar si hay pagos en USD
   const hasUSDPayments = safeSale.payments.some(p => isUSDMethod(p.method_name));
-  const totalUSD = safeSale.fx_rate_used > 0 ? (safeSale.total_final_ars / safeSale.fx_rate_used).toFixed(2) : 0;
+  const depositAmount = Number(safeSale.deposit_amount || 0);
+  const totalDueARS = Number(
+    safeSale.total_due_ars ?? safeSale.total_final_ars ?? 0
+  );
+  const totalUSD =
+    safeSale.fx_rate_used > 0 ? (totalDueARS / safeSale.fx_rate_used).toFixed(2) : 0;
 
   const resetSale = () => {
     if (typeof safeSale.reset === "function") safeSale.reset();
@@ -265,6 +270,15 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
       y += 6;
     }
 
+    if (depositAmount > 0) {
+      doc.text(
+        `Seña aplicada: -$ ${depositAmount.toLocaleString("es-AR")}`,
+        margin,
+        y
+      );
+      y += 6;
+    }
+
     y += 6;
 
 
@@ -274,7 +288,7 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 100, 200);
-    doc.text(`TOTAL: $ ${safeSale.total_final_ars.toLocaleString("es-AR")}`, margin, y);
+    doc.text(`TOTAL: $ ${totalDueARS.toLocaleString("es-AR")}`, margin, y);
 
 
     y += 14;
@@ -412,8 +426,14 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
               </div>
             )}
 
+            {depositAmount > 0 && (
+              <div className="text-sm text-amber-600">
+                Seña aplicada: ${depositAmount.toLocaleString("es-AR")}
+              </div>
+            )}
+
             <div className="font-bold text-lg text-primary">
-              Total a pagar: ${safeSale.total_final_ars.toLocaleString("es-AR")}
+              Total a pagar ahora: ${totalDueARS.toLocaleString("es-AR")}
               {hasUSDPayments && (
                 <div className="text-sm text-blue-600">
                   ≈ USD {Number(totalUSD).toLocaleString("en-US")}

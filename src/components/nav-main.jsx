@@ -7,28 +7,42 @@ import { toast } from "sonner";
 import { useSidebar } from "@/components/ui/sidebar";
 
 
-export function NavMain({ items, actionButtonLabel, onActionClick }) {
+export function NavMain({
+  items,
+  actionButtonLabel,
+  onActionClick,
+  actionButtons,
+}) {
   const { collapsed } = useSidebar(); // <-- clave
+
+  const buttons = Array.isArray(actionButtons) && actionButtons.length > 0
+    ? actionButtons
+    : actionButtonLabel
+    ? [{ label: actionButtonLabel, onClick: onActionClick }]
+    : [];
 
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
 
-        {/* Botón Nueva venta */}
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <Button
-              variant="outline"
-              className={`w-full justify-start bg-gray-900 text-white hover:bg-gray-800 hover:text-white
-                ${collapsed ? "justify-center" : ""}
-              `}
-              onClick={onActionClick}
-            >
-              <IconCirclePlusFilled className="h-5 w-5" />
-              {!collapsed && <span className="ml-2">{actionButtonLabel}</span>}
-            </Button>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        {buttons.length > 0 && (
+          <SidebarMenu>
+            {buttons.map((btn, index) => (
+              <SidebarMenuItem key={`${btn.label}-${index}`}>
+                <Button
+                  variant="outline"
+                  className={`w-full justify-start bg-gray-900 text-white hover:bg-gray-800 hover:text-white
+                    ${collapsed ? "justify-center" : ""}
+                  `}
+                  onClick={btn.onClick}
+                >
+                  <IconCirclePlusFilled className="h-5 w-5" />
+                  {!collapsed && <span className="ml-2">{btn.label}</span>}
+                </Button>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        )}
 
         {/* Links */}
         <SidebarMenu>

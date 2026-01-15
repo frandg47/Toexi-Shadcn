@@ -36,6 +36,7 @@ import {
   IconCircleCheck,
   IconCircleDashed,
 } from "@tabler/icons-react";
+import { formatPersonName } from "@/utils/formatName";
 import {
   Table,
   TableHeader,
@@ -107,6 +108,8 @@ const OrdersTable = () => {
                   status,
                   product_status,
                   appointment_datetime,
+                  deposit_paid,
+                  deposit_amount,
                   notes,
                   interested_variants,
                   customers (id, name, last_name, phone),
@@ -251,10 +254,10 @@ const OrdersTable = () => {
 
   const filteredOrders = orders
     .filter((o) => {
-      const customerName =
-        (o.customers?.name?.toLowerCase() || "") +
-        " " +
-        (o.customers?.last_name?.toLowerCase() || "");
+      const customerName = formatPersonName(
+        o.customers?.name,
+        o.customers?.last_name
+      ).toLowerCase();
       return customerName.includes(nameFilter.toLowerCase());
     })
     .filter((o) =>
@@ -370,6 +373,7 @@ const OrdersTable = () => {
               <TableHead>Fecha cita</TableHead>
               <TableHead>Interesado en</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead>Seña</TableHead>
               <TableHead>Producto</TableHead>
               <TableHead>Creado</TableHead>
               <TableHead className="w-10 text-center"></TableHead>
@@ -407,7 +411,10 @@ const OrdersTable = () => {
                     <div className="flex flex-col">
                       <span>
                         {o.customers
-                          ? `${o.customers.name} ${o.customers.last_name || ""}`
+                          ? formatPersonName(
+                              o.customers.name,
+                              o.customers.last_name
+                            )
                           : "Sin cliente"}
                       </span>
                       {o.customers?.phone && (
@@ -464,6 +471,21 @@ const OrdersTable = () => {
                         {o.status}
                       </span>
                     </div>
+                  </TableCell>
+
+                  <TableCell>
+                    {o.deposit_paid ? (
+                      <Badge
+                        variant="outline"
+                        className="bg-emerald-50 text-emerald-700 border-emerald-200"
+                      >
+                        Sí{Number(o.deposit_amount || 0) > 0
+                          ? ` · $${Number(o.deposit_amount).toLocaleString("es-AR")}`
+                          : ""}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No</span>
+                    )}
                   </TableCell>
 
                   {/* 📦 Estado del Producto */}

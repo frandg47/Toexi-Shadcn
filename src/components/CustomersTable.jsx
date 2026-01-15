@@ -43,6 +43,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { IconIdBadge2 } from "@tabler/icons-react";
+import { formatPersonName } from "@/utils/formatName";
 
 // Formato de fecha local Argentina
 const formatDate = (value) => {
@@ -61,7 +62,7 @@ const formatDate = (value) => {
 
 // Construir nombre completo
 const buildFullName = (c) =>
-  [c?.name, c?.last_name].filter(Boolean).join(" ") || "Sin nombre";
+  formatPersonName(c?.name, c?.last_name) || "Sin nombre";
 
 const TABLE_COLUMNS = [
   { id: "name", label: "Cliente" },

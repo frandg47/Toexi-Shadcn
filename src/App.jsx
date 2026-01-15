@@ -114,7 +114,10 @@ export default function App() {
             <Route path="top-sellers" element={<TopSellersPage />} />
             <Route path="sellers-payments" element={<SellersPayments />} />
             <Route path="payment-calculator" element={<PaymentCalculator />} />
-            <Route path="quick-payment-calculator" element={<QuickPaymentCalculator />} />
+            <Route
+              path="quick-payment-calculator"
+              element={<QuickPaymentCalculator />}
+            />
 
             {/* ⚙️ CONFIGURACIONES */}
             <Route
@@ -147,9 +150,15 @@ export default function App() {
             <Route path="products" element={<Products />} />
             <Route path="customers" element={<CustomersPage />} />
             <Route path="orders" element={<OrdersPage />} />
-            <Route path="my-sales" element={<TopSellersPage titulo="Mis ventas" />} />
+            <Route
+              path="my-sales"
+              element={<TopSellersPage titulo="Mis ventas" />}
+            />
             <Route path="payment-calculator" element={<PaymentCalculator />} />
-            <Route path="quick-payment-calculator" element={<QuickPaymentCalculator />} />
+            <Route
+              path="quick-payment-calculator"
+              element={<QuickPaymentCalculator />}
+            />
             {/* Agregá más rutas específicas del vendedor aquí */}
           </Route>
 

@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import DialogSaleInvoice from "./DialogSaleInvoice";
 import DialogAddCustomer from "./DialogAddCustomer";
+import { formatPersonName } from "@/utils/formatName";
 import {
   IconX,
   IconCash,
@@ -211,6 +212,21 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     return totalAfterDiscount + interestPart;
   }, [totalAfterDiscount, saldo, multiplier, interestMethod]);
 
+  const depositAmount = useMemo(() => {
+    if (!lead?.deposit_paid) return 0;
+    const value = Number(lead.deposit_amount || 0);
+    return Number.isFinite(value) ? value : 0;
+  }, [lead]);
+
+  const totalDue = useMemo(() => {
+    return Math.max(totalWithSurcharge - depositAmount, 0);
+  }, [totalWithSurcharge, depositAmount]);
+
+  const totalUsdDue = useMemo(() => {
+    if (!exchangeRate) return 0;
+    return totalDue / exchangeRate;
+  }, [totalDue, exchangeRate]);
+
   // Helper para saber si es USD
   const isUSDMethod = (methodName) => methodName?.toUpperCase() === "USD";
 
@@ -227,8 +243,8 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
   // saldo restante
   const remaining = useMemo(() => {
-    return Math.max(totalWithSurcharge - paidARS, 0);
-  }, [totalWithSurcharge, paidARS]);
+    return Math.max(totalDue - paidARS, 0);
+  }, [totalDue, paidARS]);
 
   // Total USD original
   const subtotalUSD = useMemo(() => {
@@ -580,10 +596,11 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       }))
       .filter((p) => p.payment_method_id && p.amount > 0);
 
-    if (!normalized.length)
+    if (totalDue > 0 && !normalized.length) {
       return toast.error("Agrega al menos un método de pago");
+    }
 
-    if (Math.round(paidARS) !== Math.round(totalWithSurcharge)) {
+    if (Math.round(paidARS) !== Math.round(totalDue)) {
       return toast.error(
         "El total pagado no coincide con el total de la venta"
       );
@@ -645,7 +662,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       lead_id: lead?.id ?? null,
       sales_channel_id: selectedChannel ? Number(selectedChannel) : null,
       sales_channel_name: salesChannels.find(ch => String(ch.id) === selectedChannel)?.name,
-      total_usd: items.reduce((acc, it) => acc + it.subtotal_usd, 0),
+      total_usd: totalUsdDue,
       total_ars: items.reduce((acc, it) => acc + it.subtotal_ars, 0),
       fx_rate_used: exchangeRate,
       notes: form.notes || null,
@@ -661,7 +678,11 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       discount_type: discount.type,
       discount_value: discount.value,
       discount_amount: discountAmount,
-      total_final_ars: totalWithSurcharge,
+      deposit_paid: Boolean(lead?.deposit_paid),
+      deposit_amount: depositAmount,
+      total_original_ars: totalWithSurcharge,
+      total_due_ars: totalDue,
+      total_final_ars: totalDue,
     };
 
     setInvoiceData(salePreview);
@@ -733,8 +754,10 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                     readOnly={!!lead}
                     value={
                       selectedCustomer
-                        ? `${selectedCustomer.name} ${selectedCustomer.last_name || ""
-                        }`
+                        ? formatPersonName(
+                            selectedCustomer.name,
+                            selectedCustomer.last_name
+                          )
                         : searchCustomer
                     }
                     onFocus={() => !lead && setFocusCustomer(true)}
@@ -763,19 +786,19 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                   <div className="absolute z-[50] mt-1 w-full rounded-md border bg-background shadow">
                     <ScrollArea className="max-h-[250px] overflow-y-auto">
                       {(customers || []).length > 0 ? (
-                        customers.map((c) => (
-                          <button
-                            type="button"
-                            key={c.id}
-                            onClick={() => {
-                              setSelectedCustomer(c);
-                              setFocusCustomer(false);
-                            }}
-                            className="w-full text-left px-3 py-2 hover:bg-muted"
-                          >
-                            <div className="font-medium">
-                              {c.name} {c.last_name}
-                            </div>
+                    customers.map((c) => (
+                      <button
+                        type="button"
+                        key={c.id}
+                        onClick={() => {
+                          setSelectedCustomer(c);
+                          setFocusCustomer(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-muted"
+                      >
+                        <div className="font-medium">
+                          {formatPersonName(c.name, c.last_name)}
+                        </div>
                             <div className="text-xs text-muted-foreground">
                               DNI: {c.dni || "N/D"} •{" "}
                               Contacto: {c.phone || c.email || "Sin contacto"} •{" "}
@@ -1360,18 +1383,27 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                   </>
                 )}
 
+                {depositAmount > 0 && (
+                  <>
+                    <div className="text-muted-foreground">Seña aplicada:</div>
+                    <div className="text-right text-amber-600 font-semibold">
+                      {formatARS(depositAmount)}
+                    </div>
+                  </>
+                )}
+
                 {/* Total final */}
                 <div className="text-muted-foreground font-medium border-t mt-2 pt-2">
-                  Total a pagar:
+                  Total a pagar ahora:
                 </div>
                 <div className="text-right font-bold text-primary border-t mt-2 pt-2">
-                  {formatARS(totalWithSurcharge)}
+                  {formatARS(totalDue)}
                 </div>
 
 
                 <div className="text-muted-foreground">Pagado:</div>
                 <div
-                  className={`text-right font-semibold ${Math.round(paidARS) === Math.round(totalWithSurcharge)
+                  className={`text-right font-semibold ${Math.round(paidARS) === Math.round(totalDue)
                     ? "text-green-600"
                     : "text-red-600"
                     }`}
@@ -1444,7 +1476,12 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
         onSuccess={(newCustomer) => {
           setSelectedCustomer(newCustomer);
           setDialogCustomerOpen(false);
-          toast.success(`Cliente ${newCustomer.name} agregado correctamente`);
+          toast.success(
+            `Cliente ${formatPersonName(
+              newCustomer.name,
+              newCustomer.last_name
+            )} agregado correctamente`
+          );
         }}
       />
     </Sheet>

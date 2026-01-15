@@ -169,7 +169,7 @@ CREATE TABLE public.sale_items (
 );
 CREATE TABLE public.sale_payments (
   id bigint NOT NULL DEFAULT nextval('sale_payments_id_seq'::regclass),
-  sale_id integer NOT NULL,
+  sale_id bigint NOT NULL,
   method text CHECK (method = ANY (ARRAY['efectivo'::text, 'transferencia'::text, 'tarjeta'::text])),
   amount_ars numeric NOT NULL,
   amount_usd numeric,
@@ -179,8 +179,8 @@ CREATE TABLE public.sale_payments (
   created_at timestamp without time zone DEFAULT now(),
   payment_method_id integer,
   CONSTRAINT sale_payments_pkey PRIMARY KEY (id),
-  CONSTRAINT sale_payments_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id),
-  CONSTRAINT sale_payments_payment_method_fk FOREIGN KEY (payment_method_id) REFERENCES public.payment_methods(id)
+  CONSTRAINT sale_payments_payment_method_fk FOREIGN KEY (payment_method_id) REFERENCES public.payment_methods(id),
+  CONSTRAINT sale_payments_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id)
 );
 CREATE TABLE public.sales (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
