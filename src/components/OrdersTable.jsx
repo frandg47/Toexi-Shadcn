@@ -102,7 +102,8 @@ const OrdersTable = () => {
     try {
       const query = supabase
         .from("leads")
-        .select(`
+        .select(
+          `
                   id,
                   created_at,
                   status,
@@ -115,7 +116,8 @@ const OrdersTable = () => {
                   interested_variants,
                   customers (id, name, last_name, phone),
                   seller:user_roles!leads_referred_by_fkey (id_auth, role)
-            `)
+            `
+        )
         .order("created_at", { ascending: false });
 
       // Si el usuario NO es superadmin (es vendedor), filtrar solo sus pedidos
@@ -124,8 +126,6 @@ const OrdersTable = () => {
       }
 
       const { data: leadsData, error: leadsError } = await query;
-
-
 
       if (leadsError) throw leadsError;
 
@@ -226,13 +226,13 @@ const OrdersTable = () => {
     }
   };
 
-  const kpis = {
-    total: orders.length,
-    pendiente: orders.filter((o) => o.status === "pendiente").length,
-    sin_exito: orders.filter((o) => o.status === "sin_exito").length,
-    vendido: orders.filter((o) => o.status === "vendido").length,
-    cancelado: orders.filter((o) => o.status === "cancelado").length,
-  };
+  // const kpis = {
+  //   total: orders.length,
+  //   pendiente: orders.filter((o) => o.status === "pendiente").length,
+  //   sin_exito: orders.filter((o) => o.status === "sin_exito").length,
+  //   vendido: orders.filter((o) => o.status === "vendido").length,
+  //   cancelado: orders.filter((o) => o.status === "cancelado").length,
+  // };
 
   const [rescheduleLead, setRescheduleLead] = useState(null);
   const openReschedule = (lead) => setRescheduleLead(lead);
@@ -248,9 +248,9 @@ const OrdersTable = () => {
   const formatDate = (dateString) =>
     dateString
       ? new Date(dateString).toLocaleString("es-AR", {
-        dateStyle: "short",
-        timeStyle: "short",
-      })
+          dateStyle: "short",
+          timeStyle: "short",
+        })
       : "-";
 
   const filteredOrders = orders
@@ -276,10 +276,8 @@ const OrdersTable = () => {
       {/* 🔹 Header */}
 
       <div className="space-y-4">
-
         {/* 🔹 HEADER PRINCIPAL */}
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-
           {/* 🔸 🟩 FILA 1 – Buscador (sm–lg full width, en xl queda en la fila única) */}
           <Input
             placeholder="Buscar por cliente..."
@@ -289,10 +287,8 @@ const OrdersTable = () => {
 
           {/* Contenedor de las filas 2 y 3 (sm–lg) / columna flexible (xl) */}
           <div className="flex flex-col gap-3 w-full xl:flex-row xl:items-center xl:justify-end">
-
             {/* 🔸 🟦 FILA 2 — Rango de fecha + Semana actual */}
             <div className="flex flex-row gap-3 w-full justify-end">
-
               {/* Rango de fecha (toma todo el espacio disponible en sm–lg) */}
               <Popover>
                 <PopoverTrigger asChild>
@@ -302,7 +298,9 @@ const OrdersTable = () => {
                   >
                     <IconCalendar className="h-4 w-4" />
                     {dateRange?.from && dateRange?.to
-                      ? `${dateRange.from.toLocaleDateString("es-AR")} - ${dateRange.to.toLocaleDateString("es-AR")}`
+                      ? `${dateRange.from.toLocaleDateString(
+                          "es-AR"
+                        )} - ${dateRange.to.toLocaleDateString("es-AR")}`
                       : "Filtrar por fecha"}
                   </Button>
                 </PopoverTrigger>
@@ -326,7 +324,6 @@ const OrdersTable = () => {
 
             {/* 🔸 🟨 FILA 3 — Estados + Refrescar (sm–lg) */}
             <div className="flex flex-row gap-3 w-full justify-end">
-
               {/* Select Estado */}
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-40">
@@ -349,20 +346,13 @@ const OrdersTable = () => {
                 className="flex items-center gap-2 px-3"
               >
                 {/* md–xl: ícono + texto */}
-                <IconRefresh
-                  className={refreshing && "h-4 w-4 animate-spin"}
-                />
+                <IconRefresh className={refreshing && "h-4 w-4 animate-spin"} />
                 <span>Refrescar</span>
               </Button>
             </div>
-
           </div>
         </div>
-
       </div>
-
-
-
 
       {/* 🔹 Tabla */}
       <div className="overflow-x-auto rounded-md border">
@@ -429,7 +419,8 @@ const OrdersTable = () => {
 
                   <TableCell>
                     {o.seller?.user
-                      ? `${o.seller.user.name ?? ""} ${o.seller.user.last_name ?? ""
+                      ? `${o.seller.user.name ?? ""} ${
+                          o.seller.user.last_name ?? ""
                         }`.trim() || "—"
                       : "—"}
                   </TableCell>
@@ -438,7 +429,7 @@ const OrdersTable = () => {
 
                   <TableCell className="max-w-xs">
                     {Array.isArray(o.interested_variants) &&
-                      o.interested_variants.length > 0 ? (
+                    o.interested_variants.length > 0 ? (
                       <div className="text-xs space-y-0.5">
                         {o.interested_variants.map((v, i) => (
                           <div key={i} className="block truncate">
@@ -458,16 +449,19 @@ const OrdersTable = () => {
                   <TableCell>
                     <div className="relative flex items-center gap-2">
                       <span
-                        className={`absolute inline-flex h-2 w-2 rounded-full ${STATUS_COLORS[o.status] || "bg-gray-400"
-                          } opacity-75 animate-ping`}
+                        className={`absolute inline-flex h-2 w-2 rounded-full ${
+                          STATUS_COLORS[o.status] || "bg-gray-400"
+                        } opacity-75 animate-ping`}
                       ></span>
                       <span
-                        className={`relative inline-flex h-2 w-2 rounded-full ${STATUS_COLORS[o.status] || "bg-gray-400"
-                          }`}
+                        className={`relative inline-flex h-2 w-2 rounded-full ${
+                          STATUS_COLORS[o.status] || "bg-gray-400"
+                        }`}
                       ></span>
                       <span
-                        className={`capitalize text-sm font-medium ${STATUS_STYLES[o.status] || "text-gray-700"
-                          }`}
+                        className={`capitalize text-sm font-medium ${
+                          STATUS_STYLES[o.status] || "text-gray-700"
+                        }`}
                       >
                         {o.status}
                       </span>
@@ -480,8 +474,13 @@ const OrdersTable = () => {
                         variant="outline"
                         className="bg-emerald-50 text-emerald-700 border-emerald-200"
                       >
-                        Sí{Number(o.deposit_amount || 0) > 0
-                          ? ` · ${o.deposit_currency === "USD" ? "USD $" : "$"}${Number(o.deposit_amount).toLocaleString("es-AR")}`
+                        Sí
+                        {Number(o.deposit_amount || 0) > 0
+                          ? ` · ${
+                              o.deposit_currency === "USD" ? "USD $" : "$"
+                            }${Number(o.deposit_amount).toLocaleString(
+                              "es-AR"
+                            )}`
                           : ""}
                       </Badge>
                     ) : (
@@ -497,8 +496,9 @@ const OrdersTable = () => {
                           <Badge
                             variant="outline"
                             className={`cursor-pointer ${
-                              PRODUCT_STATUS_COLORS[o.product_status || "en espera"] ||
-                              "bg-gray-100 text-gray-800"
+                              PRODUCT_STATUS_COLORS[
+                                o.product_status || "en espera"
+                              ] || "bg-gray-100 text-gray-800"
                             }`}
                           >
                             {o.product_status || "en espera"}
@@ -526,8 +526,9 @@ const OrdersTable = () => {
                     ) : (
                       <Badge
                         className={
-                          PRODUCT_STATUS_COLORS[o.product_status || "en espera"] ||
-                          "bg-gray-100 text-gray-800"
+                          PRODUCT_STATUS_COLORS[
+                            o.product_status || "en espera"
+                          ] || "bg-gray-100 text-gray-800"
                         }
                       >
                         {o.product_status || "en espera"}
@@ -564,27 +565,25 @@ const OrdersTable = () => {
                             case "pendiente":
                               return (
                                 <>
-                                  {
-                                    (role === "superadmin" ||
-                                      role === "owner") && (
-                                      <>
-                                        <DropdownMenuItem
-                                          onClick={() => handleCreateSale(o)}
-                                        >
-                                          <IconReceipt2 className="mr-2 h-4 w-4" />
-                                          Registrar venta
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                          onClick={() =>
-                                            handleUpdateStatus(o.id, "sin_exito")
-                                          }
-                                        >
-                                          <IconBan className="mr-2 h-4 w-4" />
-                                          Sin éxito (no concretó)
-                                        </DropdownMenuItem>
-                                      </>
-                                    )
-                                  }
+                                  {(role === "superadmin" ||
+                                    role === "owner") && (
+                                    <>
+                                      <DropdownMenuItem
+                                        onClick={() => handleCreateSale(o)}
+                                      >
+                                        <IconReceipt2 className="mr-2 h-4 w-4" />
+                                        Registrar venta
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() =>
+                                          handleUpdateStatus(o.id, "sin_exito")
+                                        }
+                                      >
+                                        <IconBan className="mr-2 h-4 w-4" />
+                                        Sin éxito (no concretó)
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
                                   <DropdownMenuItem
                                     className="text-red-600"
                                     onClick={() =>
@@ -601,7 +600,6 @@ const OrdersTable = () => {
                                     <IconCalendarEvent className="mr-2 h-4 w-4" />
                                     Reprogramar cita
                                   </DropdownMenuItem>
-
                                 </>
                               );
 

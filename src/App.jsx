@@ -21,6 +21,7 @@ import TopSellersPage from "./pages/TopSellersPage";
 import PaymentCalculator from "./pages/PaymentCalculator";
 import SellersPayments from "./pages/SellersPayments";
 import QuickPaymentCalculator from "./pages/QuickPaymentCalculator";
+import ExpensesPage from "./pages/ExpensesPage";
 
 // ⚙️ Configuración
 import ComissionConfig from "./pages/config/ComissionConfig";
@@ -29,6 +30,8 @@ import PaymentMethodsConfig from "./pages/config/PaymentMethodsConfig";
 import SalesChannelsConfig from "./pages/config/SalesChannelsConfig";
 import InventoryConfig from "./pages/config/InventoryConfig";
 import SalesConfig from "./pages/config/SalesConfig";
+import ProvidersConfig from "./pages/config/ProvidersConfig";
+import PurchasesConfig from "./pages/config/PurchasesConfig";
 
 import InstallPromptBanner from "./components/InstallPromptBanner";
 import IOSInstallBanner from "@/components/IOSInstallBanner";
@@ -118,6 +121,7 @@ export default function App() {
               path="quick-payment-calculator"
               element={<QuickPaymentCalculator />}
             />
+            <Route path="expenses" element={<ExpensesPage />} />
 
             {/* ⚙️ CONFIGURACIONES */}
             <Route
@@ -136,6 +140,8 @@ export default function App() {
             />
             <Route path="settings/inventory" element={<InventoryConfig />} />
             <Route path="settings/sales" element={<SalesConfig />} />
+            <Route path="settings/providers" element={<ProvidersConfig />} />
+            <Route path="settings/purchases" element={<PurchasesConfig />} />
           </Route>
 
           {/* 🛍️ VISTA DE VENDEDORES */}

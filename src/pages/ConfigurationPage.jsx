@@ -10,6 +10,8 @@ import {
   IconChartBar,
   IconRoute2,
   IconInfoCircle,
+  IconTruck,
+  IconReceipt,
 } from "@tabler/icons-react";
 
 const ConfigurationPage = () => {
@@ -51,6 +53,18 @@ const ConfigurationPage = () => {
       label: "Ventas",
       icon: <IconChartBar className="h-10 w-10 text-rose-600" />,
       path: "/dashboard/settings/sales",
+    },
+    {
+      id: "providers",
+      label: "Proveedores",
+      icon: <IconTruck className="h-10 w-10 text-slate-600" />,
+      path: "/dashboard/settings/providers",
+    },
+    {
+      id: "purchases",
+      label: "Compras",
+      icon: <IconReceipt className="h-10 w-10 text-emerald-600" />,
+      path: "/dashboard/settings/purchases",
     },
   ];
 

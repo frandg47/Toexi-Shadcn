@@ -1,6 +1,16 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.accounts (
+  id bigint NOT NULL DEFAULT nextval('accounts_id_seq'::regclass),
+  name text NOT NULL,
+  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text])),
+  initial_balance numeric NOT NULL DEFAULT 0,
+  notes text,
+  include_in_balance boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT accounts_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.brands (
   id integer NOT NULL DEFAULT nextval('brands_id_seq'::regclass),
   name text NOT NULL UNIQUE,
@@ -48,6 +58,38 @@ CREATE TABLE public.customers (
   is_active boolean NOT NULL DEFAULT true,
   CONSTRAINT customers_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.expenses (
+  id bigint NOT NULL DEFAULT nextval('expenses_id_seq'::regclass),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  expense_date date NOT NULL,
+  amount numeric NOT NULL,
+  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text])),
+  amount_ars numeric NOT NULL,
+  fx_rate_used numeric,
+  account_id bigint,
+  category text,
+  type text NOT NULL CHECK (type = ANY (ARRAY['fixed'::text, 'variable'::text])),
+  notes text,
+  fixed_expense_id bigint,
+  CONSTRAINT expenses_pkey PRIMARY KEY (id),
+  CONSTRAINT expenses_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id),
+  CONSTRAINT expenses_fixed_expense_id_fkey FOREIGN KEY (fixed_expense_id) REFERENCES public.fixed_expenses(id)
+);
+CREATE TABLE public.fixed_expenses (
+  id bigint NOT NULL DEFAULT nextval('fixed_expenses_id_seq'::regclass),
+  name text NOT NULL,
+  amount numeric NOT NULL,
+  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text])),
+  account_id bigint,
+  category text,
+  due_day integer,
+  notes text,
+  is_active boolean NOT NULL DEFAULT true,
+  last_paid_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT fixed_expenses_pkey PRIMARY KEY (id),
+  CONSTRAINT fixed_expenses_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id)
+);
 CREATE TABLE public.fx_rates (
   id integer NOT NULL DEFAULT nextval('fx_rates_id_seq'::regclass),
   source text,
@@ -72,6 +114,9 @@ CREATE TABLE public.leads (
   sale_id integer UNIQUE,
   interested_variants jsonb,
   product_status character varying DEFAULT 'en espera'::character varying,
+  deposit_paid boolean NOT NULL DEFAULT false,
+  deposit_amount numeric NOT NULL DEFAULT 0,
+  deposit_currency text NOT NULL DEFAULT 'ARS'::text,
   CONSTRAINT leads_pkey PRIMARY KEY (id),
   CONSTRAINT leads_referred_by_fkey FOREIGN KEY (referred_by) REFERENCES public.user_roles(id_auth),
   CONSTRAINT leads_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
