@@ -79,6 +79,12 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     value: 0
   });
 
+  // --- Surcharge ---
+  const [surcharge, setSurcharge] = useState({
+    type: "none", // none | percent | fixed
+    value: 0
+  });
+
 
   // --- Payments (mixto) ---
   const [payments, setPayments] = useState([
@@ -157,6 +163,16 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     }
     return 0;
   }, [discount, baseTotal]);
+
+  const surchargeAmount = useMemo(() => {
+    if (surcharge.type === "percent") {
+      return baseTotal * (surcharge.value / 100);
+    }
+    if (surcharge.type === "fixed") {
+      return surcharge.value;
+    }
+    return 0;
+  }, [surcharge, baseTotal]);
   // pagos sin interés (efectivo/transfer/macro)
   const paidNoInterest = useMemo(() => {
     return payments
@@ -172,9 +188,9 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       .reduce((acc, p) => acc + Number(p.amount || 0), 0);
   }, [payments, paymentInstallments]);
 
-  const totalAfterDiscount = useMemo(() => {
-    return Math.max(baseTotal - discountAmount, 0);
-  }, [baseTotal, discountAmount]);
+  const totalAfterAdjustments = useMemo(() => {
+    return Math.max(baseTotal - discountAmount + surchargeAmount, 0);
+  }, [baseTotal, discountAmount, surchargeAmount]);
 
   // buscar método con interés (si existe)
   const interestMethod = useMemo(() => {
@@ -201,16 +217,16 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
   // saldo después de pagos sin interés
   const saldo = useMemo(() => {
-    return Math.max(totalAfterDiscount - paidNoInterest, 0);
-  }, [totalAfterDiscount, paidNoInterest]);
+    return Math.max(totalAfterAdjustments - paidNoInterest, 0);
+  }, [totalAfterAdjustments, paidNoInterest]);
 
   // total final con recargo
   const totalWithSurcharge = useMemo(() => {
-    if (!interestMethod) return totalAfterDiscount;
+    if (!interestMethod) return totalAfterAdjustments;
 
     const interestPart = saldo * (multiplier - 1);
-    return totalAfterDiscount + interestPart;
-  }, [totalAfterDiscount, saldo, multiplier, interestMethod]);
+    return totalAfterAdjustments + interestPart;
+  }, [totalAfterAdjustments, saldo, multiplier, interestMethod]);
 
   const depositData = useMemo(() => {
     if (!lead?.deposit_paid) {
@@ -266,8 +282,8 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
 
   const subtotalWithSurcharge = useMemo(() => {
-    return totalWithSurcharge + discountAmount;
-  }, [totalWithSurcharge, discountAmount]);
+    return totalWithSurcharge + discountAmount - surchargeAmount;
+  }, [totalWithSurcharge, discountAmount, surchargeAmount]);
 
   const filteredSellers = useMemo(() => {
     const q = searchSeller.trim().toLowerCase();
@@ -688,6 +704,9 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       discount_type: discount.type,
       discount_value: discount.value,
       discount_amount: discountAmount,
+      surcharge_type: surcharge.type,
+      surcharge_value: surcharge.value,
+      surcharge_amount: surchargeAmount,
       deposit_paid: Boolean(lead?.deposit_paid),
       deposit_amount: depositData.amount,
       deposit_currency: depositData.currency,
@@ -1192,6 +1211,47 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                 </div>
               </div>
 
+              <div className="border p-3 rounded-md bg-muted/20 space-y-2">
+                <label className="text-sm font-medium">Recargo</label>
+
+                <div className="flex gap-2">
+                  <Select
+                    value={surcharge.type}
+                    onValueChange={(v) =>
+                      setSurcharge((s) => ({ ...s, type: v, value: 0 }))
+                    }
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-[9999]">
+                      <SelectItem value="none">Sin recargo</SelectItem>
+                      <SelectItem value="percent">Porcentaje (%)</SelectItem>
+                      <SelectItem value="fixed">Monto fijo ($)</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {surcharge.type !== "none" && (
+                    <Input
+                      type="number"
+                      placeholder={
+                        surcharge.type === "percent"
+                          ? "% recargo"
+                          : "$ recargo"
+                      }
+                      value={surcharge.value}
+                      onChange={(e) =>
+                        setSurcharge((s) => ({
+                          ...s,
+                          value: Number(e.target.value),
+                        }))
+                      }
+                      className="flex-1"
+                    />
+                  )}
+                </div>
+              </div>
+
 
               <h3 className="font-medium">Métodos de Pago</h3>
 
@@ -1391,6 +1451,15 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                     <div className="text-muted-foreground">Descuento aplicado:</div>
                     <div className="text-right text-green-600 font-semibold">
                       − {formatARS(discountAmount)}
+                    </div>
+                  </>
+                )}
+
+                {surcharge.type !== "none" && surchargeAmount > 0 && (
+                  <>
+                    <div className="text-muted-foreground">Recargo aplicado:</div>
+                    <div className="text-right text-orange-600 font-semibold">
+                      {formatARS(surchargeAmount)}
                     </div>
                   </>
                 )}

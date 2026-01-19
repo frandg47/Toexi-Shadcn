@@ -28,6 +28,7 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
   // Detectar si hay pagos en USD
   const hasUSDPayments = safeSale.payments.some(p => isUSDMethod(p.method_name));
   const depositAmountUSD = Number(safeSale.deposit_amount || 0);
+  const surchargeAmount = Number(safeSale.surcharge_amount || 0);
   const depositCurrency = safeSale.deposit_currency || "ARS";
   const depositAmount = Number(
     safeSale.deposit_amount_ars ??
@@ -281,6 +282,15 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
       }
     }
 
+    if (surchargeAmount > 0) {
+      doc.text(
+        `Recargo: $ ${surchargeAmount.toLocaleString("es-AR")}`,
+        margin,
+        y
+      );
+      y += 6;
+    }
+
     if (depositAmount > 0) {
       doc.text(
         `Seña aplicada: -$ ${depositAmount.toLocaleString("es-AR")}`,
@@ -434,6 +444,12 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
             {safeSale.discount_amount > 0 && (
               <div className="text-sm text-green-600">
                 Descuento: −${safeSale.discount_amount.toLocaleString("es-AR")}
+              </div>
+            )}
+
+            {surchargeAmount > 0 && (
+              <div className="text-sm text-orange-600">
+                Recargo: ${surchargeAmount.toLocaleString("es-AR")}
               </div>
             )}
 

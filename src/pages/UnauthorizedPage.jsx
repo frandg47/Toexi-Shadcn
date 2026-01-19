@@ -17,9 +17,9 @@ export default function UnauthorizedPage() {
       </div>
       <div className="flex flex-wrap justify-center gap-3">
         <Button onClick={() => navigate(-1)}>Volver atras</Button>
-        <Button variant="outline" onClick={() => navigate(fromPath, { replace: true })}>
+        {/* <Button variant="outline" onClick={() => navigate(fromPath, { replace: true })}>
           Ir al inicio
-        </Button>
+        </Button> */}
       </div>
     </div>
   );

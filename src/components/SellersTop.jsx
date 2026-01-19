@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { IconTrendingUp } from "@tabler/icons-react";
 import ConcentricLoader from "./ui/loading";
+import { formatPersonName } from "@/utils/formatName";
 import {
   Select,
   SelectTrigger,
@@ -124,7 +125,7 @@ export default function SellersTop({ role }) {
       if (!sellerData[sale.seller_id]) {
         sellerData[sale.seller_id] = {
           seller_id: sale.seller_id,
-          seller_name: `${seller.name} ${seller.last_name || ''}`.trim(),
+          seller_name: formatPersonName(seller.name, seller.last_name),
           avatar_url: seller.avatar_url,
           total_sales: 0,
         };
@@ -176,7 +177,7 @@ export default function SellersTop({ role }) {
       if (!commissionsByVendor[payment.seller_id]) {
         commissionsByVendor[payment.seller_id] = {
           seller_id: payment.seller_id,
-          seller_name: `${seller.name} ${seller.last_name || ''}`.trim(),
+          seller_name: formatPersonName(seller.name, seller.last_name),
           avatar_url: seller.avatar_url,
           total_commission: 0,
         };

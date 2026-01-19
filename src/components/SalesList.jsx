@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContextProvider";
 import { supabase } from "@/lib/supabaseClient";
+import { formatPersonName } from "@/utils/formatName";
 import {
     Dialog,
     DialogContent,
@@ -642,13 +643,13 @@ export function SalesList() {
                         {/* Cliente y vendedor */}
                         <div className="text-sm mb-3">
                             <p>
-                                <strong>Cliente:</strong> {s.customer_name}{" "}
-                                {s.customer_last_name}
+                                <strong>Cliente:</strong>{" "}
+                                {formatPersonName(s.customer_name, s.customer_last_name)}
                                 <strong>{" | "}Tel:</strong> {" "} {s.customer_phone ?? "-"}
                             </p>
                             <p>
-                                <strong>Vendedor:</strong> {s.seller_name}{" "}
-                                {s.seller_last_name}
+                                <strong>Vendedor:</strong>{" "}
+                                {formatPersonName(s.seller_name, s.seller_last_name)}
                                 <strong>{" | "}Tel:</strong> {" "} {s.seller_phone ?? "3816783617"}
                             </p>
                         </div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { supabase } from "../lib/supabaseClient";
+import { formatPersonName } from "@/utils/formatName";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -72,7 +73,7 @@ const formatDate = (value) => {
 
 const buildFullName = (user) => {
     if (!user?.name && !user?.last_name) return "Sin nombre";
-    return [user?.name, user?.last_name].filter(Boolean).join(" ");
+    return formatPersonName(user?.name, user?.last_name);
 };
 
 const getInitials = (user) => {
