@@ -46,6 +46,12 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 const TABLE_COLUMNS = [
     { id: "avatar", label: "Avatar" },
@@ -143,6 +149,99 @@ const SellersTable = ({ refreshToken = 0 }) => {
         open: false,
         paymentRecord: null,
     });
+    const [salesDialogOpen, setSalesDialogOpen] = useState(false);
+    const [salesDialogTitle, setSalesDialogTitle] = useState("");
+    const [salesDialogItems, setSalesDialogItems] = useState([]);
+
+    const loadSalesForSeller = useCallback(
+        async (sellerId, sellerName, periodStart, periodEnd) => {
+            if (!sellerId || !periodStart || !periodEnd) {
+                setSalesDialogItems([]);
+                setSalesDialogTitle(sellerName || "Ventas");
+                setSalesDialogOpen(true);
+                return;
+            }
+
+            const { data: sales, error } = await supabase
+                .from("sales")
+                .select(
+                    "id, sale_date, total_ars, customers(name, last_name), sales_channels(name)"
+                )
+                .eq("seller_id", sellerId)
+                .gte("sale_date", periodStart)
+                .lte("sale_date", periodEnd)
+                .neq("status", "anulado")
+                .order("sale_date", { ascending: false });
+
+            if (error) {
+                console.error(error);
+                setSalesDialogItems([]);
+                setSalesDialogTitle(sellerName || "Ventas");
+                setSalesDialogOpen(true);
+                return;
+            }
+
+            const saleIds = (sales || []).map((sale) => sale.id).filter(Boolean);
+
+            if (saleIds.length === 0) {
+                setSalesDialogItems(sales || []);
+                setSalesDialogTitle(sellerName || "Ventas");
+                setSalesDialogOpen(true);
+                return;
+            }
+
+            const { data: items, error: itemsError } = await supabase
+                .from("sale_items")
+                .select(
+                    "sale_id, quantity, usd_price, product_name, variant_name, commission_pct, commission_fixed"
+                )
+                .in("sale_id", saleIds);
+
+            if (itemsError) {
+                console.error(itemsError);
+            }
+
+            const saleItemsMap = {};
+            const saleCommissionMap = {};
+
+            (items || []).forEach((item) => {
+                const qty = Number(item.quantity || 0);
+                const usdPrice = Number(item.usd_price || 0);
+                const pct = item.commission_pct;
+                const fixed = item.commission_fixed;
+                let itemCommission = 0;
+
+                if (pct != null) {
+                    itemCommission = usdPrice * qty * (Number(pct) / 100);
+                } else if (fixed != null) {
+                    itemCommission = Number(fixed) * qty;
+                }
+
+                if (!saleItemsMap[item.sale_id]) {
+                    saleItemsMap[item.sale_id] = [];
+                }
+                saleItemsMap[item.sale_id].push({
+                    name: item.product_name || "Producto",
+                    variant: item.variant_name || "",
+                    quantity: qty,
+                });
+
+                saleCommissionMap[item.sale_id] =
+                    (saleCommissionMap[item.sale_id] || 0) + itemCommission;
+            });
+
+            const salesWithDetails = (sales || []).map((sale) => ({
+                ...sale,
+                items: saleItemsMap[sale.id] || [],
+                commission_usd: saleCommissionMap[sale.id] || 0,
+            }));
+
+            setSalesDialogItems(salesWithDetails);
+            setSalesDialogTitle(sellerName || "Ventas");
+            setSalesDialogOpen(true);
+        },
+        []
+    );
 
     const fetchSellers = useCallback(async (showSkeleton = false) => {
         if (showSkeleton) {
@@ -426,7 +525,18 @@ const SellersTable = ({ refreshToken = 0 }) => {
 
                         {!loading &&
                             filteredSellers.map((payment) => (
-                                <TableRow key={payment.id}>
+                                <TableRow
+                                    key={payment.id}
+                                    className="cursor-pointer"
+                                    onClick={() =>
+                                        loadSalesForSeller(
+                                            payment.seller.id_auth,
+                                            buildFullName(payment.seller),
+                                            payment.period_start,
+                                            payment.period_end
+                                        )
+                                    }
+                                >
                                     {visibleColumns.includes("avatar") && (
                                         <TableCell className="w-auto">
                                             <Avatar className="h-12 w-12">
@@ -478,7 +588,15 @@ const SellersTable = ({ refreshToken = 0 }) => {
                                                 size="sm"
                                                 variant={payment.isPaid ? "secondary" : "default"}
                                                 className="flex items-center gap-2"
-                                                onClick={() => !payment.isPaid && setPaymentDialog({ open: true, paymentRecord: payment })}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    if (!payment.isPaid) {
+                                                        setPaymentDialog({
+                                                            open: true,
+                                                            paymentRecord: payment,
+                                                        });
+                                                    }
+                                                }}
                                                 disabled={refreshing || payment.isPaid}
                                             >
                                                 <IconCreditCard className="h-4 w-4" />
@@ -536,6 +654,74 @@ const SellersTable = ({ refreshToken = 0 }) => {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <Dialog open={salesDialogOpen} onOpenChange={setSalesDialogOpen}>
+                <DialogContent className="w-[90vw] sm:max-w-3xl max-h-[85svh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>{salesDialogTitle}</DialogTitle>
+                    </DialogHeader>
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Fecha</TableHead>
+                                    <TableHead>Cliente</TableHead>
+                                    <TableHead>Productos</TableHead>
+                                    <TableHead>Canal</TableHead>
+                                    <TableHead className="text-right">Comisión</TableHead>
+                                    <TableHead className="text-right">Total</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {salesDialogItems.map((sale) => (
+                                    <TableRow key={sale.id}>
+                                        <TableCell>
+                                            {new Date(sale.sale_date).toLocaleDateString("es-AR")}
+                                        </TableCell>
+                                        <TableCell>
+                                            {sale.customers
+                                                ? formatPersonName(
+                                                    sale.customers.name,
+                                                    sale.customers.last_name
+                                                )
+                                                : "Sin cliente"}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="space-y-1 text-xs text-muted-foreground">
+                                                {sale.items?.length
+                                                    ? sale.items.map((item, index) => (
+                                                        <div key={`${sale.id}-item-${index}`}>
+                                                            {item.name}
+                                                            {item.variant ? ` (${item.variant})` : ""} x{item.quantity}
+                                                        </div>
+                                                    ))
+                                                    : "Sin productos"}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>{sale.sales_channels?.name || "-"}</TableCell>
+                                        <TableCell className="text-right">
+                                            {formatCurrencyUSD(sale.commission_usd || 0)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {Number(sale.total_ars || 0).toLocaleString("es-AR")}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {salesDialogItems.length === 0 && (
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={6}
+                                            className="text-center text-muted-foreground"
+                                        >
+                                            No hay ventas en el periodo seleccionado.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

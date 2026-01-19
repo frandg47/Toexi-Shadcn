@@ -53,38 +53,6 @@ const formatCurrencyUSD = (value) =>
     ? "-"
     : currencyFormatterUSD.format(value);
 
-const getCommissionForProduct = (product, rules) => {
-  if (!product) {
-    return { pct: null, fixed: null };
-  }
-
-  if (product.commission_pct !== null || product.commission_fixed !== null) {
-    return {
-      pct: product.commission_pct,
-      fixed: product.commission_fixed,
-    };
-  }
-
-  const applicable = rules.filter(
-    (r) =>
-      (r.brand_id && r.brand_id === product.brand_id) ||
-      (r.category_id && r.category_id === product.category_id)
-  );
-
-  if (applicable.length === 0) {
-    return { pct: null, fixed: null };
-  }
-
-  const bestRule = applicable.reduce((a, b) =>
-    a.priority < b.priority ? a : b
-  );
-
-  return {
-    pct: bestRule.commission_pct,
-    fixed: bestRule.commission_fixed,
-  };
-};
-
 // ------------------------------
 // COMPONENTE GENERAL
 // ------------------------------
@@ -247,20 +215,15 @@ export default function SellersTop({ role }) {
       if (saleIds.length === 0) {
         setSalesDialogItems(sales || []);
       } else {
-        const [itemsRes, rulesRes] = await Promise.all([
+        const [itemsRes] = await Promise.all([
           supabase
             .from("sale_items")
             .select(
-              "sale_id, quantity, usd_price, product_name, variant_name, product_variants(product_id, products(brand_id, category_id, commission_pct, commission_fixed))"
+              "sale_id, quantity, usd_price, product_name, variant_name, commission_pct, commission_fixed"
             )
             .in("sale_id", saleIds),
-          supabase
-            .from("commission_rules")
-            .select("id, category_id, brand_id, commission_pct, commission_fixed, priority")
-            .order("priority"),
         ]);
 
-        const rules = rulesRes?.data || [];
         const items = itemsRes?.data || [];
         const saleItemsMap = {};
         const saleCommissionMap = {};
@@ -268,8 +231,10 @@ export default function SellersTop({ role }) {
         items.forEach((item) => {
           const qty = Number(item.quantity || 0);
           const usdPrice = Number(item.usd_price || 0);
-          const product = item.product_variants?.products || null;
-          const commission = getCommissionForProduct(product, rules);
+          const commission = {
+            pct: item.commission_pct,
+            fixed: item.commission_fixed,
+          };
           let itemCommission = 0;
 
           if (commission.pct != null) {
