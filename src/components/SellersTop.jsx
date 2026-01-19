@@ -15,6 +15,20 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const getMonthName = (dateString) => {
   if (!dateString) return "-";
@@ -29,6 +43,48 @@ const getMonthName = (dateString) => {
   }
 };
 
+const currencyFormatterUSD = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
+const formatCurrencyUSD = (value) =>
+  value == null || Number.isNaN(Number(value))
+    ? "-"
+    : currencyFormatterUSD.format(value);
+
+const getCommissionForProduct = (product, rules) => {
+  if (!product) {
+    return { pct: null, fixed: null };
+  }
+
+  if (product.commission_pct !== null || product.commission_fixed !== null) {
+    return {
+      pct: product.commission_pct,
+      fixed: product.commission_fixed,
+    };
+  }
+
+  const applicable = rules.filter(
+    (r) =>
+      (r.brand_id && r.brand_id === product.brand_id) ||
+      (r.category_id && r.category_id === product.category_id)
+  );
+
+  if (applicable.length === 0) {
+    return { pct: null, fixed: null };
+  }
+
+  const bestRule = applicable.reduce((a, b) =>
+    a.priority < b.priority ? a : b
+  );
+
+  return {
+    pct: bestRule.commission_pct,
+    fixed: bestRule.commission_fixed,
+  };
+};
+
 // ------------------------------
 // COMPONENTE GENERAL
 // ------------------------------
@@ -36,6 +92,9 @@ export default function SellersTop({ role }) {
   const [topSales, setTopSales] = useState([]);
   const [topCommission, setTopCommission] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [salesDialogOpen, setSalesDialogOpen] = useState(false);
+  const [salesDialogTitle, setSalesDialogTitle] = useState("");
+  const [salesDialogItems, setSalesDialogItems] = useState([]);
   const [monthFilter, setMonthFilter] = useState(() => {
     const now = new Date();
     // Defecto: último día del mes actual
@@ -44,6 +103,13 @@ export default function SellersTop({ role }) {
       .split("T")[0];
   });
   const [availableMonths, setAvailableMonths] = useState([]);
+
+  const handleBarClick = (data) => {
+    const sellerId = data?.payload?.seller_id ?? data?.seller_id;
+    const sellerName = data?.payload?.seller_name ?? data?.seller_name;
+    if (!sellerId) return;
+    loadSalesForSeller(sellerId, sellerName);
+  };
 
   // Responsive row height
   const getRowHeight = () => {
@@ -141,6 +207,102 @@ export default function SellersTop({ role }) {
     }));
 
     setTopSales(formatted);
+  };
+
+  const loadSalesForSeller = async (sellerId, sellerName) => {
+    const { data: periodData } = await supabase
+      .from("commission_payments")
+      .select("period_start, period_end")
+      .eq("period_end", monthFilter)
+      .limit(1)
+      .single();
+
+    const periodStart = periodData?.period_start || null;
+    const periodEnd = periodData?.period_end || null;
+
+    if (!periodStart || !periodEnd) {
+      setSalesDialogItems([]);
+      setSalesDialogTitle(sellerName || "Ventas");
+      setSalesDialogOpen(true);
+      return;
+    }
+
+    const { data: sales, error } = await supabase
+      .from("sales")
+      .select(
+        "id, sale_date, total_ars, customers(name, last_name), sales_channels(name)"
+      )
+      .eq("seller_id", sellerId)
+      .gte("sale_date", periodStart)
+      .lte("sale_date", periodEnd)
+      .neq("status", "anulado")
+      .order("sale_date", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      setSalesDialogItems([]);
+    } else {
+      const saleIds = (sales || []).map((sale) => sale.id).filter(Boolean);
+
+      if (saleIds.length === 0) {
+        setSalesDialogItems(sales || []);
+      } else {
+        const [itemsRes, rulesRes] = await Promise.all([
+          supabase
+            .from("sale_items")
+            .select(
+              "sale_id, quantity, usd_price, product_name, variant_name, product_variants(product_id, products(brand_id, category_id, commission_pct, commission_fixed))"
+            )
+            .in("sale_id", saleIds),
+          supabase
+            .from("commission_rules")
+            .select("id, category_id, brand_id, commission_pct, commission_fixed, priority")
+            .order("priority"),
+        ]);
+
+        const rules = rulesRes?.data || [];
+        const items = itemsRes?.data || [];
+        const saleItemsMap = {};
+        const saleCommissionMap = {};
+
+        items.forEach((item) => {
+          const qty = Number(item.quantity || 0);
+          const usdPrice = Number(item.usd_price || 0);
+          const product = item.product_variants?.products || null;
+          const commission = getCommissionForProduct(product, rules);
+          let itemCommission = 0;
+
+          if (commission.pct != null) {
+            itemCommission = usdPrice * qty * (Number(commission.pct) / 100);
+          } else if (commission.fixed != null) {
+            itemCommission = Number(commission.fixed) * qty;
+          }
+
+          if (!saleItemsMap[item.sale_id]) {
+            saleItemsMap[item.sale_id] = [];
+          }
+          saleItemsMap[item.sale_id].push({
+            name: item.product_name || "Producto",
+            variant: item.variant_name || "",
+            quantity: qty,
+          });
+
+          saleCommissionMap[item.sale_id] =
+            (saleCommissionMap[item.sale_id] || 0) + itemCommission;
+        });
+
+        const salesWithDetails = (sales || []).map((sale) => ({
+          ...sale,
+          items: saleItemsMap[sale.id] || [],
+          commission_usd: saleCommissionMap[sale.id] || 0,
+        }));
+
+        setSalesDialogItems(salesWithDetails);
+      }
+    }
+
+    setSalesDialogTitle(sellerName || "Ventas");
+    setSalesDialogOpen(true);
   };
 
   // --------------------------
@@ -344,7 +506,11 @@ export default function SellersTop({ role }) {
                 }
               />
 
-              <Bar dataKey="total_sales" radius={6} />
+              <Bar
+                dataKey="total_sales"
+                radius={6}
+                onClick={handleBarClick}
+              />
             </BarChart>
           </ChartContainer>
         </CardContent>
@@ -411,7 +577,11 @@ export default function SellersTop({ role }) {
                 }
               />
 
-              <Bar dataKey="total_commission" radius={6} />
+              <Bar
+                dataKey="total_commission"
+                radius={6}
+                onClick={handleBarClick}
+              />
             </BarChart>
           </ChartContainer>
         </CardContent>
@@ -428,6 +598,71 @@ export default function SellersTop({ role }) {
           </div>
         </CardFooter>
       </Card>
+
+      <Dialog open={salesDialogOpen} onOpenChange={setSalesDialogOpen}>
+        <DialogContent className="w-[90vw] sm:max-w-3xl max-h-[85svh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{salesDialogTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Productos</TableHead>
+                  <TableHead>Canal</TableHead>
+                  <TableHead className="text-right">Comisión</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {salesDialogItems.map((sale) => (
+                  <TableRow key={sale.id}>
+                    <TableCell>
+                      {new Date(sale.sale_date).toLocaleDateString("es-AR")}
+                    </TableCell>
+                    <TableCell>
+                      {sale.customers
+                        ? formatPersonName(
+                            sale.customers.name,
+                            sale.customers.last_name
+                          )
+                        : "Sin cliente"}
+                      </TableCell>
+                    <TableCell>
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        {sale.items?.length
+                          ? sale.items.map((item, index) => (
+                              <div key={`${sale.id}-item-${index}`}>
+                                {item.name}
+                                {item.variant ? ` (${item.variant})` : ""} x{item.quantity}
+                              </div>
+                            ))
+                          : "Sin productos"}
+                      </div>
+                    </TableCell>
+                    <TableCell>{sale.sales_channels?.name || "-"}</TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrencyUSD(sale.commission_usd || 0)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {Number(sale.total_ars || 0).toLocaleString("es-AR")}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {salesDialogItems.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      No hay ventas en el periodo seleccionado.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
