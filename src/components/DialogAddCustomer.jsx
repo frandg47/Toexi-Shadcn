@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { formatNamePart } from "@/utils/formatName";
 
 // ✅ Esquema de validación con Yup
 const schema = yup.object({
@@ -68,10 +69,15 @@ export default function DialogAddCustomer({ open, onClose, onSuccess }) {
 
   const onSubmit = async (values) => {
     try {
+      const formattedValues = {
+        ...values,
+        name: formatNamePart(values.name),
+        last_name: formatNamePart(values.last_name),
+      };
       // Insertar y devolver el registro recién creado
       const { data, error } = await supabase
         .from("customers")
-        .insert([{ ...values, is_active: true }])
+        .insert([{ ...formattedValues, is_active: true }])
         .select()
         .single(); // 👈 esto devuelve un solo objeto, no un array
 

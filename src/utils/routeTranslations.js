@@ -14,6 +14,7 @@ export const ROUTE_TRANSLATIONS = {
   "s-payments": "Pagos a Vendedores",
   "my-sales": "Mis Ventas",
   "quick-payment-calculator": "Cotizador",
+  expenses: "Gastos",
 
   // ⚙️ Configuración
   settings: "Configuraciones",
@@ -23,4 +24,7 @@ export const ROUTE_TRANSLATIONS = {
   inventory: "Inventario",
   sales: "Ventas",
   "sales-channels": "Canales de Venta",
+  providers: "Proveedores",
+  purchases: "Compras",
+  accounts: "Cuentas",
 };

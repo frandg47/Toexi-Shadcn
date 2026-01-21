@@ -22,3 +22,12 @@ export const formatPersonName = (firstName, lastName) => {
     .map((token) => formatToken(token))
     .join(" ");
 };
+
+export const formatNamePart = (value = "") => {
+  const cleaned = normalizeSpacing(value);
+  if (!cleaned) return "";
+  return cleaned
+    .split(" ")
+    .map((token) => formatToken(token))
+    .join(" ");
+};

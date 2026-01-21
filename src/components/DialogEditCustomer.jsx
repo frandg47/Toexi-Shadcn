@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch"; // 🔹 AGREGADO
+import { formatNamePart } from "@/utils/formatName";
 
 // ✅ Esquema de validación
 const schema = yup.object({
@@ -104,10 +105,14 @@ export default function DialogEditCustomer({
   // 🔹 Guardar cambios
   const onSubmit = async (values) => {
     try {
-      const { id, ...cleanValues } = values;
+      const formattedValues = {
+        ...values,
+        name: formatNamePart(values.name),
+        last_name: formatNamePart(values.last_name),
+      };
       const { error } = await supabase
         .from("customers")
-        .update({ ...cleanValues, is_active: isActive }) // 🔹 Se actualiza junto con el resto
+        .update({ ...formattedValues, is_active: isActive }) // 🔹 Se actualiza junto con el resto
         .eq("id", customerId);
 
       if (error) throw error;

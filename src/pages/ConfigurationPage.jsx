@@ -12,6 +12,7 @@ import {
   IconInfoCircle,
   IconTruck,
   IconReceipt,
+  IconBuildingBank,
 } from "@tabler/icons-react";
 
 const ConfigurationPage = () => {
@@ -65,6 +66,12 @@ const ConfigurationPage = () => {
       label: "Compras",
       icon: <IconReceipt className="h-10 w-10 text-emerald-600" />,
       path: "/dashboard/settings/purchases",
+    },
+    {
+      id: "accounts",
+      label: "Cuentas",
+      icon: <IconBuildingBank className="h-10 w-10 text-indigo-600" />,
+      path: "/dashboard/settings/accounts",
     },
   ];
 

@@ -139,6 +139,32 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
     product: null,
   });
 
+  // Estado para ordenamiento de columnas
+  const [sortBy, setSortBy] = useState(null); // id de columna
+  const [sortDir, setSortDir] = useState("asc"); // "asc" | "desc"
+
+  const handleSortChange = useCallback(
+    (col) => {
+      setSortBy((current) => {
+        if (current !== col) {
+          setSortDir("asc");
+          return col;
+        }
+
+        // mismo encabezado: ciclo asc -> desc -> sin orden
+        if (sortDir === "asc") {
+          setSortDir("desc");
+          return current;
+        }
+
+        // si ya estaba en desc, quitar orden (volver al default)
+        setSortDir("asc");
+        return null;
+      });
+    },
+    [sortDir]
+  );
+
   const fetchProducts = useCallback(async (showSkeleton = false) => {
     if (showSkeleton) setLoading(true);
     else setRefreshing(true);
@@ -335,8 +361,9 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
         await fetchProducts(false);
 
         toast.success("Estado actualizado", {
-          description: `${product.name} ahora está ${!product.active ? "activo" : "inactivo"
-            }.`,
+          description: `${product.name} ahora está ${
+            !product.active ? "activo" : "inactivo"
+          }.`,
         });
       } catch (error) {
         console.error(error);
@@ -403,7 +430,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return products.filter((p) => {
+    const filtered = products.filter((p) => {
       if (isSellerView && !p.active) return false;
       const matchesSearch =
         !term ||
@@ -415,18 +442,40 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
         !selectedCategory || p.category_id === parseInt(selectedCategory);
       return matchesSearch && matchesBrand && matchesCategory;
     });
-  }, [products, searchTerm, selectedBrand, selectedCategory]);
+
+    const dir = sortDir === "asc" ? 1 : -1;
+
+    const compareValues = (a, b, col) => {
+      if (col === "name") return a.name.localeCompare(b.name) * dir;
+      if (col === "brand") return a.brandName.localeCompare(b.brandName) * dir;
+      if (col === "stock") return (Number(a.stock) - Number(b.stock)) * dir;
+      if (col === "commission") {
+        const va = a.commissionPct ?? a.commissionFixed ?? 0;
+        const vb = b.commissionPct ?? b.commissionFixed ?? 0;
+        return (Number(va) - Number(vb)) * dir;
+      }
+      return a.name.localeCompare(b.name) * dir;
+    };
+
+    const sorted = filtered.slice().sort((a, b) => {
+      // Priorizar activos: si difieren, activo primero
+      if (a.active !== b.active) return a.active ? -1 : 1;
+
+      // Si hay una columna seleccionada, aplicar orden adicional
+      if (sortBy) return compareValues(a, b, sortBy);
+
+      // Default: nombre asc
+      return a.name.localeCompare(b.name);
+    });
+
+    return sorted;
+  }, [products, searchTerm, selectedBrand, selectedCategory, isSellerView, sortBy, sortDir]);
 
   return (
     <TooltipProvider>
       <div className="gap-4">
         {/* 🔹 Filtros y acciones (SIN CAMBIOS) */}
-        <div
-          className="
-    flex flex-col gap-3
-    xl:flex-row xl:items-center xl:justify-between
-  "
-        >
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           {/* 🟩 FILA 1 (sm–lg: full width, xl: queda a la izquierda) */}
           <Input
             placeholder="Buscar por producto o marca..."
@@ -436,14 +485,9 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
           />
 
           {/* Contenedor de filtros + botones (stack en sm–lg, inline en xl) */}
-          <div
-            className="flex flex-col gap-3 w-full xl:flex-row xl:items-center xl:justify-end"
-          >
-
+          <div className="flex flex-col gap-3 w-full xl:flex-row xl:items-center xl:justify-end">
             {/* 🟦 FILA 2 — Filtros (marca + categoría) */}
-            <div
-              className="flex flex-wrap gap-2 justify-end w-full"
-            >
+            <div className="flex flex-wrap gap-2 justify-end w-full">
               <Select
                 value={selectedBrand || "all"}
                 onValueChange={(v) => setSelectedBrand(v === "all" ? "" : v)}
@@ -500,7 +544,9 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
 
               {!isSellerView && (
                 <Button
-                  onClick={() => setProductDialog({ open: true, product: null })}
+                  onClick={() =>
+                    setProductDialog({ open: true, product: null })
+                  }
                   className="flex items-center gap-1"
                 >
                   <IconPlus className="h-4 w-4" />
@@ -510,7 +556,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
             </div>
           </div>
         </div>
-
 
         {/* 🔹 NUEVO: Vista tipo CARD para móviles */}
         <div className="mt-2 block md:hidden">
@@ -565,7 +610,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                       </span>
                     )}
 
-
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div className="flex items-center gap-1">
@@ -576,8 +620,8 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                             {p.commissionPct
                               ? formatPercentage(p.commissionPct)
                               : p.commissionFixed
-                                ? formatCurrencyUSD(p.commissionFixed)
-                                : "-"}
+                              ? formatCurrencyUSD(p.commissionFixed)
+                              : "-"}
                           </span>
                           <IconInfoCircle className="h-4 w-4 text-muted-foreground" />
                         </div>
@@ -644,7 +688,26 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                     !(isSellerView && c.id === "actions") &&
                     c.id !== "usd_price" // ❌ se elimina la columna de precio
                 ).map((c) => (
-                  <TableHead key={c.id}>{c.label}</TableHead>
+                  <TableHead key={c.id}>
+                    {(c.id === "actions" || c.id === "image") ? (
+                      c.label
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSortChange(c.id);
+                        }}
+                        className="flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>{c.label}</span>
+                        {sortBy === c.id && (
+                          <span aria-hidden className="text-xs">
+                            {sortDir === "asc" ? " ▲" : " ▼"}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  </TableHead>
                 ))}
               </TableRow>
             </TableHeader>
@@ -723,7 +786,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                       </TableCell>
                     )}
 
-
                     {/* ❌ Se elimina el precio USD y ARS */}
                     <TableCell>
                       <Tooltip>
@@ -733,8 +795,8 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                               {p.commissionPct
                                 ? formatPercentage(p.commissionPct)
                                 : p.commissionFixed
-                                  ? formatCurrencyUSD(p.commissionFixed)
-                                  : "-"}
+                                ? formatCurrencyUSD(p.commissionFixed)
+                                : "-"}
                             </span>
                             <IconInfoCircle className="h-4 w-4 text-muted-foreground" />
                           </div>

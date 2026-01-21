@@ -32,6 +32,7 @@ import InventoryConfig from "./pages/config/InventoryConfig";
 import SalesConfig from "./pages/config/SalesConfig";
 import ProvidersConfig from "./pages/config/ProvidersConfig";
 import PurchasesConfig from "./pages/config/PurchasesConfig";
+import AccountsConfig from "./pages/config/AccountsConfig";
 
 import InstallPromptBanner from "./components/InstallPromptBanner";
 import IOSInstallBanner from "@/components/IOSInstallBanner";
@@ -142,6 +143,7 @@ export default function App() {
             <Route path="settings/sales" element={<SalesConfig />} />
             <Route path="settings/providers" element={<ProvidersConfig />} />
             <Route path="settings/purchases" element={<PurchasesConfig />} />
+            <Route path="settings/accounts" element={<AccountsConfig />} />
           </Route>
 
           {/* 🛍️ VISTA DE VENDEDORES */}
