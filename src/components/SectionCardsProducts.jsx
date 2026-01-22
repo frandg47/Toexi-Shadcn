@@ -15,30 +15,30 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { IconHomeDollar, IconDatabase } from "@tabler/icons-react";
+import { IconHomeDollar, IconUserCheck, IconUsers } from "@tabler/icons-react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 
 export default function SectionCardsProducts() {
   const COLORS = [
-    "#FFB74D", // naranja medio claro
-    "#FFA726", // naranja brillante estándar
-    "#FB8C00", // naranja intenso
-    "#F57C00", // naranja oscuro
-    "#EF6C00", // naranja tostado
-    "#E65100", // naranja quemado
-    "#D84315", // naranja rojizo
-    "#FFE0B2", // naranja muy claro (suave, para áreas grandes)
-    "#BF360C", // naranja profundo
-    "#A23E12", // terracota oscuro (buen contraste con blanco)
+    "#A7F3D0",
+    "#6EE7B7",
+    "#34D399",
+    "#10B981",
+    "#059669",
+    "#047857",
+    "#065F46",
+    "#D1FAE5",
+    "#22C55E",
+    "#16A34A",
   ];
 
   const [fxRate, setFxRate] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [rateDiff, setRateDiff] = useState(null);
   const [categoriesData, setCategoriesData] = useState([]);
-  const [totalProducts, setTotalProducts] = useState(0);
-  const [totalStock, setTotalStock] = useState(0); // 🟢 nuevo estado
+  const [activeSellersCount, setActiveSellersCount] = useState(0);
+  const [sellersWithSalesCount, setSellersWithSalesCount] = useState(0); // 🟢 nuevo estado
   const [loading, setLoading] = useState(false);
 
   const fetchDashboardData = useCallback(async () => {
@@ -82,6 +82,10 @@ export default function SectionCardsProducts() {
         setRateDiff(null);
       }
 
+      const now = new Date();
+      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
       // 3️⃣ Traer categorías
       const { data: categories, error: catError } = await supabase
         .from("categories")
@@ -112,21 +116,30 @@ export default function SectionCardsProducts() {
       });
 
       setCategoriesData(counts);
-      setTotalProducts(counts.reduce((sum, c) => sum + (c.value || 0), 0));
 
-      // 6️⃣ Calcular el total de stock de todas las variantes
-      const { data: stockResult, error: stockError } = await supabase
-        .from("product_variants")
-        .select("stock", { count: "exact" });
+      // 6) Vendedores activos
+      const { count: activeSellersCount } = await supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "seller")
+        .eq("is_active", true);
 
-      if (stockError) throw stockError;
+      setActiveSellersCount(activeSellersCount || 0);
 
-      // Supabase no hace SUM directamente, así que sumamos manualmente:
-      const stockSum = stockResult?.reduce(
-        (acc, item) => acc + (item.stock || 0),
-        0
+      // 7) Vendedores con ventas en el mes actual
+      const { data: sales, error: salesError } = await supabase
+        .from("sales")
+        .select("seller_id, sale_date, status")
+        .gte("sale_date", periodStart.toISOString())
+        .lte("sale_date", periodEnd.toISOString())
+        .eq("status", "vendido");
+
+      if (salesError) throw salesError;
+
+      const sellersWithSales = new Set(
+        (sales || []).map((s) => s.seller_id).filter(Boolean)
       );
-      setTotalStock(stockSum || 0);
+      setSellersWithSalesCount(sellersWithSales.size);
     } catch (err) {
       console.error(err);
       toast.error("Error al cargar datos", {
@@ -198,44 +211,38 @@ export default function SectionCardsProducts() {
         </Card>
 
         <div className="flex gap-4">
-          {/* Card 2: Total de productos */}
+          {/* Card 2: Vendedores activos */}
           <Card className="flex-1 flex flex-col justify-between relative">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                <IconDatabase className="text-blue-500" />
-                Productos
+                <IconUsers className="text-emerald-600" />
+                Vendedores activos
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {loading ? "-" : totalProducts}
+                {loading ? "-" : activeSellersCount}
               </div>
               <div className="mt-1 text-sm text-muted-foreground">
-                Unidades ofrecidas en tienda
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                Incluye todas las variantes de los productos
+                Usuarios habilitados para vender
               </div>
             </CardContent>
           </Card>
 
-          {/* Card 3: Total de stock */}
+          {/* Card 3: Vendieron este mes */}
           <Card className="flex-1 flex flex-col justify-between relative">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                <IconDatabase className="text-amber-500" />
-                Stock
+                <IconUserCheck className="text-green-600" />
+                Vendieron este mes
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {loading ? "-" : totalStock}
+                {loading ? "-" : sellersWithSalesCount}
               </div>
               <div className="mt-1 text-sm text-muted-foreground">
-                Unidades disponibles en tienda
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                Suma total de todas las distintas variantes
+                Vendedores con ventas registradas
               </div>
             </CardContent>
           </Card>

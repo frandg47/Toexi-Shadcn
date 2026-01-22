@@ -535,7 +535,18 @@ export default function PaymentCalculator() {
                                     <Button
                                         variant="outline"
                                         size="sm"
+                                        disabled={
+                                            !p.payment_method_id ||
+                                            (getInstallmentsForMethod(p.payment_method_id).length > 0 &&
+                                                !p.installments)
+                                        }
                                         onClick={() => {
+                                            if (
+                                                !p.payment_method_id ||
+                                                (getInstallmentsForMethod(p.payment_method_id).length > 0 &&
+                                                    !p.installments)
+                                            )
+                                                return;
                                             setPayments((prev) =>
                                                 prev.map((row, idx) =>
                                                     idx === i ? { ...row, amount: String(remainingARS) } : row

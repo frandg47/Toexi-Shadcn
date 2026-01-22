@@ -685,7 +685,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
               <TableRow>
                 {TABLE_COLUMNS.filter(
                   (c) =>
-                    !(isSellerView && c.id === "actions") &&
+                    !(isSellerView && c.id === "actions" || c.id === "active") &&
                     c.id !== "usd_price" // ❌ se elimina la columna de precio
                 ).map((c) => (
                   <TableHead key={c.id}>
