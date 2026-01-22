@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DialogVariants from "../components/DialogVariants";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -123,6 +124,8 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [fxRate, setFxRate] = useState(DEFAULT_FX_RATE);
   const [paymentMethods, setPaymentMethods] = useState([]);
+  const [rateDiff, setRateDiff] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
 
   const [openVariants, setOpenVariants] = useState(false);
   const [selectedVariantProduct, setSelectedVariantProduct] = useState(null);
@@ -178,7 +181,9 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
         categoriesRes,
         commissionRulesRes,
       ] = await Promise.all([
-        supabase.from("fx_rates").select("rate, is_active"),
+        supabase
+          .from("fx_rates")
+          .select("id, source, rate, is_active, created_at"),
         supabase
           .from("products")
           .select(
@@ -239,8 +244,29 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
           .order("priority"),
       ]);
 
-      const currentFxRate =
-        fxRatesRes?.data?.find((r) => r.is_active)?.rate ?? DEFAULT_FX_RATE;
+      const fxActive = fxRatesRes?.data?.find((r) => r.is_active);
+      const currentFxRate = fxActive ? Number(fxActive.rate) : DEFAULT_FX_RATE;
+
+      // calcular última actualización y diferencia respecto a la anterior (si existe)
+      let lastUpdateLocal = null;
+      let rateDiffLocal = null;
+      if (fxActive) {
+        lastUpdateLocal = fxActive.created_at ? new Date(fxActive.created_at) : null;
+
+        const { data: fxPrev, error: fxPrevError } = await supabase
+          .from("fx_rates")
+          .select("rate")
+          .eq("source", fxActive.source)
+          .eq("is_active", false)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (!fxPrevError && fxPrev && fxPrev.length > 0) {
+          const prev = fxPrev[0];
+          rateDiffLocal =
+            ((Number(fxActive.rate) - Number(prev.rate)) / Number(prev.rate)) * 100;
+        }
+      }
 
       const rules = commissionRulesRes?.data || [];
       const methodsRaw = paymentMethodsRes?.data || [];
@@ -327,6 +353,8 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       });
 
       setFxRate(currentFxRate);
+      setLastUpdate(lastUpdateLocal);
+      setRateDiff(rateDiffLocal);
       setProducts(processed);
       setBrands(brandsRes?.data || []);
       setCategories(categoriesRes?.data || []);
@@ -469,11 +497,73 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
     });
 
     return sorted;
-  }, [products, searchTerm, selectedBrand, selectedCategory, isSellerView, sortBy, sortDir]);
+  }, [
+    products,
+    searchTerm,
+    selectedBrand,
+    selectedCategory,
+    isSellerView,
+    sortBy,
+    sortDir,
+  ]);
+
+  const getRateBadge = () => {
+    if (rateDiff === null) return null;
+    const diffAbs = Math.abs(rateDiff).toFixed(2);
+    if (rateDiff > 0)
+      return (
+        <Badge variant="outline" className="text-green-600">
+          ▲ +{diffAbs}%
+        </Badge>
+      );
+    if (rateDiff < 0)
+      return (
+        <Badge variant="outline" className="text-red-600">
+          ▼ {diffAbs}%
+        </Badge>
+      );
+    return (
+      <Badge variant="outline" className="text-gray-600">
+        = 0%
+      </Badge>
+    );
+  };
+
+  const formatDate = (date) => {
+    if (!date) return "-";
+    return new Intl.DateTimeFormat("es-AR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(date);
+  };
 
   return (
     <TooltipProvider>
       <div className="gap-4">
+        {isSellerView && (
+          <div className="flex flex-col gap-4 mb-4">
+            <Card className="flex-1 flex flex-col justify-between relative">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                  <IconHomeDollar className="text-green-500" />
+                  Cotización actual
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold flex items-center gap-3">
+                  {fxRate ? `$${fxRate.toLocaleString("es-AR")}` : "-"}
+                  {getRateBadge()}
+                </div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  USD → ARS
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Última actualización: {formatDate(lastUpdate)}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
         {/* 🔹 Filtros y acciones (SIN CAMBIOS) */}
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           {/* 🟩 FILA 1 (sm–lg: full width, xl: queda a la izquierda) */}
@@ -685,11 +775,13 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
               <TableRow>
                 {TABLE_COLUMNS.filter(
                   (c) =>
-                    !(isSellerView && c.id === "actions" || c.id === "active") &&
-                    c.id !== "usd_price" // ❌ se elimina la columna de precio
+                    !(
+                      (isSellerView && c.id === "actions") ||
+                      c.id === "active"
+                    ) && c.id !== "usd_price" // ❌ se elimina la columna de precio
                 ).map((c) => (
                   <TableHead key={c.id}>
-                    {(c.id === "actions" || c.id === "image") ? (
+                    {c.id === "actions" || c.id === "image" ? (
                       c.label
                     ) : (
                       <button
