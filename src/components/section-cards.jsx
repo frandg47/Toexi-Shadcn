@@ -149,7 +149,7 @@ export function SectionCards() {
 
   return (
     <div
-      className="grid grid-cols-1 gap-4 px-4 lg:px-6 md:grid-cols-2 xl:grid-cols-4
+      className="grid grid-cols-1 gap-4 px-6 lg:px-6 md:grid-cols-2 xl:grid-cols-4
                  *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card"
     >
       <Card className="@container/card">

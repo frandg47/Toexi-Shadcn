@@ -13,6 +13,7 @@ import {
   CardTitle,
   CardContent,
   CardDescription,
+  CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { IconHomeDollar, IconUserCheck, IconUsers } from "@tabler/icons-react";
@@ -101,7 +102,7 @@ export default function SectionCardsProducts() {
         category_id,
         usd_price,
         product_variants (id, stock)
-      `
+      `,
         );
       if (prodError) throw prodError;
 
@@ -137,7 +138,7 @@ export default function SectionCardsProducts() {
       if (salesError) throw salesError;
 
       const sellersWithSales = new Set(
-        (sales || []).map((s) => s.seller_id).filter(Boolean)
+        (sales || []).map((s) => s.seller_id).filter(Boolean),
       );
       setSellersWithSalesCount(sellersWithSales.size);
     } catch (err) {
@@ -214,37 +215,41 @@ export default function SectionCardsProducts() {
           {/* Card 2: Vendedores activos */}
           <Card className="flex-1 flex flex-col justify-between relative">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                <IconUsers className="text-emerald-600" />
-                Vendedores activos
+              <CardDescription>Vendedores activos</CardDescription>
+              <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+                {/* <IconUsers className="text-emerald-600" /> */}
+                {loading ? "--" : activeSellersCount}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">
-                {loading ? "-" : activeSellersCount}
-              </div>
-              <div className="mt-1 text-sm text-muted-foreground">
+            <CardFooter className="flex-col items-start gap-1.5 text-sm">
+              <div className="flex gap-2 font-medium">
                 Usuarios habilitados para vender
+                <IconUsers className="" />
               </div>
-            </CardContent>
+              <div className="text-muted-foreground">
+                Incluye vendedores con y sin ventas este mes
+              </div>
+            </CardFooter>
           </Card>
 
           {/* Card 3: Vendieron este mes */}
           <Card className="flex-1 flex flex-col justify-between relative">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                <IconUserCheck className="text-green-600" />
-                Vendieron este mes
+              <CardDescription>Vendieron este mes</CardDescription>
+              <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+                {loading ? "--" : sellersWithSalesCount}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">
-                {loading ? "-" : sellersWithSalesCount}
-              </div>
-              <div className="mt-1 text-sm text-muted-foreground">
+            <CardFooter className="flex-col items-start gap-1.5 text-sm">
+              <div className="flex gap-2 font-medium">
                 Vendedores con ventas registradas
+                <IconUserCheck className="" />
               </div>
-            </CardContent>
+              <div className="text-muted-foreground">
+                Vendedores que realizaron al menos una venta
+                durante el mes actual
+              </div>
+            </CardFooter>
           </Card>
         </div>
       </div>
@@ -273,7 +278,7 @@ export default function SectionCardsProducts() {
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Legend verticalAlign="bottom" height={36} />
+                  <Legend verticalAlign="bottom"  />
                   <ChartTooltip />
                 </PieChart>
               </ResponsiveContainer>

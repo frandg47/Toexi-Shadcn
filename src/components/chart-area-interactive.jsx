@@ -28,12 +28,36 @@ const chartConfig = {
   },
 };
 
-const toDateKey = (date) => date.toISOString().slice(0, 10);
+const toDateKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateKey = (value) => {
+  if (value instanceof Date) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+  if (typeof value === "string") {
+    const [year, month, day] = value.slice(0, 10).split("-");
+    if (year && month && day) {
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+  }
+  const fallback = new Date(value);
+  return new Date(
+    fallback.getFullYear(),
+    fallback.getMonth(),
+    fallback.getDate()
+  );
+};
 
 const buildDailySeries = (startDate, endDate, totalsByDate) => {
   const result = [];
-  const cursor = new Date(startDate);
-  while (cursor <= endDate) {
+  const cursor = parseDateKey(startDate);
+  const end = parseDateKey(endDate);
+  while (cursor <= end) {
     const key = toDateKey(cursor);
     result.push({
       date: key,
@@ -60,11 +84,12 @@ export function ChartAreaInteractive() {
       const now = new Date();
       const start = new Date(now);
       start.setDate(start.getDate() - 90);
+      const startKey = toDateKey(start);
 
       const { data, error } = await supabase
         .from("sales")
         .select("sale_date, status")
-        .gte("sale_date", start.toISOString())
+        .gte("sale_date", startKey)
         .neq("status", "anulado")
         .order("sale_date", { ascending: true });
 
@@ -75,7 +100,7 @@ export function ChartAreaInteractive() {
 
       const totals = new Map();
       (data || []).forEach((sale) => {
-        const key = toDateKey(new Date(sale.sale_date));
+        const key = toDateKey(parseDateKey(sale.sale_date));
         const next = (totals.get(key) ?? 0) + 1;
         totals.set(key, next);
       });
@@ -92,7 +117,8 @@ export function ChartAreaInteractive() {
     const days = timeRange === "30d" ? 30 : timeRange === "7d" ? 7 : 90;
     const startDate = new Date(now);
     startDate.setDate(startDate.getDate() - days);
-    return chartData.filter((item) => new Date(item.date) >= startDate);
+    const startKey = parseDateKey(startDate);
+    return chartData.filter((item) => parseDateKey(item.date) >= startKey);
   }, [chartData, timeRange]);
 
   return (
@@ -156,7 +182,7 @@ export function ChartAreaInteractive() {
               tickMargin={8}
               minTickGap={32}
               tickFormatter={(value) => {
-                const date = new Date(value);
+                const date = parseDateKey(value);
                 return date.toLocaleDateString("es-AR", {
                   month: "short",
                   day: "numeric",
@@ -168,7 +194,7 @@ export function ChartAreaInteractive() {
               content={
                 <ChartTooltipContent
                   labelFormatter={(value) => {
-                    return new Date(value).toLocaleDateString("es-AR", {
+                    return parseDateKey(value).toLocaleDateString("es-AR", {
                       month: "short",
                       day: "numeric",
                     });
