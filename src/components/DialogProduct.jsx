@@ -309,8 +309,26 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
             <Label>Imagen del producto</Label>
 
             <Input
+              type="url"
+              placeholder="URL de la imagen (opcional)"
+              value={form.cover_image_url || ""}
+              disabled={!!imageFile}
+              onChange={(e) => {
+                const value = e.target.value;
+                setForm((prev) => ({ ...prev, cover_image_url: value }));
+                if (value) {
+                  setImageFile(null);
+                  setImagePreview(value);
+                } else if (!imageFile) {
+                  setImagePreview(null);
+                }
+              }}
+            />
+
+            <Input
               type="file"
               accept="image/*"
+              disabled={!!form.cover_image_url}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
@@ -321,9 +339,25 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
                 }
 
                 setImageFile(file);
+                setForm((prev) => ({ ...prev, cover_image_url: "" }));
                 setImagePreview(URL.createObjectURL(file));
               }}
             />
+
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setForm((prev) => ({ ...prev, cover_image_url: "" }));
+                  setImageFile(null);
+                  setImagePreview(null);
+                }}
+              >
+                Limpiar imagen
+              </Button>
+            </div>
 
             {imagePreview && (
               <img
