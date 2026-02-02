@@ -76,6 +76,7 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
           amount: Number(p.amount),
           installments: p.installments ? Number(p.installments) : null,
           reference: p.reference || null,
+          account_id: p.account_id || null,
         })),
 
 

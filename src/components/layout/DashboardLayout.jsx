@@ -75,6 +75,7 @@ export default function DashboardLayout() {
     "/dashboard/settings/comission": "Comisiones",
     "/dashboard/settings/fx-rates": "Cotizaciones",
     "/dashboard/expenses": "Gastos",
+    "/dashboard/settings/movements": "Movimientos",
   };
 
   const navMain = [

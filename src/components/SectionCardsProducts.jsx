@@ -278,7 +278,7 @@ export default function SectionCardsProducts() {
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Legend verticalAlign="bottom"  />
+                  <Legend verticalAlign="bottom" />
                   <ChartTooltip />
                 </PieChart>
               </ResponsiveContainer>

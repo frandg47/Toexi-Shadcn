@@ -27,4 +27,5 @@ export const ROUTE_TRANSLATIONS = {
   providers: "Proveedores",
   purchases: "Compras",
   accounts: "Cuentas",
+  movements: "Movimientos",
 };

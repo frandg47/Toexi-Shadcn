@@ -22,6 +22,7 @@ const TITULOS = {
   "settings/payment-methods": "Métodos de Pago",
   "settings/inventory": "Inventario",
   "settings/sales": "Ventas",
+  "settings/movements": "Movimientos",
 };
 
 export function SiteHeader({ actions }) {

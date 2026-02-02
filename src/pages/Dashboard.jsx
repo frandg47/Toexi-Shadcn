@@ -12,14 +12,14 @@ const Dashboard = () => {
       <div className="flex flex-1 flex-col">
         <div className="@container/main flex flex-1 flex-col gap-4 ">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:p-6">
-            <div className="px-6">
+            <div className="px-4">
               <SectionCardsProducts />
             </div>
             <SectionCards />
-            <div className="px-4 lg:px-6">
+            <div className="px-4">
               <ChartAreaInteractive />
             </div>
-            <div className="px-4 lg:px-6">
+            <div className="px-4">
               <SalesByChannelChart />
             </div>
             {/* <DataTable data={data} /> */}

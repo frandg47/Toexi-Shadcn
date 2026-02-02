@@ -71,9 +71,20 @@ CREATE TABLE public.expenses (
   type text NOT NULL CHECK (type = ANY (ARRAY['fixed'::text, 'variable'::text])),
   notes text,
   fixed_expense_id bigint,
+  frequency_value integer,
+  frequency_unit text,
+  last_paid_at timestamp with time zone,
   CONSTRAINT expenses_pkey PRIMARY KEY (id),
   CONSTRAINT expenses_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id),
   CONSTRAINT expenses_fixed_expense_id_fkey FOREIGN KEY (fixed_expense_id) REFERENCES public.fixed_expenses(id)
+);
+CREATE TABLE public.finance_categories (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  name text NOT NULL,
+  type text NOT NULL CHECK (type = ANY (ARRAY['expense'::text, 'income'::text])),
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT finance_categories_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.fixed_expenses (
   id bigint NOT NULL DEFAULT nextval('fixed_expenses_id_seq'::regclass),
@@ -186,6 +197,43 @@ CREATE TABLE public.products (
   CONSTRAINT products_brand_id_fkey FOREIGN KEY (brand_id) REFERENCES public.brands(id),
   CONSTRAINT products_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id)
 );
+CREATE TABLE public.providers (
+  id bigint NOT NULL DEFAULT nextval('providers_id_seq'::regclass),
+  name text NOT NULL,
+  contact_name text,
+  phone text,
+  email text,
+  address text,
+  city text,
+  notes text,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT providers_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.purchase_items (
+  id bigint NOT NULL DEFAULT nextval('purchase_items_id_seq'::regclass),
+  purchase_id bigint,
+  variant_id integer,
+  quantity integer NOT NULL,
+  unit_cost numeric NOT NULL,
+  subtotal numeric NOT NULL,
+  CONSTRAINT purchase_items_pkey PRIMARY KEY (id),
+  CONSTRAINT purchase_items_purchase_id_fkey FOREIGN KEY (purchase_id) REFERENCES public.purchases(id),
+  CONSTRAINT purchase_items_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id)
+);
+CREATE TABLE public.purchases (
+  id bigint NOT NULL DEFAULT nextval('purchases_id_seq'::regclass),
+  provider_id bigint,
+  purchase_date date NOT NULL,
+  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text])),
+  total_amount numeric NOT NULL,
+  total_amount_ars numeric,
+  fx_rate_used numeric,
+  notes text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT purchases_pkey PRIMARY KEY (id),
+  CONSTRAINT purchases_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id)
+);
 CREATE TABLE public.sale_item_imeis (
   id integer NOT NULL DEFAULT nextval('sale_item_imeis_id_seq'::regclass),
   sale_item_id integer NOT NULL,
@@ -208,6 +256,8 @@ CREATE TABLE public.sale_items (
   subtotal_usd numeric,
   subtotal_ars numeric,
   imei character varying DEFAULT NULL::character varying,
+  commission_pct numeric,
+  commission_fixed numeric,
   CONSTRAINT sale_items_pkey PRIMARY KEY (id),
   CONSTRAINT sale_items_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id),
   CONSTRAINT sale_items_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id)
@@ -247,6 +297,9 @@ CREATE TABLE public.sales (
   void_reason text,
   void_stock_bucket text CHECK (void_stock_bucket IS NULL OR (void_stock_bucket = ANY (ARRAY['available'::text, 'defective'::text]))),
   sales_channel_id integer,
+  surcharge_type text,
+  surcharge_value numeric,
+  surcharge_amount numeric,
   CONSTRAINT sales_pkey PRIMARY KEY (id),
   CONSTRAINT sales_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
   CONSTRAINT sales_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES public.user_roles(id_auth),

@@ -88,7 +88,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
   // --- Payments (mixto) ---
   const [payments, setPayments] = useState([
-    { method: "", amount: "", reference: "", installments: "" },
+    { method: "", amount: "", reference: "", installments: "", account_id: "" },
   ]);
 
   // --- Invoice dialog ---
@@ -101,6 +101,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   // Métodos de pago desde la BD
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentInstallments, setPaymentInstallments] = useState([]);
+  const [accounts, setAccounts] = useState([]);
 
   // Canales de venta
   const [salesChannels, setSalesChannels] = useState([]);
@@ -255,6 +256,11 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
   // Helper para saber si es USD
   const isUSDMethod = (methodName) => methodName?.toUpperCase() === "USD";
+  const getAccountsForPayment = (payment) => {
+    if (!payment?.method_name) return accounts;
+    const currency = isUSDMethod(payment.method_name) ? "USD" : "ARS";
+    return accounts.filter((acc) => acc.currency === currency);
+  };
 
   // cuánto lleva pagado el cliente (en ARS, convertiendo USD si aplica)
   const paidARS = useMemo(() => {
@@ -355,6 +361,21 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     fetchPayments();
   }, []);
 
+  // Obtener cuentas
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      const { data, error } = await supabase
+        .from("accounts")
+        .select("id, name, currency")
+        .order("name", { ascending: true });
+
+      if (error) console.error("Error obteniendo cuentas:", error);
+      setAccounts(data || []);
+    };
+
+    fetchAccounts();
+  }, []);
+
   // Obtener canales de venta
   useEffect(() => {
     const fetchChannels = async () => {
@@ -434,7 +455,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
     // Pagos
     setPayments([
-      { method: "", amount: "", reference: "", installments: "" }
+      { method: "", amount: "", reference: "", installments: "", account_id: "" }
     ]);
 
     // Datos del preview
@@ -597,7 +618,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   const addPaymentRow = () =>
     setPayments((p) => [
       ...p,
-      { method: "", amount: "", reference: "", installments: "" },
+      { method: "", amount: "", reference: "", installments: "", account_id: "" },
     ]);
   const removePaymentRow = (idx) =>
     setPayments((p) => p.filter((_, i) => i !== idx));
@@ -619,11 +640,16 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
         installments: p.installments || null,
         multiplier: p.multiplier || 1,
         amount: Number(p.amount || 0),
+        account_id: p.account_id ? Number(p.account_id) : null,
       }))
       .filter((p) => p.payment_method_id && p.amount > 0);
 
     if (totalDue > 0 && !normalized.length) {
       return toast.error("Agrega al menos un método de pago");
+    }
+
+    if (normalized.some((p) => !p.account_id)) {
+      return toast.error("Selecciona una cuenta para cada pago");
     }
 
     if (Math.round(paidARS) !== Math.round(totalDue)) {
@@ -1255,7 +1281,9 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
               <h3 className="font-medium">Métodos de Pago</h3>
 
-              {payments.map((p, i) => (
+              {payments.map((p, i) => {
+                const accountsForPayment = getAccountsForPayment(p);
+                return (
                 <div
                   key={i}
                   className="border p-3 rounded-md space-y-3 bg-muted/40"
@@ -1287,6 +1315,18 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                         updatePaymentField(i, "method", chosen?.name.toLowerCase());
                         updatePaymentField(i, "installments", "");
                         updatePaymentField(i, "multiplier", chosen?.multiplier || 1);
+                        const accountsForMethod = getAccountsForPayment({
+                          method_name: chosen?.name,
+                        });
+                        if (accountsForMethod.length === 1) {
+                          updatePaymentField(
+                            i,
+                            "account_id",
+                            String(accountsForMethod[0].id)
+                          );
+                        } else {
+                          updatePaymentField(i, "account_id", "");
+                        }
                       }}
 
                     >
@@ -1350,6 +1390,30 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
                   {/* Inputs debajo */}
                   <div className="grid gap-2">
+                    <div className="grid gap-2">
+                      <Select
+                        value={p.account_id ? String(p.account_id) : ""}
+                        onValueChange={(val) =>
+                          updatePaymentField(i, "account_id", val)
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Cuenta..." />
+                        </SelectTrigger>
+                        <SelectContent className="z-[9999]">
+                          {accountsForPayment.map((acc) => (
+                            <SelectItem key={acc.id} value={String(acc.id)}>
+                              {acc.name} ({acc.currency})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {accountsForPayment.length === 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          No hay cuentas disponibles para esta moneda
+                        </div>
+                      )}
+                    </div>
                     <div className="flex gap-2 items-end">
                       <Input
                         className="flex-1"
@@ -1404,7 +1468,8 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
 
               <Button
                 variant="outline"

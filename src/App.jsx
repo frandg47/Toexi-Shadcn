@@ -33,6 +33,7 @@ import SalesConfig from "./pages/config/SalesConfig";
 import ProvidersConfig from "./pages/config/ProvidersConfig";
 import PurchasesConfig from "./pages/config/PurchasesConfig";
 import AccountsConfig from "./pages/config/AccountsConfig";
+import MovementsConfig from "./pages/config/MovementsConfig";
 
 import InstallPromptBanner from "./components/InstallPromptBanner";
 import IOSInstallBanner from "@/components/IOSInstallBanner";
@@ -144,6 +145,7 @@ export default function App() {
             <Route path="settings/providers" element={<ProvidersConfig />} />
             <Route path="settings/purchases" element={<PurchasesConfig />} />
             <Route path="settings/accounts" element={<AccountsConfig />} />
+            <Route path="settings/movements" element={<MovementsConfig />} />
           </Route>
 
           {/* 🛍️ VISTA DE VENDEDORES */}

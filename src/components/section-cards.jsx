@@ -48,10 +48,7 @@ export function SectionCards() {
           leadsWindowRes,
           salesRes,
         ] = await Promise.all([
-          supabase
-            .from("products")
-            .select("id, created_at")
-            .eq("active", true),
+          supabase.from("products").select("id, created_at").eq("active", true),
           supabase
             .from("product_variants")
             .select("stock, stock_defective")
@@ -88,13 +85,13 @@ export function SectionCards() {
         const stockDefective =
           variants?.reduce(
             (acc, v) => acc + Number(v.stock_defective || 0),
-            0
+            0,
           ) ?? 0;
 
         const pendingTotal = leadsTotalRes?.count ?? 0;
         const leadsWindow = leadsWindowRes?.data ?? [];
         const pendingLast30 = leadsWindow.filter(
-          (l) => new Date(l.created_at) >= start30
+          (l) => new Date(l.created_at) >= start30,
         ).length;
         const pendingPrev30 = leadsWindow.filter((l) => {
           const d = new Date(l.created_at);
@@ -103,7 +100,7 @@ export function SectionCards() {
 
         const sales = salesRes?.data ?? [];
         const salesCountLast30 = sales.filter(
-          (s) => new Date(s.sale_date) >= start30
+          (s) => new Date(s.sale_date) >= start30,
         ).length;
         const salesCountPrev30 = sales.filter((s) => {
           const d = new Date(s.sale_date);
@@ -148,10 +145,7 @@ export function SectionCards() {
   }, [stats.stockTotal, stats.stockDefective]);
 
   return (
-    <div
-      className="grid grid-cols-1 gap-4 px-6 lg:px-6 md:grid-cols-2 xl:grid-cols-4
-                 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card"
-    >
+    <div className="grid grid-cols-1 gap-4  px-4 md:grid-cols-2 xl:grid-cols-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card">
       <Card className="@container/card">
         <CardHeader>
           <CardDescription>Total de Productos</CardDescription>
@@ -238,9 +232,7 @@ export function SectionCards() {
         <CardHeader>
           <CardDescription>Ventas Ultimos 30 Dias</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {loading
-              ? "--"
-              : stats.salesCount30d.toLocaleString("es-AR")}
+            {loading ? "--" : stats.salesCount30d.toLocaleString("es-AR")}
           </CardTitle>
           <CardAction className="shrink-0">
             <Badge variant="outline">
