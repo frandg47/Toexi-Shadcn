@@ -290,21 +290,54 @@ const SellersTable = ({ refreshToken = 0 }) => {
                     if (!seller) return null;
 
                     // Contar ventas del vendedor en el período
-                    const { count: salesCount } = await supabase
+                    const { data: salesInPeriod } = await supabase
                         .from("sales")
-                        .select("id", { count: "exact", head: true })
+                        .select("id")
                         .eq("seller_id", payment.seller_id)
                         .eq("status", "vendido")
                         .gte("sale_date", payment.period_start)
                         .lte("sale_date", payment.period_end);
 
-                    const totalCommissionsUSD = Number(payment.total_amount || 0);
+                    const saleIds = (salesInPeriod || []).map((sale) => sale.id).filter(Boolean);
+                    let computedCommissionUSD = 0;
+
+                    if (saleIds.length > 0) {
+                        const { data: items, error: itemsError } = await supabase
+                            .from("sale_items")
+                            .select("sale_id, quantity, usd_price, commission_pct, commission_fixed")
+                            .in("sale_id", saleIds);
+
+                        if (itemsError) {
+                            console.error(itemsError);
+                        } else {
+                            (items || []).forEach((item) => {
+                                const qty = Number(item.quantity || 0);
+                                const usdPrice = Number(item.usd_price || 0);
+                                const pct = item.commission_pct;
+                                const fixed = item.commission_fixed;
+                                let itemCommission = 0;
+
+                                if (pct != null) {
+                                    itemCommission = usdPrice * qty * (Number(pct) / 100);
+                                } else if (fixed != null) {
+                                    itemCommission = Number(fixed) * qty;
+                                }
+
+                                computedCommissionUSD += itemCommission;
+                            });
+                        }
+                    }
+
+                    const totalCommissionsUSD =
+                        saleIds.length > 0
+                            ? computedCommissionUSD
+                            : Number(payment.total_amount || 0);
                     const isPaid = !!payment.paid_at;
 
                     return {
                         ...payment,
                         seller,
-                        sales_count: salesCount || 0,
+                        sales_count: saleIds.length,
                         commissions_total_usd: totalCommissionsUSD,
                         commissions_total_ars: totalCommissionsUSD * (fxRate || 1),
                         isPaid,

@@ -53,6 +53,22 @@ const formatCurrencyUSD = (value) =>
     ? "-"
     : currencyFormatterUSD.format(value);
 
+const toDateKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getPeriodRange = (monthFilter) => {
+  if (!monthFilter) return null;
+  const [year, month] = monthFilter.split("-").map(Number);
+  if (!year || !month) return null;
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
+  return { startKey: toDateKey(start), endKey: toDateKey(end) };
+};
+
 // ------------------------------
 // COMPONENTE GENERAL
 // ------------------------------
@@ -111,15 +127,11 @@ export default function SellersTop({ role }) {
   // CARGAR **TOP SELLERS**
   // --------------------------
   const loadTopSales = async () => {
+    const period = getPeriodRange(monthFilter);
+    const periodStart = period?.startKey;
+    const periodEnd = period?.endKey;
     // Obtener el período completo basado en period_end
-    const { data: periodData, error: periodError } = await supabase
-      .from("commission_payments")
-      .select("period_start, period_end")
-      .eq("period_end", monthFilter)
-      .limit(1)
-      .single();
-
-    if (periodError || !periodData) {
+    if (!periodStart || !periodEnd) {
       setTopSales([]);
       return;
     }
@@ -128,8 +140,8 @@ export default function SellersTop({ role }) {
     const { data: sales, error: salesError } = await supabase
       .from("sales")
       .select("seller_id")
-      .gte("sale_date", periodData.period_start)
-      .lte("sale_date", periodData.period_end)
+      .gte("sale_date", periodStart)
+      .lte("sale_date", periodEnd)
       .eq("status", "vendido");
 
     if (salesError) return console.error(salesError);
@@ -178,16 +190,9 @@ export default function SellersTop({ role }) {
   };
 
   const loadSalesForSeller = async (sellerId, sellerName) => {
-    const { data: periodData } = await supabase
-      .from("commission_payments")
-      .select("period_start, period_end")
-      .eq("period_end", monthFilter)
-      .limit(1)
-      .single();
-
-    const periodStart = periodData?.period_start || null;
-    const periodEnd = periodData?.period_end || null;
-
+    const period = getPeriodRange(monthFilter);
+    const periodStart = period?.startKey;
+    const periodEnd = period?.endKey;
     if (!periodStart || !periodEnd) {
       setSalesDialogItems([]);
       setSalesDialogTitle(sellerName || "Ventas");
@@ -274,13 +279,35 @@ export default function SellersTop({ role }) {
   // CARGAR **TOP COMMISSIONS**
   // --------------------------
   const loadTopCommission = async () => {
-    // Obtener comisiones del mes filtrado
-    const { data: monthPayments, error: paymentsError } = await supabase
-      .from("commission_payments")
-      .select("seller_id, total_amount")
-      .eq("period_end", monthFilter);
+    const period = getPeriodRange(monthFilter);
+    const periodStart = period?.startKey;
+    const periodEnd = period?.endKey;
+    if (!periodStart || !periodEnd) {
+      setTopCommission([]);
+      return;
+    }
 
-    if (paymentsError) return console.error(paymentsError);
+    const { data: sales, error: salesError } = await supabase
+      .from("sales")
+      .select("id, seller_id")
+      .gte("sale_date", periodStart)
+      .lte("sale_date", periodEnd)
+      .eq("status", "vendido");
+
+    if (salesError) return console.error(salesError);
+
+    const saleIds = (sales || []).map((sale) => sale.id).filter(Boolean);
+    if (saleIds.length === 0) {
+      setTopCommission([]);
+      return;
+    }
+
+    const { data: items, error: itemsError } = await supabase
+      .from("sale_items")
+      .select("sale_id, quantity, usd_price, commission_pct, commission_fixed")
+      .in("sale_id", saleIds);
+
+    if (itemsError) return console.error(itemsError);
 
     // Obtener datos de usuarios
     const { data: users, error: usersError } = await supabase
@@ -295,21 +322,41 @@ export default function SellersTop({ role }) {
       usersMap[u.id_auth] = u;
     });
 
+    const saleSellerMap = {};
+    sales?.forEach((sale) => {
+      if (sale?.id) saleSellerMap[sale.id] = sale.seller_id;
+    });
+
     // Agrupar comisiones por vendedor
     const commissionsByVendor = {};
-    monthPayments?.forEach(payment => {
-      const seller = usersMap[payment.seller_id];
+    (items || []).forEach((item) => {
+      const sellerId = saleSellerMap[item.sale_id];
+      if (!sellerId) return;
+      const seller = usersMap[sellerId];
       if (!seller) return;
 
-      if (!commissionsByVendor[payment.seller_id]) {
-        commissionsByVendor[payment.seller_id] = {
-          seller_id: payment.seller_id,
+      if (!commissionsByVendor[sellerId]) {
+        commissionsByVendor[sellerId] = {
+          seller_id: sellerId,
           seller_name: formatPersonName(seller.name, seller.last_name),
           avatar_url: seller.avatar_url,
           total_commission: 0,
         };
       }
-      commissionsByVendor[payment.seller_id].total_commission += Number(payment.total_amount || 0);
+
+      const qty = Number(item.quantity || 0);
+      const usdPrice = Number(item.usd_price || 0);
+      const pct = item.commission_pct;
+      const fixed = item.commission_fixed;
+      let itemCommission = 0;
+
+      if (pct != null) {
+        itemCommission = usdPrice * qty * (Number(pct) / 100);
+      } else if (fixed != null) {
+        itemCommission = Number(fixed) * qty;
+      }
+
+      commissionsByVendor[sellerId].total_commission += itemCommission;
     });
 
     const sorted = Object.values(commissionsByVendor)
@@ -336,14 +383,29 @@ export default function SellersTop({ role }) {
       await loadTopCommission();
 
       // Obtener todos los meses disponibles
-      const { data: allPayments, error } = await supabase
-        .from("commission_payments")
-        .select("period_end")
-        .order("period_end", { ascending: false });
+      const { data: allSales, error } = await supabase
+        .from("sales")
+        .select("sale_date")
+        .neq("status", "anulado")
+        .order("sale_date", { ascending: false })
+        .limit(500);
 
-      if (!error && allPayments) {
-        const uniqueMonths = [...new Set(allPayments.map(p => p.period_end))];
-        setAvailableMonths(uniqueMonths);
+      if (!error && allSales) {
+        const uniqueMonths = new Set();
+        allSales.forEach((sale) => {
+          if (!sale?.sale_date) return;
+          const date = new Date(sale.sale_date);
+          if (Number.isNaN(date.getTime())) return;
+          const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+          uniqueMonths.add(toDateKey(monthEnd));
+        });
+        const uniqueMonthsList = Array.from(uniqueMonths).sort(
+          (a, b) => new Date(b) - new Date(a)
+        );
+        setAvailableMonths(uniqueMonthsList);
+        if (uniqueMonthsList.length > 0 && !uniqueMonthsList.includes(monthFilter)) {
+          setMonthFilter(uniqueMonthsList[0]);
+        }
       }
 
       setLoading(false);
