@@ -49,6 +49,40 @@ import { IconCalendar, IconRefresh, IconDownload } from "@tabler/icons-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+const AR_TIMEZONE = "America/Argentina/Buenos_Aires";
+const AR_OFFSET = "-03:00";
+
+const toDateKeyAR = (date) =>
+    new Intl.DateTimeFormat("en-CA", {
+        timeZone: AR_TIMEZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).format(date);
+
+const toTimestampAR = (date) => {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: AR_TIMEZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+    }).formatToParts(date);
+
+    const get = (type) => parts.find((p) => p.type === type)?.value || "00";
+    const yyyy = get("year");
+    const mm = get("month");
+    const dd = get("day");
+    const hh = get("hour");
+    const min = get("minute");
+    const ss = get("second");
+
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}${AR_OFFSET}`;
+};
+
 export function SalesList() {
     const [sales, setSales] = useState([]);
     const [page, setPage] = useState(1);
@@ -108,8 +142,8 @@ export function SalesList() {
 
             setFilters((f) => ({
                 ...f,
-                start_date: dateRange.from.toISOString().split("T")[0],
-                end_date: endDate.toISOString().split("T")[0],
+                start_date: toDateKeyAR(dateRange.from),
+                end_date: toDateKeyAR(endDate),
             }));
         }
     }, [dateRange]);
@@ -208,7 +242,7 @@ export function SalesList() {
         nextDate.setHours(Number(hh), Number(mm), 0, 0);
 
         const payload = {
-            sale_date: nextDate.toISOString(),
+            sale_date: toTimestampAR(nextDate),
         };
 
         if (editSellerId) {
@@ -324,7 +358,9 @@ export function SalesList() {
             y += 26;
 
             // Cliente / Fechas
-            const fecha = new Date(sale.sale_date).toLocaleDateString("es-AR");
+            const fecha = new Date(sale.sale_date).toLocaleDateString("es-AR", {
+                timeZone: AR_TIMEZONE,
+            });
 
             doc.setFontSize(11);
             doc.rect(margin, y, 180, 22);
@@ -608,7 +644,9 @@ export function SalesList() {
                         <div className="flex justify-between">
                             <h2 className="font-bold text-lg">Venta #{s.sale_id}</h2>
                             <span className="text-sm text-muted-foreground">
-                                {new Date(s.sale_date).toLocaleString()}
+                                {new Date(s.sale_date).toLocaleString("es-AR", {
+                                    timeZone: AR_TIMEZONE,
+                                })}
                             </span>
                         </div>
                         <div className="flex items-center gap-3 mt-2 flex-wrap">
@@ -706,7 +744,9 @@ export function SalesList() {
                                     <p>
                                         <strong>Anulado el:</strong>{" "}
                                         {s.voided_at
-                                            ? new Date(s.voided_at).toLocaleString("es-AR")
+                                            ? new Date(s.voided_at).toLocaleString("es-AR", {
+                                                timeZone: AR_TIMEZONE,
+                                            })
                                             : "-"}
                                     </p>
                                     <p>
