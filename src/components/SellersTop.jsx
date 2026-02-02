@@ -60,13 +60,22 @@ const toDateKey = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+const addDaysToDateKey = (dateKey, days) => {
+  if (!dateKey) return null;
+  const [year, month, day] = dateKey.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  const base = new Date(year, month - 1, day);
+  base.setDate(base.getDate() + days);
+  return toDateKey(base);
+};
+
 const getPeriodRange = (monthFilter) => {
   if (!monthFilter) return null;
   const [year, month] = monthFilter.split("-").map(Number);
   if (!year || !month) return null;
   const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0);
-  return { startKey: toDateKey(start), endKey: toDateKey(end) };
+  const endExclusive = new Date(year, month, 1);
+  return { startKey: toDateKey(start), endExclusiveKey: toDateKey(endExclusive) };
 };
 
 // ------------------------------
@@ -129,9 +138,9 @@ export default function SellersTop({ role }) {
   const loadTopSales = async () => {
     const period = getPeriodRange(monthFilter);
     const periodStart = period?.startKey;
-    const periodEnd = period?.endKey;
+    const periodEndExclusive = period?.endExclusiveKey;
     // Obtener el período completo basado en period_end
-    if (!periodStart || !periodEnd) {
+    if (!periodStart || !periodEndExclusive) {
       setTopSales([]);
       return;
     }
@@ -141,7 +150,7 @@ export default function SellersTop({ role }) {
       .from("sales")
       .select("seller_id")
       .gte("sale_date", periodStart)
-      .lte("sale_date", periodEnd)
+      .lt("sale_date", periodEndExclusive)
       .eq("status", "vendido");
 
     if (salesError) return console.error(salesError);
@@ -192,8 +201,8 @@ export default function SellersTop({ role }) {
   const loadSalesForSeller = async (sellerId, sellerName) => {
     const period = getPeriodRange(monthFilter);
     const periodStart = period?.startKey;
-    const periodEnd = period?.endKey;
-    if (!periodStart || !periodEnd) {
+    const periodEndExclusive = period?.endExclusiveKey;
+    if (!periodStart || !periodEndExclusive) {
       setSalesDialogItems([]);
       setSalesDialogTitle(sellerName || "Ventas");
       setSalesDialogOpen(true);
@@ -207,7 +216,7 @@ export default function SellersTop({ role }) {
       )
       .eq("seller_id", sellerId)
       .gte("sale_date", periodStart)
-      .lte("sale_date", periodEnd)
+      .lt("sale_date", periodEndExclusive)
       .neq("status", "anulado")
       .order("sale_date", { ascending: false });
 
@@ -281,8 +290,8 @@ export default function SellersTop({ role }) {
   const loadTopCommission = async () => {
     const period = getPeriodRange(monthFilter);
     const periodStart = period?.startKey;
-    const periodEnd = period?.endKey;
-    if (!periodStart || !periodEnd) {
+    const periodEndExclusive = period?.endExclusiveKey;
+    if (!periodStart || !periodEndExclusive) {
       setTopCommission([]);
       return;
     }
@@ -291,7 +300,7 @@ export default function SellersTop({ role }) {
       .from("sales")
       .select("id, seller_id")
       .gte("sale_date", periodStart)
-      .lte("sale_date", periodEnd)
+      .lt("sale_date", periodEndExclusive)
       .eq("status", "vendido");
 
     if (salesError) return console.error(salesError);

@@ -126,6 +126,22 @@ const getMonthName = (dateString) => {
     }
 };
 
+const toDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+};
+
+const getPeriodRange = (monthFilter) => {
+    if (!monthFilter) return null;
+    const [year, month] = monthFilter.split("-").map(Number);
+    if (!year || !month) return null;
+    const start = new Date(year, month - 1, 1);
+    const endExclusive = new Date(year, month, 1);
+    return { startKey: toDateKey(start), endExclusiveKey: toDateKey(endExclusive) };
+};
+
 const SellersTable = ({ refreshToken = 0 }) => {
     const [visibleColumns, setVisibleColumns] = useState(
         TABLE_COLUMNS.map((col) => col.id)
@@ -162,6 +178,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
                 return;
             }
 
+            const periodEndExclusive = addDaysToDateKey(periodEnd, 1);
             const { data: sales, error } = await supabase
                 .from("sales")
                 .select(
@@ -169,7 +186,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
                 )
                 .eq("seller_id", sellerId)
                 .gte("sale_date", periodStart)
-                .lte("sale_date", periodEnd)
+                .lt("sale_date", periodEndExclusive || periodEnd)
                 .neq("status", "anulado")
                 .order("sale_date", { ascending: false });
 
@@ -251,6 +268,158 @@ const SellersTable = ({ refreshToken = 0 }) => {
         }
 
         try {
+            const period = getPeriodRange(monthFilter);
+            const periodStart = period?.startKey;
+            const periodEndExclusive = period?.endExclusiveKey;
+            if (!periodStart || !periodEndExclusive) {
+                setSellers([]);
+                setLoading(false);
+                setRefreshing(false);
+                return;
+            }
+
+            const periodEnd = addDaysToDateKey(periodEndExclusive, -1);
+
+            // Obtener tipo de cambio activo
+            const { data: fxData, error: fxError } = await supabase
+                .from("fx_rates")
+                .select("rate")
+                .eq("is_active", true)
+                .maybeSingle();
+
+            if (fxError) throw fxError;
+            if (fxData) setFxRate(Number(fxData.rate));
+
+            // Obtener vendedores (usuarios con rol 'seller')
+            const { data: users, error: usersError } = await supabase
+                .from("users")
+                .select("id, id_auth, name, avatar_url, last_name, email, role")
+                .eq("role", "seller")
+                .order("name", { ascending: true });
+
+            if (usersError) throw usersError;
+
+            const { data: salesInPeriod, error: salesError } = await supabase
+                .from("sales")
+                .select("id, seller_id")
+                .eq("status", "vendido")
+                .gte("sale_date", periodStart)
+                .lt("sale_date", periodEndExclusive);
+
+            if (salesError) throw salesError;
+
+            const usersMap = {};
+            (users || []).forEach(user => {
+                usersMap[user.id_auth] = user;
+            });
+
+            const saleIdsAll = (salesInPeriod || []).map((sale) => sale.id).filter(Boolean);
+            const { data: items, error: itemsError } = await supabase
+                .from("sale_items")
+                .select("sale_id, quantity, usd_price, commission_pct, commission_fixed")
+                .in("sale_id", saleIdsAll.length ? saleIdsAll : [0]);
+
+            if (itemsError) console.error(itemsError);
+
+            const saleSellerMap = {};
+            salesInPeriod?.forEach((sale) => {
+                if (sale?.id) saleSellerMap[sale.id] = sale.seller_id;
+            });
+
+            const commissionsBySeller = {};
+            const salesCountBySeller = {};
+
+            salesInPeriod?.forEach((sale) => {
+                if (!sale?.seller_id) return;
+                salesCountBySeller[sale.seller_id] =
+                    (salesCountBySeller[sale.seller_id] || 0) + 1;
+            });
+
+            (items || []).forEach((item) => {
+                const sellerId = saleSellerMap[item.sale_id];
+                if (!sellerId) return;
+                const qty = Number(item.quantity || 0);
+                const usdPrice = Number(item.usd_price || 0);
+                const pct = item.commission_pct;
+                const fixed = item.commission_fixed;
+                let itemCommission = 0;
+
+                if (pct != null) {
+                    itemCommission = usdPrice * qty * (Number(pct) / 100);
+                } else if (fixed != null) {
+                    itemCommission = Number(fixed) * qty;
+                }
+
+                commissionsBySeller[sellerId] =
+                    (commissionsBySeller[sellerId] || 0) + itemCommission;
+            });
+
+            const { data: paymentsForPeriod, error: paymentsError } = await supabase
+                .from("commission_payments")
+                .select("id, seller_id, period_start, period_end, total_amount, paid_at")
+                .eq("period_end", periodEnd);
+
+            if (paymentsError) throw paymentsError;
+
+            const paymentsMap = {};
+            (paymentsForPeriod || []).forEach((p) => {
+                paymentsMap[p.seller_id] = p;
+            });
+
+            const sellerIdsWithSales = Object.keys(salesCountBySeller);
+            const enrichedPayments = sellerIdsWithSales.map((sellerId) => {
+                const seller = usersMap[sellerId];
+                if (!seller) return null;
+                const payment = paymentsMap[sellerId];
+                const totalCommissionsUSD = Number(commissionsBySeller[sellerId] || 0);
+                const isPaid = !!payment?.paid_at;
+
+                return {
+                    id: payment?.id || null,
+                    seller_id: sellerId,
+                    period_start: payment?.period_start || periodStart,
+                    period_end: payment?.period_end || periodEnd,
+                    total_amount: payment?.total_amount || totalCommissionsUSD,
+                    paid_at: payment?.paid_at || null,
+                    seller,
+                    sales_count: salesCountBySeller[sellerId] || 0,
+                    commissions_total_usd: totalCommissionsUSD,
+                    commissions_total_ars: totalCommissionsUSD * (fxData?.rate || fxRate || 1),
+                    isPaid,
+                };
+            });
+
+            const validPayments = enrichedPayments.filter(p => p !== null);
+
+            const { data: allSales, error: allSalesError } = await supabase
+                .from("sales")
+                .select("sale_date")
+                .neq("status", "anulado")
+                .order("sale_date", { ascending: false })
+                .limit(500);
+
+            if (!allSalesError && allSales) {
+                const uniqueMonths = new Set();
+                allSales.forEach((sale) => {
+                    if (!sale?.sale_date) return;
+                    const date = new Date(sale.sale_date);
+                    if (Number.isNaN(date.getTime())) return;
+                    const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+                    uniqueMonths.add(toDateKey(monthEnd));
+                });
+                const monthList = Array.from(uniqueMonths).sort(
+                    (a, b) => new Date(b) - new Date(a)
+                );
+
+                setAvailableMonths(monthList);
+                if (!monthList.includes(monthFilter) && monthList.length > 0) {
+                    setMonthFilter(monthList[0]);
+                }
+            }
+
+            setSellers(validPayments);
+            return;
+            /*
             // Obtener tipo de cambio activo
             const { data: fxData } = await supabase
                 .from("fx_rates")
@@ -290,13 +459,14 @@ const SellersTable = ({ refreshToken = 0 }) => {
                     if (!seller) return null;
 
                     // Contar ventas del vendedor en el período
+                    const periodEndExclusive = addDaysToDateKey(payment.period_end, 1);
                     const { data: salesInPeriod } = await supabase
                         .from("sales")
                         .select("id")
                         .eq("seller_id", payment.seller_id)
                         .eq("status", "vendido")
                         .gte("sale_date", payment.period_start)
-                        .lte("sale_date", payment.period_end);
+                        .lt("sale_date", periodEndExclusive || payment.period_end);
 
                     const saleIds = (salesInPeriod || []).map((sale) => sale.id).filter(Boolean);
                     let computedCommissionUSD = 0;
@@ -367,6 +537,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
             }
 
             setSellers(validPayments);
+            */
         } catch (error) {
             console.error(error);
             toast.error("No se pudieron cargar los vendedores", {
@@ -376,7 +547,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [fxRate]);
+    }, [fxRate, monthFilter]);
 
     useEffect(() => {
         fetchSellers(refreshToken === 0);
@@ -386,11 +557,27 @@ const SellersTable = ({ refreshToken = 0 }) => {
         try {
             setRefreshing(true);
 
-            // Actualizar el pago a liquidado
-            const { error } = await supabase
-                .from("commission_payments")
-                .update({ paid_at: new Date().toISOString() })
-                .eq("id", paymentRecord.id);
+            const paidAt = new Date().toISOString();
+            let error;
+
+            if (paymentRecord.id) {
+                ({ error } = await supabase
+                    .from("commission_payments")
+                    .update({ paid_at: paidAt })
+                    .eq("id", paymentRecord.id));
+            } else {
+                ({ error } = await supabase
+                    .from("commission_payments")
+                    .insert([
+                        {
+                            seller_id: paymentRecord.seller_id,
+                            period_start: paymentRecord.period_start,
+                            period_end: paymentRecord.period_end,
+                            total_amount: paymentRecord.commissions_total_usd || 0,
+                            paid_at: paidAt,
+                        },
+                    ]));
+            }
 
             if (error) throw error;
 
@@ -757,6 +944,18 @@ const SellersTable = ({ refreshToken = 0 }) => {
             </Dialog>
         </div>
     );
+};
+
+const addDaysToDateKey = (dateKey, days) => {
+    if (!dateKey) return null;
+    const [year, month, day] = dateKey.split("-").map(Number);
+    if (!year || !month || !day) return null;
+    const base = new Date(year, month - 1, day);
+    base.setDate(base.getDate() + days);
+    const yyyy = base.getFullYear();
+    const mm = String(base.getMonth() + 1).padStart(2, "0");
+    const dd = String(base.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
 };
 
 export default SellersTable;
