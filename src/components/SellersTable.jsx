@@ -419,125 +419,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
 
             setSellers(validPayments);
             return;
-            /*
-            // Obtener tipo de cambio activo
-            const { data: fxData } = await supabase
-                .from("fx_rates")
-                .select("rate")
-                .eq("is_active", true)
-                .maybeSingle();
-
-            if (fxData) setFxRate(Number(fxData.rate));
-
-            // Obtener vendedores (usuarios con rol 'seller')
-            const { data: users, error: usersError } = await supabase
-                .from("users")
-                .select("id, id_auth, name, avatar_url, last_name, email, role")
-                .eq("role", "seller")
-                .order("name", { ascending: true });
-
-            if (usersError) throw usersError;
-
-            // Obtener todos los pagos de comisión
-            const { data: allPayments, error: paymentsError } = await supabase
-                .from("commission_payments")
-                .select("id, seller_id, period_start, period_end, total_amount, paid_at")
-                .order("period_end", { ascending: false });
-
-            if (paymentsError) throw paymentsError;
-
-            // Crear un mapa de usuarios por id_auth
-            const usersMap = {};
-            (users || []).forEach(user => {
-                usersMap[user.id_auth] = user;
-            });
-
-            // Enriquecer cada pago de comisión con datos del vendedor y ventas
-            const enrichedPayments = await Promise.all(
-                (allPayments || []).map(async (payment) => {
-                    const seller = usersMap[payment.seller_id];
-                    if (!seller) return null;
-
-                    // Contar ventas del vendedor en el período
-                    const periodEndExclusive = addDaysToDateKey(payment.period_end, 1);
-                    const { data: salesInPeriod } = await supabase
-                        .from("sales")
-                        .select("id")
-                        .eq("seller_id", payment.seller_id)
-                        .eq("status", "vendido")
-                        .gte("sale_date", payment.period_start)
-                        .lt("sale_date", periodEndExclusive || payment.period_end);
-
-                    const saleIds = (salesInPeriod || []).map((sale) => sale.id).filter(Boolean);
-                    let computedCommissionUSD = 0;
-
-                    if (saleIds.length > 0) {
-                        const { data: items, error: itemsError } = await supabase
-                            .from("sale_items")
-                            .select("sale_id, quantity, usd_price, commission_pct, commission_fixed")
-                            .in("sale_id", saleIds);
-
-                        if (itemsError) {
-                            console.error(itemsError);
-                        } else {
-                            (items || []).forEach((item) => {
-                                const qty = Number(item.quantity || 0);
-                                const usdPrice = Number(item.usd_price || 0);
-                                const pct = item.commission_pct;
-                                const fixed = item.commission_fixed;
-                                let itemCommission = 0;
-
-                                if (pct != null) {
-                                    itemCommission = usdPrice * qty * (Number(pct) / 100);
-                                } else if (fixed != null) {
-                                    itemCommission = Number(fixed) * qty;
-                                }
-
-                                computedCommissionUSD += itemCommission;
-                            });
-                        }
-                    }
-
-                    const totalCommissionsUSD =
-                        saleIds.length > 0
-                            ? computedCommissionUSD
-                            : Number(payment.total_amount || 0);
-                    const isPaid = !!payment.paid_at;
-
-                    return {
-                        ...payment,
-                        seller,
-                        sales_count: saleIds.length,
-                        commissions_total_usd: totalCommissionsUSD,
-                        commissions_total_ars: totalCommissionsUSD * (fxRate || 1),
-                        isPaid,
-                    };
-                })
-            );
-
-            // Filtrar nulos
-            const validPayments = enrichedPayments.filter(p => p !== null);
-
-            // Extraer todos los meses únicos disponibles
-            const allMonths = new Set();
-            validPayments.forEach(payment => {
-                allMonths.add(payment.period_end);
-            });
-
-            const monthList = Array.from(allMonths)
-                .filter(m => m)
-                .sort((a, b) => new Date(b) - new Date(a));
-
-            setAvailableMonths(monthList);
-
-            // Si el monthFilter inicial NO coincide con ningún mes disponible,
-            // seteamos automáticamente al mes más reciente.
-            if (!monthList.includes(monthFilter) && monthList.length > 0) {
-                setMonthFilter(monthList[0]);
-            }
-
-            setSellers(validPayments);
-            */
+                    
         } catch (error) {
             console.error(error);
             toast.error("No se pudieron cargar los vendedores", {
@@ -606,12 +488,24 @@ const SellersTable = ({ refreshToken = 0 }) => {
     }, []);
 
     const filteredSellers = useMemo(() => {
-        return sellers
-            .filter(p => p.period_end === monthFilter) // Filtrar por mes exacto
-            .filter(p => p.sales_count > 0) // Filtrar solo vendedores con ventas
-            .filter(p =>
-                buildFullName(p.seller).toLowerCase().includes(nameFilter.toLowerCase())
-            );
+        const normalizedFilter = nameFilter.trim().toLowerCase();
+        const uniqueBySeller = new Map();
+
+        sellers
+            .filter((p) => p.period_end === monthFilter)
+            .filter((p) => p.sales_count > 0)
+            .filter((p) => {
+                if (!normalizedFilter) return true;
+                return buildFullName(p.seller).toLowerCase().includes(normalizedFilter);
+            })
+            .forEach((payment) => {
+                if (!payment?.seller_id) return;
+                if (!uniqueBySeller.has(payment.seller_id)) {
+                    uniqueBySeller.set(payment.seller_id, payment);
+                }
+            });
+
+        return Array.from(uniqueBySeller.values());
     }, [sellers, monthFilter, nameFilter]);
 
 
@@ -630,6 +524,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
                 {/* Buscador */}
                 <Input
                     placeholder="Buscar por nombre..."
+                    value={nameFilter}
                     onChange={(e) => setNameFilter(e.target.value)}
                     className="w-full lg:w-80 max-w-full"
                 />
@@ -746,7 +641,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
                         {!loading &&
                             filteredSellers.map((payment) => (
                                 <TableRow
-                                    key={payment.id}
+                                    key={`${payment.seller_id}-${payment.period_end || "period"}`}
                                     className="cursor-pointer"
                                     onClick={() =>
                                         loadSalesForSeller(
