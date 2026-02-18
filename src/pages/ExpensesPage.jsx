@@ -111,6 +111,14 @@ export default function ExpensesPage() {
     last_paid_at: null,
   });
 
+  const [incomeForm, setIncomeForm] = useState({
+    movement_date: new Date().toISOString().slice(0, 10),
+    amount: "",
+    account_id: "",
+    category: "",
+    notes: "",
+  });
+
   const [expenseForm, setExpenseForm] = useState({
     expense_date: new Date().toISOString().slice(0, 10),
     amount: "",
@@ -142,6 +150,7 @@ export default function ExpensesPage() {
           .from("fx_rates")
           .select("rate")
           .eq("is_active", true)
+          .eq("source", "blue")
           .maybeSingle(),
         supabase
           .from("accounts")
@@ -188,6 +197,10 @@ export default function ExpensesPage() {
   const selectedAccount = useMemo(
     () => accounts.find((a) => String(a.id) === String(expenseForm.account_id)),
     [accounts, expenseForm.account_id]
+  );
+  const selectedIncomeAccount = useMemo(
+    () => accounts.find((a) => String(a.id) === String(incomeForm.account_id)),
+    [accounts, incomeForm.account_id]
   );
   const expenseCategories = useMemo(
     () => categories.filter((c) => c.type === "expense" && c.is_active),
@@ -313,6 +326,56 @@ export default function ExpensesPage() {
       .order("expense_date", { ascending: false })
       .limit(50);
     setExpenses(data || []);
+  };
+
+  const handleCreateIncome = async () => {
+    if (!incomeForm.movement_date) return toast.error("Selecciona una fecha");
+    if (!selectedIncomeAccount) return toast.error("Selecciona una cuenta");
+
+    const amount = Number(incomeForm.amount || 0);
+    if (!amount || Number.isNaN(amount)) return toast.error("Monto invalido");
+
+    const currency = selectedIncomeAccount.currency || "ARS";
+    if (currency === "USD" && !fxRate) {
+      return toast.error("No hay cotizacion activa para USD");
+    }
+
+    const amountARS = currency === "USD" ? amount * fxRate : amount;
+    const notes = [
+      incomeForm.category ? `Categoria: ${incomeForm.category}` : "",
+      incomeForm.notes,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    const { error } = await supabase.from("account_movements").insert([
+      {
+        movement_date: incomeForm.movement_date,
+        account_id: selectedIncomeAccount.id,
+        type: "income",
+        amount,
+        currency,
+        amount_ars: amountARS,
+        fx_rate_used: currency === "USD" ? fxRate : null,
+        related_table: "manual_income",
+        notes: notes || null,
+      },
+    ]);
+
+    if (error) {
+      toast.error("No se pudo registrar el ingreso", {
+        description: error.message,
+      });
+      return;
+    }
+
+    toast.success("Ingreso registrado");
+    setIncomeForm((f) => ({
+      ...f,
+      amount: "",
+      category: "",
+      notes: "",
+    }));
   };
 
   const handleOpenEdit = (expense) => {
@@ -863,17 +926,51 @@ export default function ExpensesPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid gap-3 md:grid-cols-3">
-              <Input type="date" disabled />
-              <Input type="number" step="0.01" placeholder="Monto" disabled />
-              <Select disabled>
+              <Input
+                type="date"
+                value={incomeForm.movement_date}
+                onChange={(e) =>
+                  setIncomeForm((f) => ({
+                    ...f,
+                    movement_date: e.target.value,
+                  }))
+                }
+              />
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="Monto"
+                value={incomeForm.amount}
+                onChange={(e) =>
+                  setIncomeForm((f) => ({ ...f, amount: e.target.value }))
+                }
+              />
+              <Select
+                value={incomeForm.account_id}
+                onValueChange={(value) =>
+                  setIncomeForm((f) => ({ ...f, account_id: value }))
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Cuenta" />
                 </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((acc) => (
+                    <SelectItem key={acc.id} value={String(acc.id)}>
+                      {acc.name} ({acc.currency})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div className="flex items-center gap-2">
-                <Select disabled>
+                <Select
+                  value={incomeForm.category}
+                  onValueChange={(value) =>
+                    setIncomeForm((f) => ({ ...f, category: value }))
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Categoria" />
                   </SelectTrigger>
@@ -891,19 +988,26 @@ export default function ExpensesPage() {
                   size="icon"
                   onClick={() => setCategoryDialogOpen(true)}
                   aria-label="Agregar categoria"
-                  disabled
                 >
                   <IconPlus className="h-4 w-4" />
                 </Button>
               </div>
-              <Input placeholder="Moneda" disabled />
+              <Input
+                placeholder="Moneda"
+                value={selectedIncomeAccount?.currency || "--"}
+                readOnly
+              />
             </div>
-            <Textarea placeholder="Notas" disabled />
-            <Button disabled>Guardar ingreso</Button>
-            <p className="text-sm text-muted-foreground">
-              Seccion en preparacion. Las categorias ya quedan listas para
-              ingresos y gastos.
-            </p>
+            <Textarea
+              placeholder="Notas"
+              value={incomeForm.notes}
+              onChange={(e) =>
+                setIncomeForm((f) => ({ ...f, notes: e.target.value }))
+              }
+            />
+            <Button onClick={handleCreateIncome} disabled={loading}>
+              Guardar ingreso
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -947,7 +1051,7 @@ export default function ExpensesPage() {
       </Card> */}
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="w-[90vw] sm:max-w-lg">
+        <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Editar gasto</DialogTitle>
           </DialogHeader>
@@ -1064,7 +1168,7 @@ export default function ExpensesPage() {
       </Dialog>
 
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-        <DialogContent className="w-[90vw] sm:max-w-lg">
+        <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Nueva categoria</DialogTitle>
           </DialogHeader>

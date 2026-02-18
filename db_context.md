@@ -1,6 +1,22 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.account_movements (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  movement_date date NOT NULL DEFAULT CURRENT_DATE,
+  account_id bigint NOT NULL,
+  type text NOT NULL CHECK (type = ANY (ARRAY['income'::text, 'expense'::text, 'transfer'::text])),
+  amount numeric NOT NULL,
+  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text])),
+  amount_ars numeric,
+  fx_rate_used numeric,
+  related_table text,
+  related_id bigint,
+  notes text,
+  CONSTRAINT account_movements_pkey PRIMARY KEY (id),
+  CONSTRAINT account_movements_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id)
+);
 CREATE TABLE public.accounts (
   id bigint NOT NULL DEFAULT nextval('accounts_id_seq'::regclass),
   name text NOT NULL,
@@ -221,6 +237,22 @@ CREATE TABLE public.purchase_items (
   CONSTRAINT purchase_items_purchase_id_fkey FOREIGN KEY (purchase_id) REFERENCES public.purchases(id),
   CONSTRAINT purchase_items_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id)
 );
+CREATE TABLE public.purchase_payments (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  purchase_id bigint NOT NULL,
+  account_id bigint NOT NULL,
+  payment_method_id integer,
+  amount numeric NOT NULL,
+  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text])),
+  amount_ars numeric,
+  fx_rate_used numeric,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  notes text,
+  CONSTRAINT purchase_payments_pkey PRIMARY KEY (id),
+  CONSTRAINT purchase_payments_purchase_id_fkey FOREIGN KEY (purchase_id) REFERENCES public.purchases(id),
+  CONSTRAINT purchase_payments_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id),
+  CONSTRAINT purchase_payments_payment_method_id_fkey FOREIGN KEY (payment_method_id) REFERENCES public.payment_methods(id)
+);
 CREATE TABLE public.purchases (
   id bigint NOT NULL DEFAULT nextval('purchases_id_seq'::regclass),
   provider_id bigint,
@@ -273,9 +305,11 @@ CREATE TABLE public.sale_payments (
   installments integer,
   created_at timestamp without time zone DEFAULT now(),
   payment_method_id integer,
+  account_id bigint,
   CONSTRAINT sale_payments_pkey PRIMARY KEY (id),
   CONSTRAINT sale_payments_payment_method_fk FOREIGN KEY (payment_method_id) REFERENCES public.payment_methods(id),
-  CONSTRAINT sale_payments_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id)
+  CONSTRAINT sale_payments_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id),
+  CONSTRAINT sale_payments_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id)
 );
 CREATE TABLE public.sales (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,

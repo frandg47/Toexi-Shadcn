@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthContextProvider, useAuth } from "./context/AuthContextProvider";
+import { Button } from "@/components/ui/button";
 
 import DashboardLayout from "./components/layout/DashboardLayout";
 import SellerLayout from "./components/layout/SellerLayout";
@@ -41,13 +42,28 @@ import IOSInstallBanner from "@/components/IOSInstallBanner";
 // 🔒 COMPONENTE DE RUTA PROTEGIDA
 function ProtectedRoute({ children, allowedRoles }) {
   const location = useLocation();
-  const { user, role, isActive, status } = useAuth();
+  const { user, role, isActive, status, error, refreshProfile } = useAuth();
 
   // 🔍 Mostrar loader solo mientras se verifica sesión por primera vez
   if (status === "loading") {
     return (
       <div className="flex min-h-[100svh] w-full items-center justify-center">
         <ConcentricLoader />
+      </div>
+    );
+  }
+
+  if (status === "backend-unavailable") {
+    return (
+      <div className="flex min-h-[100svh] w-full items-center justify-center p-6">
+        <div className="max-w-md space-y-3 rounded-lg border bg-background p-6 text-center shadow-sm">
+          <h2 className="text-lg font-semibold">Servicio temporalmente inestable</h2>
+          <p className="text-sm text-muted-foreground">
+            {error ||
+              "Estamos teniendo problemas de conectividad con el servidor. Por favor, intenta nuevamente en unos minutos."}
+          </p>
+          <Button onClick={refreshProfile}>Reintentar</Button>
+        </div>
       </div>
     );
   }

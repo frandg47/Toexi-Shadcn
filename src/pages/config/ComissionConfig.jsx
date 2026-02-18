@@ -323,7 +323,7 @@ const ComissionConfig = () => {
 
       {/* Modal para crear/editar */}
       <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-        <DialogContent className="max-w-3xl w-[90vw]">
+        <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>
               {editingRule

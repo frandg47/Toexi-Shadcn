@@ -55,6 +55,7 @@ const QuickPaymentCalculator = () => {
         .from("fx_rates")
         .select("rate")
         .eq("is_active", true)
+        .eq("source", "blue")
         .maybeSingle();
 
       if (data) setExchangeRate(Number(data.rate));

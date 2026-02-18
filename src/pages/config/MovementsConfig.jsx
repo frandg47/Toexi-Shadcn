@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -34,6 +40,13 @@ export default function MovementsConfig() {
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState([]);
   const [movements, setMovements] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 30;
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailMovement, setDetailMovement] = useState(null);
+  const [detailData, setDetailData] = useState(null);
   const [filters, setFilters] = useState({
     dateFrom: "",
     dateTo: "",
@@ -41,64 +54,76 @@ export default function MovementsConfig() {
     type: "all",
   });
 
-  const loadData = async () => {
-    setLoading(true);
-    const [{ data: accountsData, error: accountsError }, movementsRes] =
-      await Promise.all([
-        supabase
-          .from("accounts")
-          .select("id, name, currency, initial_balance, include_in_balance")
-          .order("name", { ascending: true }),
-        supabase
-          .from("account_movements")
-          .select(
-            "id, created_at, movement_date, account_id, type, amount, currency, amount_ars, related_table, related_id, notes, accounts(name, currency)"
-          )
-          .order("movement_date", { ascending: false })
-          .limit(200),
-      ]);
+  const loadAccounts = useCallback(async () => {
+    const { data: accountsData, error: accountsError } = await supabase
+      .from("accounts")
+      .select("id, name, currency, initial_balance, include_in_balance")
+      .order("name", { ascending: true });
 
     if (accountsError) {
-      setLoading(false);
       toast.error("No se pudieron cargar las cuentas", {
         description: accountsError.message,
       });
       return;
     }
-    if (movementsRes.error) {
-      setLoading(false);
+
+    setAccounts(accountsData || []);
+  }, []);
+
+  const loadMovements = useCallback(async () => {
+    setLoading(true);
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    let query = supabase
+      .from("account_movements")
+      .select(
+        "id, created_at, movement_date, account_id, type, amount, currency, amount_ars, related_table, related_id, notes, accounts(name, currency)",
+        { count: "exact" }
+      )
+      .order("movement_date", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to);
+
+    if (filters.accountId !== "all") {
+      query = query.eq("account_id", filters.accountId);
+    }
+    if (filters.type !== "all") {
+      query = query.eq("type", filters.type);
+    }
+    if (filters.dateFrom) {
+      query = query.gte("movement_date", filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      query = query.lte("movement_date", filters.dateTo);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) {
       toast.error("No se pudieron cargar los movimientos", {
-        description: movementsRes.error.message,
+        description: error.message,
       });
+      setLoading(false);
       return;
     }
 
-    setAccounts(accountsData || []);
-    setMovements(movementsRes.data || []);
+    setMovements(data || []);
+    setTotalCount(count || 0);
     setLoading(false);
-  };
+  }, [filters, page, pageSize]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadAccounts();
+  }, [loadAccounts]);
 
-  const movementsFiltered = useMemo(() => {
-    return movements.filter((m) => {
-      if (filters.accountId !== "all" && String(m.account_id) !== filters.accountId) {
-        return false;
-      }
-      if (filters.type !== "all" && m.type !== filters.type) {
-        return false;
-      }
-      if (filters.dateFrom && new Date(m.movement_date) < new Date(filters.dateFrom)) {
-        return false;
-      }
-      if (filters.dateTo && new Date(m.movement_date) > new Date(filters.dateTo)) {
-        return false;
-      }
-      return true;
-    });
-  }, [movements, filters]);
+  useEffect(() => {
+    loadMovements();
+  }, [loadMovements]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters.accountId, filters.type, filters.dateFrom, filters.dateTo]);
 
   const accountBalances = useMemo(() => {
     const totals = new Map();
@@ -134,6 +159,55 @@ export default function MovementsConfig() {
       { ars: 0, usd: 0 }
     );
   }, [accountBalances]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  const openMovementDetail = useCallback(async (movement) => {
+    setDetailMovement(movement);
+    setDetailData(null);
+    setDetailOpen(true);
+
+    if (!movement?.related_table || !movement?.related_id) return;
+    setDetailLoading(true);
+
+    let detailResponse = null;
+    if (movement.related_table === "sale_payments") {
+      detailResponse = await supabase
+        .from("sale_payments")
+        .select(
+          "id, sale_id, amount_ars, amount_usd, payment_method_id, installments, reference, created_at, payment_methods(name), sales(id, total_ars, customer_id)"
+        )
+        .eq("id", movement.related_id)
+        .maybeSingle();
+    } else if (movement.related_table === "purchase_payments") {
+      detailResponse = await supabase
+        .from("purchase_payments")
+        .select(
+          "id, purchase_id, amount, currency, amount_ars, payment_method_id, created_at, purchases(purchase_date, total_amount, currency, providers(name)), payment_methods(name)"
+        )
+        .eq("id", movement.related_id)
+        .maybeSingle();
+    } else if (movement.related_table === "expenses") {
+      detailResponse = await supabase
+        .from("expenses")
+        .select(
+          "id, expense_date, amount, currency, amount_ars, category, type, notes, account_id"
+        )
+        .eq("id", movement.related_id)
+        .maybeSingle();
+    }
+
+    if (detailResponse?.error) {
+      toast.error("No se pudo cargar el detalle", {
+        description: detailResponse.error.message,
+      });
+      setDetailLoading(false);
+      return;
+    }
+
+    setDetailData(detailResponse?.data || null);
+    setDetailLoading(false);
+  }, []);
 
   return (
     <div className=" mt-6 space-y-6">
@@ -200,7 +274,7 @@ export default function MovementsConfig() {
       <Card>
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <CardTitle>Movimientos</CardTitle>
-          <Button onClick={loadData} disabled={loading}>
+          <Button onClick={loadMovements} disabled={loading}>
             {loading ? "Actualizando..." : "Actualizar"}
           </Button>
         </CardHeader>
@@ -267,8 +341,12 @@ export default function MovementsConfig() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {movementsFiltered.map((m) => (
-                  <TableRow key={m.id}>
+                {movements.map((m) => (
+                  <TableRow
+                    key={m.id}
+                    className="cursor-pointer"
+                    onClick={() => openMovementDetail(m)}
+                  >
                     <TableCell>{m.movement_date}</TableCell>
                     <TableCell>
                       {m.accounts?.name || `Cuenta ${m.account_id}`}
@@ -287,7 +365,7 @@ export default function MovementsConfig() {
                     <TableCell>{m.notes || "-"}</TableCell>
                   </TableRow>
                 ))}
-                {movementsFiltered.length === 0 && (
+                {movements.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground">
                       No hay movimientos para mostrar.
@@ -297,8 +375,95 @@ export default function MovementsConfig() {
               </TableBody>
             </Table>
           </div>
+          <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
+            <div className="text-sm text-muted-foreground">
+              Mostrando {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, totalCount)} de {totalCount}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || loading}
+              >
+                Anterior
+              </Button>
+              <div className="text-sm">
+                {page} / {totalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages || loading}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
+
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Detalle del movimiento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <div><strong>Fecha:</strong> {detailMovement?.movement_date || "-"}</div>
+            <div><strong>Cuenta:</strong> {detailMovement?.accounts?.name || "-"}</div>
+            <div>
+              <strong>Monto:</strong>{" "}
+              {formatCurrency(detailMovement?.amount, detailMovement?.currency)}
+            </div>
+            <div><strong>Tipo:</strong> {detailMovement?.type === "income" ? "Ingreso" : detailMovement?.type === "expense" ? "Egreso" : "Transferencia"}</div>
+            <div>
+              <strong>Origen:</strong>{" "}
+              {detailMovement?.related_table
+                ? `${detailMovement.related_table === "sale_payments" ? "Venta" : detailMovement.related_table === "purchase_payments" ? "Compra" : detailMovement.related_table === "expenses" ? "Gasto" : detailMovement.related_table === ""} #${detailMovement.related_id}`
+                : "Manual"}
+            </div>
+            {detailMovement?.notes && (
+              <div><strong>Notas:</strong> {detailMovement.notes}</div>
+            )}
+          </div>
+          <div className="rounded-md border p-3 text-sm">
+            {detailLoading && <div className="text-muted-foreground">Cargando detalle...</div>}
+            {!detailLoading && !detailData && (
+              <div className="text-muted-foreground">No hay detalle adicional.</div>
+            )}
+            {!detailLoading && detailData && (
+              <div className="space-y-2">
+                {detailMovement?.related_table === "sale_payments" && (
+                  <>
+                    <div><strong>Venta:</strong> #{detailData.sale_id}</div>
+                    <div><strong>Metodo:</strong> {detailData.payment_methods?.name || "-"}</div>
+                    <div><strong>Cuotas:</strong> {detailData.installments || "-"}</div>
+                    {detailData.reference && (
+                      <div><strong>Referencia:</strong> {detailData.reference}</div>
+                    )}
+                  </>
+                )}
+                {detailMovement?.related_table === "purchase_payments" && (
+                  <>
+                    <div><strong>Compra:</strong> #{detailData.purchase_id}</div>
+                    <div><strong>Proveedor:</strong> {detailData.purchases?.providers?.name || "-"}</div>
+                    <div><strong>Metodo:</strong> {detailData.payment_methods?.name || "-"}</div>
+                    <div><strong>Fecha compra:</strong> {detailData.purchases?.purchase_date || "-"}</div>
+                  </>
+                )}
+                {detailMovement?.related_table === "expenses" && (
+                  <>
+                    <div><strong>Categoria:</strong> {detailData.category || "-"}</div>
+                    <div><strong>Tipo:</strong> {detailData.type || "-"}</div>
+                    <div><strong>Fecha gasto:</strong> {detailData.expense_date || "-"}</div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

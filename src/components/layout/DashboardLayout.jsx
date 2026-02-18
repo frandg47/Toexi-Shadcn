@@ -81,7 +81,7 @@ export default function DashboardLayout() {
   const navMain = [
     ...navMainBase,
     ...(isOwner
-      ? [{ title: "Gastos", url: "/dashboard/expenses", icon: IconCash }]
+      ? [{ title: "Ingresos/Gastos", url: "/dashboard/expenses", icon: IconCash }]
       : []),
   ];
 

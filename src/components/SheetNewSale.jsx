@@ -47,6 +47,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
   // --- Exchange rate ---
   const [exchangeRate, setExchangeRate] = useState(null);
+  const [usdtRate, setUsdtRate] = useState(null);
 
   // --- Lookups ---
   const [customers, setCustomers] = useState([]);
@@ -174,6 +175,23 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     }
     return 0;
   }, [surcharge, baseTotal]);
+
+  const getPaymentDisplayCurrency = (methodName) => {
+    const upper = methodName?.toUpperCase();
+    if (upper === "USDT") return "USDT";
+    if (upper === "USD") return "USD";
+    return "ARS";
+  };
+
+  const isUSDMethod = (methodName) =>
+    ["USD", "USDT"].includes(methodName?.toUpperCase());
+
+  const getPaymentFxRate = (methodName) => {
+    const upper = methodName?.toUpperCase();
+    if (upper === "USDT") return usdtRate;
+    if (upper === "USD") return exchangeRate;
+    return 1;
+  };
   // pagos sin interés (efectivo/transfer/macro)
   const paidNoInterest = useMemo(() => {
     return payments
@@ -186,8 +204,17 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
         const multiplier = info?.multiplier || p.multiplier || 1;
         return Number(multiplier) === 1;
       })
-      .reduce((acc, p) => acc + Number(p.amount || 0), 0);
-  }, [payments, paymentInstallments]);
+      .reduce((acc, p) => {
+        const amount = Number(p.amount || 0);
+        if (isUSDMethod(p.method_name)) {
+          const rate = getPaymentFxRate(p.method_name);
+          if (rate) {
+            return acc + amount * rate;
+          }
+        }
+        return acc + amount;
+      }, 0);
+  }, [payments, paymentInstallments, exchangeRate, usdtRate]);
 
   const totalAfterAdjustments = useMemo(() => {
     return Math.max(baseTotal - discountAmount + surchargeAmount, 0);
@@ -254,8 +281,14 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     return totalDue / exchangeRate;
   }, [totalDue, exchangeRate]);
 
-  // Helper para saber si es USD
-  const isUSDMethod = (methodName) => methodName?.toUpperCase() === "USD";
+  const hasMissingAccount = useMemo(
+    () =>
+      payments.some(
+        (p) => p.payment_method_id && (!p.account_id || p.account_id === "")
+      ),
+    [payments]
+  );
+
   const getAccountsForPayment = (payment) => {
     if (!payment?.method_name) return accounts;
     const currency = isUSDMethod(payment.method_name) ? "USD" : "ARS";
@@ -266,12 +299,15 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   const paidARS = useMemo(() => {
     return payments.reduce((acc, p) => {
       const amount = Number(p.amount || 0);
-      if (isUSDMethod(p.method_name) && exchangeRate) {
-        return acc + (amount * exchangeRate);
+      if (isUSDMethod(p.method_name)) {
+        const rate = getPaymentFxRate(p.method_name);
+        if (rate) {
+          return acc + (amount * rate);
+        }
       }
       return acc + amount;
     }, 0);
-  }, [payments, exchangeRate]);
+  }, [payments, exchangeRate, usdtRate]);
 
   // saldo restante
   const remaining = useMemo(() => {
@@ -317,12 +353,20 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     const fetchExchangeRate = async () => {
       const { data, error } = await supabase
         .from("fx_rates")
-        .select("rate")
+        .select("source, rate")
         .eq("is_active", true)
-        .maybeSingle();
+        .in("source", ["blue", "USDT"]);
 
       if (error) console.error("Error obteniendo cotización:", error);
-      if (data) setExchangeRate(Number(data.rate));
+      const rates = data || [];
+      const blueRate = rates.find(
+        (r) => r.source?.toLowerCase() === "blue"
+      );
+      const usdt = rates.find(
+        (r) => r.source?.toUpperCase() === "USDT"
+      );
+      setExchangeRate(blueRate?.rate ? Number(blueRate.rate) : null);
+      setUsdtRate(usdt?.rate ? Number(usdt.rate) : null);
     };
     fetchExchangeRate();
   }, []);
@@ -652,10 +696,20 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       return toast.error("Selecciona una cuenta para cada pago");
     }
 
-    if (Math.round(paidARS) !== Math.round(totalDue)) {
+    const remainingDiff = Math.abs(paidARS - totalDue);
+    if (Math.round(remainingDiff) > 10) {
       return toast.error(
         "El total pagado no coincide con el total de la venta"
       );
+    }
+
+    const usesUsd = normalized.some((p) => p.method_name?.toUpperCase() === "USD");
+    const usesUsdt = normalized.some((p) => p.method_name?.toUpperCase() === "USDT");
+    if (usesUsd && !exchangeRate) {
+      return toast.error("No hay cotizacion activa para USD");
+    }
+    if (usesUsdt && !usdtRate) {
+      return toast.error("No hay cotizacion activa para USDT");
     }
 
     // Chequeo de stock
@@ -717,6 +771,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       total_usd: totalUsdDue,
       total_ars: items.reduce((acc, it) => acc + it.subtotal_ars, 0),
       fx_rate_used: exchangeRate,
+      fx_rate_usdt: usdtRate,
       notes: form.notes || null,
       payments: normalized,
       variants: items,
@@ -1315,6 +1370,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                         updatePaymentField(i, "method", chosen?.name.toLowerCase());
                         updatePaymentField(i, "installments", "");
                         updatePaymentField(i, "multiplier", chosen?.multiplier || 1);
+                        updatePaymentField(i, "amount", "");
                         const accountsForMethod = getAccountsForPayment({
                           method_name: chosen?.name,
                         });
@@ -1356,6 +1412,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                               "multiplier",
                               inst?.multiplier || 1
                             );
+                            updatePaymentField(i, "amount", "");
                           }}
                         >
                           <SelectTrigger className="w-28">
@@ -1413,11 +1470,16 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                           No hay cuentas disponibles para esta moneda
                         </div>
                       )}
+                      {p.payment_method_id && !p.account_id && (
+                        <div className="text-xs text-destructive">
+                          Selecciona una cuenta para este pago.
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2 items-end">
                       <Input
                         className="flex-1"
-                        placeholder={isUSDMethod(p.method_name) ? "Monto (USD)" : "Monto (ARS)"}
+                        placeholder={`Monto (${getPaymentDisplayCurrency(p.method_name)})`}
                         type="number"
                         value={p.amount}
                         onChange={(e) =>
@@ -1443,13 +1505,19 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                             ) {
                               return;
                             }
-                            if (isUSDMethod(p.method_name) && exchangeRate) {
-                              // Si es USD, convertir el remaining (ARS) a USD
-                              const remainingUSD = remaining / exchangeRate;
+                            if (isUSDMethod(p.method_name)) {
+                              const rate = getPaymentFxRate(p.method_name);
+                              if (!rate) {
+                                const label = getPaymentDisplayCurrency(p.method_name);
+                                toast.error(`No hay cotizacion activa para ${label}`);
+                                return;
+                              }
+                              // Si es USD/USDT, convertir el remaining (ARS) a esa moneda
+                              const remainingUSD = remaining / rate;
                               updatePaymentField(i, "amount", String(remainingUSD.toFixed(2)));
-                            } else {
-                              updatePaymentField(i, "amount", String(remaining));
+                              return;
                             }
+                            updatePaymentField(i, "amount", String(remaining));
                           }}
                         >
                           Restante
@@ -1498,9 +1566,14 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                 {payments.map((p, i) => {
                   if (!p.payment_method_id) return null;
                   const amount = Number(p.amount || 0);
-                  const isUSD = isUSDMethod(p.method_name);
-                  const displayAmount = isUSD ? formatUSD(amount) : formatARS(amount);
-                  const arsEquivalent = isUSD && exchangeRate ? amount * exchangeRate : amount;
+                  const displayCurrency = getPaymentDisplayCurrency(p.method_name);
+                  const isUsdLike = displayCurrency !== "ARS";
+                  const isUSD = false;
+                  const displayAmount = isUsdLike
+                    ? `${displayCurrency} ${amount.toFixed(2)}`
+                    : formatARS(amount);
+                  const rate = isUsdLike ? getPaymentFxRate(p.method_name) : 1;
+                  const arsEquivalent = isUsdLike && rate ? amount * rate : amount;
                   
                   return (
                     <div key={i} className="col-span-2 flex justify-between">
@@ -1509,6 +1582,11 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                       </div>
                       <div className="text-right">
                         <div>{displayAmount}</div>
+                        {isUsdLike && rate && (
+                          <div className="text-xs text-muted-foreground">
+                            {formatARS(arsEquivalent)}
+                          </div>
+                        )}
                         {isUSD && <div className="text-xs text-muted-foreground">≈ {formatARS(arsEquivalent)}</div>}
                       </div>
                     </div>
@@ -1575,11 +1653,16 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                   <div>{formatARS(paidARS)}</div>
                   {payments.some(p => isUSDMethod(p.method_name)) && (
                     <div className="text-xs text-muted-foreground">
-                      {payments.filter(p => isUSDMethod(p.method_name)).map((p, i) => (
-                        <div key={i}>
-                          {formatUSD(Number(p.amount || 0))} ({p.method_name})
-                        </div>
-                      ))}
+                      {payments.filter(p => isUSDMethod(p.method_name)).map((p, i) => {
+                        const displayCurrency = getPaymentDisplayCurrency(p.method_name);
+                        const amount = Number(p.amount || 0);
+                        const displayAmount = `${displayCurrency} ${amount.toFixed(2)}`;
+                        return (
+                          <div key={i}>
+                            {displayAmount} ({p.method_name})
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1612,7 +1695,11 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                   Volver
                 </Button>
 
-                <Button className="" disabled={loading} onClick={handleSubmit}>
+                <Button
+                  className=""
+                  disabled={loading || hasMissingAccount}
+                  onClick={handleSubmit}
+                >
                   {loading ? "Guardando..." : "Finalizar"}
                 </Button>
               </div>

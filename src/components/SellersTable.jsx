@@ -160,11 +160,13 @@ const SellersTable = ({ refreshToken = 0 }) => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [fxRate, setFxRate] = useState(null);
+    const [accounts, setAccounts] = useState([]);
     const [availableMonths, setAvailableMonths] = useState([]);
     const [paymentDialog, setPaymentDialog] = useState({
         open: false,
         paymentRecord: null,
     });
+    const [paymentAccountId, setPaymentAccountId] = useState("");
     const [salesDialogOpen, setSalesDialogOpen] = useState(false);
     const [salesDialogTitle, setSalesDialogTitle] = useState("");
     const [salesDialogItems, setSalesDialogItems] = useState([]);
@@ -285,6 +287,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
                 .from("fx_rates")
                 .select("rate")
                 .eq("is_active", true)
+                .eq("source", "blue")
                 .maybeSingle();
 
             if (fxError) throw fxError;
@@ -435,12 +438,47 @@ const SellersTable = ({ refreshToken = 0 }) => {
         fetchSellers(refreshToken === 0);
     }, [fetchSellers, refreshToken]);
 
+    useEffect(() => {
+        const loadAccounts = async () => {
+            const { data, error } = await supabase
+                .from("accounts")
+                .select("id, name, currency")
+                .order("name", { ascending: true });
+            if (error) {
+                console.error(error);
+                return;
+            }
+            setAccounts(data || []);
+        };
+
+        loadAccounts();
+    }, []);
+
     const handlePayment = useCallback(async (paymentRecord) => {
         try {
             setRefreshing(true);
 
+            if (!paymentAccountId) {
+                toast.error("Selecciona una cuenta para registrar el pago");
+                return;
+            }
+
+            const account = accounts.find(
+                (acc) => String(acc.id) === String(paymentAccountId)
+            );
+            if (!account) {
+                toast.error("Selecciona una cuenta valida");
+                return;
+            }
+
+            if (account.currency === "USD" && !fxRate) {
+                toast.error("No hay cotizacion activa para USD");
+                return;
+            }
+
             const paidAt = new Date().toISOString();
             let error;
+            let paymentId = paymentRecord.id || null;
 
             if (paymentRecord.id) {
                 ({ error } = await supabase
@@ -448,7 +486,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
                     .update({ paid_at: paidAt })
                     .eq("id", paymentRecord.id));
             } else {
-                ({ error } = await supabase
+                const insertRes = await supabase
                     .from("commission_payments")
                     .insert([
                         {
@@ -458,16 +496,48 @@ const SellersTable = ({ refreshToken = 0 }) => {
                             total_amount: paymentRecord.commissions_total_usd || 0,
                             paid_at: paidAt,
                         },
-                    ]));
+                    ])
+                    .select("id")
+                    .single();
+                error = insertRes.error;
+                paymentId = insertRes.data?.id || null;
             }
 
             if (error) throw error;
+
+            if (!paymentId) throw new Error("No se pudo determinar el pago");
+
+            const isUsdAccount = account.currency === "USD";
+            const amount = isUsdAccount
+                ? Number(paymentRecord.commissions_total_usd || 0)
+                : Number(paymentRecord.commissions_total_ars || 0);
+            const amountArs = isUsdAccount ? amount * fxRate : amount;
+
+            const { error: movementError } = await supabase
+                .from("account_movements")
+                .insert([
+                    {
+                        account_id: account.id,
+                        type: "expense",
+                        amount,
+                        currency: account.currency,
+                        amount_ars: amountArs,
+                        fx_rate_used: isUsdAccount ? fxRate : null,
+                        related_table: "commission_payments",
+                        related_id: paymentId,
+                        notes: `Pago de comision a ${buildFullName(paymentRecord.seller)}`,
+                        movement_date: paidAt.slice(0, 10),
+                    },
+                ]);
+
+            if (movementError) throw movementError;
 
             toast.success("Pago registrado", {
                 description: `Se registró el pago de comisión para ${buildFullName(paymentRecord.seller)}.`,
             });
 
             setPaymentDialog({ open: false, paymentRecord: null });
+            setPaymentAccountId("");
             fetchSellers(false);
         } catch (error) {
             console.error(error);
@@ -477,7 +547,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
         } finally {
             setRefreshing(false);
         }
-    }, [fetchSellers]);
+    }, [accounts, fetchSellers, fxRate, paymentAccountId]);
 
     const toggleColumn = useCallback((columnName) => {
         setVisibleColumns((current) =>
@@ -710,6 +780,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
                                                             open: true,
                                                             paymentRecord: payment,
                                                         });
+                                                        setPaymentAccountId("");
                                                     }
                                                 }}
                                                 disabled={refreshing || payment.isPaid}
@@ -756,6 +827,26 @@ const SellersTable = ({ refreshToken = 0 }) => {
                                     </p>
                                 </div>
                             )}
+                            {paymentDialog.paymentRecord && (
+                                <div className="space-y-2 mt-4">
+                                    <strong>Cuenta:</strong>
+                                    <Select
+                                        value={paymentAccountId}
+                                        onValueChange={setPaymentAccountId}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Seleccionar cuenta" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {accounts.map((acc) => (
+                                                <SelectItem key={acc.id} value={String(acc.id)}>
+                                                    {acc.name} ({acc.currency})
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -763,6 +854,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
                         <AlertDialogAction
                             onClick={() => handlePayment(paymentDialog.paymentRecord)}
                             className="bg-green-600 hover:bg-green-700"
+                            disabled={!paymentAccountId}
                         >
                             Confirmar pago
                         </AlertDialogAction>

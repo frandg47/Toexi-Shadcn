@@ -39,6 +39,12 @@ const formatUSD = (n) =>
 export default function AccountsConfig() {
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState([]);
+  const [editId, setEditId] = useState(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    initial_balance: "",
+    currency: "ARS",
+  });
   const [form, setForm] = useState({
     name: "",
     initial_balance: "",
@@ -66,6 +72,56 @@ export default function AccountsConfig() {
   useEffect(() => {
     loadAccounts();
   }, []);
+
+  const startEdit = (account) => {
+    setEditId(account.id);
+    setEditForm({
+      name: account.name || "",
+      initial_balance: String(account.initial_balance ?? ""),
+      currency: account.currency || "ARS",
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditId(null);
+    setEditForm({
+      name: "",
+      initial_balance: "",
+      currency: "ARS",
+    });
+  };
+
+  const handleUpdateAccount = async () => {
+    const name = editForm.name.trim();
+    const initialBalance = Number(editForm.initial_balance || 0);
+
+    if (!name) return toast.error("Ingresa un nombre de cuenta");
+    if (Number.isNaN(initialBalance))
+      return toast.error("Monto inicial invalido");
+
+    setLoading(true);
+    const { error } = await supabase
+      .from("accounts")
+      .update({
+        name,
+        initial_balance: initialBalance,
+        currency: editForm.currency,
+      })
+      .eq("id", editId);
+
+    if (error) {
+      setLoading(false);
+      toast.error("No se pudo actualizar la cuenta", {
+        description: error.message,
+      });
+      return;
+    }
+
+    toast.success("Cuenta actualizada");
+    await loadAccounts();
+    setLoading(false);
+    cancelEdit();
+  };
 
   const handleCreateAccount = async () => {
     const name = form.name.trim();
@@ -166,26 +222,96 @@ export default function AccountsConfig() {
                 <TableHead>Cuenta</TableHead>
                 <TableHead>Moneda</TableHead>
                 <TableHead>Saldo inicial</TableHead>
-                <TableHead>Balance</TableHead>
+                <TableHead>Incluir</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {accounts.map((acc) => (
                 <TableRow key={acc.id}>
-                  <TableCell>{acc.name}</TableCell>
-                  <TableCell>{acc.currency}</TableCell>
                   <TableCell>
-                    {acc.currency === "USD"
-                      ? formatUSD(acc.initial_balance)
-                      : formatARS(acc.initial_balance)}
+                    {editId === acc.id ? (
+                      <Input
+                        value={editForm.name}
+                        onChange={(e) =>
+                          setEditForm((f) => ({ ...f, name: e.target.value }))
+                        }
+                      />
+                    ) : (
+                      acc.name
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editId === acc.id ? (
+                      <Select
+                        value={editForm.currency}
+                        onValueChange={(value) =>
+                          setEditForm((f) => ({ ...f, currency: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Moneda" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ARS">ARS</SelectItem>
+                          <SelectItem value="USD">USD</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      acc.currency
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editId === acc.id ? (
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editForm.initial_balance}
+                        onChange={(e) =>
+                          setEditForm((f) => ({
+                            ...f,
+                            initial_balance: e.target.value,
+                          }))
+                        }
+                      />
+                    ) : acc.currency === "USD" ? (
+                      formatUSD(acc.initial_balance)
+                    ) : (
+                      formatARS(acc.initial_balance)
+                    )}
                   </TableCell>
                   <TableCell>{acc.include_in_balance ? "Si" : "No"}</TableCell>
+                  <TableCell className="text-right">
+                    {editId === acc.id ? (
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          size="sm"
+                          onClick={handleUpdateAccount}
+                          disabled={loading}
+                        >
+                          Guardar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={cancelEdit}
+                          disabled={loading}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => startEdit(acc)}>
+                        Editar
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
               {accounts.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="text-center text-muted-foreground"
                   >
                     No hay cuentas creadas.

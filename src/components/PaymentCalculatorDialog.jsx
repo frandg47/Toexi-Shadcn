@@ -68,6 +68,7 @@ export default function PaymentCalculatorDialog({ open, onOpenChange }) {
         .from("fx_rates")
         .select("rate")
         .eq("is_active", true)
+        .eq("source", "blue")
         .maybeSingle();
 
       if (fx?.rate) setExchangeRate(Number(fx.rate));

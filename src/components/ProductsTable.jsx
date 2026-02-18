@@ -183,7 +183,8 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       ] = await Promise.all([
         supabase
           .from("fx_rates")
-          .select("id, source, rate, is_active, created_at"),
+          .select("id, source, rate, is_active, created_at")
+          .eq("source", "blue"),
         supabase
           .from("products")
           .select(

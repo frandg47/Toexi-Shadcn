@@ -636,11 +636,11 @@ export default function SellersTop({ role }) {
       </Card>
 
       <Dialog open={salesDialogOpen} onOpenChange={setSalesDialogOpen}>
-        <DialogContent className="w-[90vw] sm:max-w-3xl max-h-[85svh] overflow-y-auto">
+        <DialogContent className="w-[90vw] sm:max-w-3xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>{salesDialogTitle}</DialogTitle>
           </DialogHeader>
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>

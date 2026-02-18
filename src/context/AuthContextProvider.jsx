@@ -10,6 +10,16 @@ import {
 import { supabase } from "../lib/supabaseClient";
 import { toast } from "sonner";
 
+const isNetworkError = (error) => {
+  const message = `${error?.message || ""}`.toLowerCase();
+  return (
+    error?.name === "TypeError" ||
+    message.includes("failed to fetch") ||
+    message.includes("networkerror") ||
+    message.includes("err_name_not_resolved")
+  );
+};
+
 const AuthContext = createContext({
   user: null,
   role: null,
@@ -31,13 +41,27 @@ export const AuthContextProvider = ({ children }) => {
   // 🧠 Flag persistente para no repetir toast
   const hasShownInactiveToast = useRef(false);
 
+  const setBackendUnavailable = useCallback((error) => {
+    setError(
+      "No pudimos conectar con el servidor. Por favor, intenta nuevamente en unos minutos."
+    );
+    setStatus("backend-unavailable");
+    if (error) {
+      console.error("Backend no disponible:", error);
+    }
+  }, []);
+
   // 🔹 Cargar o crear usuario
   const loadUser = useCallback(
     async (sessionUser) => {
       if (!sessionUser) {
         for (let i = 0; i < 5; i++) {
           await new Promise((r) => setTimeout(r, 300)); // espera 300 ms
-          const { data: retry } = await supabase.auth.getSession();
+          const { data: retry, error: retryError } = await supabase.auth.getSession();
+          if (retryError && isNetworkError(retryError)) {
+            setBackendUnavailable(retryError);
+            return;
+          }
           sessionUser = retry?.session?.user;
           if (sessionUser) break;
         }
@@ -62,6 +86,10 @@ export const AuthContextProvider = ({ children }) => {
         .maybeSingle();
 
       if (queryError) {
+        if (isNetworkError(queryError)) {
+          setBackendUnavailable(queryError);
+          return;
+        }
         console.error("Error al consultar usuario:", queryError.message);
         setError(queryError.message);
         setStatus("ready");
@@ -70,11 +98,16 @@ export const AuthContextProvider = ({ children }) => {
 
       // 🧱 Si no existe → crear
       if (!data) {
-        const { data: existing } = await supabase
+        const { data: existing, error: existingError } = await supabase
           .from("users")
           .select("id")
           .eq("id_auth", sessionUser.id)
           .maybeSingle();
+
+        if (existingError && isNetworkError(existingError)) {
+          setBackendUnavailable(existingError);
+          return;
+        }
 
         if (!existing) {
           const { error: insertError } = await supabase.from("users").insert([
@@ -95,6 +128,10 @@ export const AuthContextProvider = ({ children }) => {
 
 
           if (insertError && insertError.code !== "23505") {
+            if (isNetworkError(insertError)) {
+              setBackendUnavailable(insertError);
+              return;
+            }
             console.error("Error al insertar usuario:", insertError.message);
             setError(insertError.message);
           } else if (!insertError) {
@@ -145,14 +182,18 @@ export const AuthContextProvider = ({ children }) => {
       setError(null);
       setStatus("ready");
     },
-    [profile]
+    [profile, setBackendUnavailable]
   );
 
   // 🔹 Refrescar perfil manualmente
   const refreshProfile = useCallback(async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError && isNetworkError(sessionError)) {
+      setBackendUnavailable(sessionError);
+      return;
+    }
     await loadUser(sessionData?.session?.user ?? null);
-  }, [loadUser]);
+  }, [loadUser, setBackendUnavailable]);
 
   // 🔹 Inicialización + listener de sesión
   useEffect(() => {
@@ -160,7 +201,11 @@ export const AuthContextProvider = ({ children }) => {
     let lastUserId = null;
 
     const initialize = async () => {
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError && isNetworkError(sessionError)) {
+        setBackendUnavailable(sessionError);
+        return;
+      }
       const currentUser = sessionData?.session?.user ?? null;
       if (!isSubscribed) return;
       if (currentUser?.id !== lastUserId) {
@@ -187,7 +232,7 @@ export const AuthContextProvider = ({ children }) => {
       isSubscribed = false;
       authListener?.subscription?.unsubscribe?.();
     };
-  }, [loadUser]);
+  }, [loadUser, setBackendUnavailable]);
 
   // 🔹 Valor del contexto
   const value = useMemo(

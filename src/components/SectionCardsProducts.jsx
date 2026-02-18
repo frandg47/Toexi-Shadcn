@@ -50,6 +50,7 @@ export default function SectionCardsProducts() {
         .from("fx_rates")
         .select("id, source, rate, is_active, created_at")
         .eq("is_active", true)
+        .eq("source", "blue")
         .limit(1);
 
       if (fxActiveError) throw fxActiveError;

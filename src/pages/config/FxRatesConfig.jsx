@@ -511,6 +511,7 @@ const FxRatesConfig = () => {
 
             const currentRate =
               allSourceRates.find((r) => r.is_active) || allSourceRates[0];
+            const isReference = source?.toLowerCase() === "blue";
 
             return (
               <Card
@@ -525,6 +526,9 @@ const FxRatesConfig = () => {
                       <Badge className="bg-green-500 text-white shadow-md">
                         Activa
                       </Badge>
+                    )}
+                    {isReference && (
+                      <Badge variant="outline">Referencia</Badge>
                     )}
                   </CardTitle>
                   <div className="flex gap-2">

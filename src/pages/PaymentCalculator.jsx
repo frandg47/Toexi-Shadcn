@@ -56,7 +56,12 @@ export default function PaymentCalculator() {
     // =========================================================
     useEffect(() => {
         const fetchExchangeRate = async () => {
-            const { data } = await supabase.from("fx_rates").select("rate").eq("is_active", true).maybeSingle();
+            const { data } = await supabase
+              .from("fx_rates")
+              .select("rate")
+              .eq("is_active", true)
+              .eq("source", "blue")
+              .maybeSingle();
             if (data) setExchangeRate(Number(data.rate));
         };
         fetchExchangeRate();

@@ -13,6 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 
@@ -23,6 +29,13 @@ const formatARS = (n) =>
     minimumFractionDigits: 2,
   }).format(n || 0);
 
+const formatUSD = (n) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+  }).format(n || 0);
+
 const PurchasesConfig = () => {
   const { role } = useAuth();
   const isOwner = role?.toLowerCase() === "owner";
@@ -30,11 +43,17 @@ const PurchasesConfig = () => {
   const [variants, setVariants] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [fxRate, setFxRate] = useState(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailPurchase, setDetailPurchase] = useState(null);
+  const [detailItems, setDetailItems] = useState([]);
+  const [accounts, setAccounts] = useState([]);
 
   const [form, setForm] = useState({
     provider_id: "",
     purchase_date: new Date().toISOString().slice(0, 10),
     currency: "ARS",
+    account_id: "",
     notes: "",
   });
   const [items, setItems] = useState([]);
@@ -43,7 +62,13 @@ const PurchasesConfig = () => {
 
   useEffect(() => {
     const load = async () => {
-      const [{ data: prov }, { data: vars }, { data: rate }, { data: list }] =
+      const [
+        { data: prov },
+        { data: vars },
+        { data: rate },
+        { data: list },
+        { data: accountsData },
+      ] =
         await Promise.all([
           supabase.from("providers").select("id, name").order("name"),
           supabase
@@ -55,6 +80,7 @@ const PurchasesConfig = () => {
             .from("fx_rates")
             .select("rate")
             .eq("is_active", true)
+            .eq("source", "blue")
             .maybeSingle(),
           supabase
             .from("purchases")
@@ -63,16 +89,45 @@ const PurchasesConfig = () => {
             )
             .order("purchase_date", { ascending: false })
             .limit(20),
+          supabase
+            .from("accounts")
+            .select("id, name, currency")
+            .order("name", { ascending: true }),
         ]);
 
       setProviders(prov || []);
       setVariants(vars || []);
       setFxRate(rate?.rate ? Number(rate.rate) : null);
       setPurchases(list || []);
+      setAccounts(accountsData || []);
     };
 
     load();
   }, []);
+
+  const accountsForCurrency = useMemo(
+    () => accounts.filter((acc) => acc.currency === form.currency),
+    [accounts, form.currency]
+  );
+
+  useEffect(() => {
+    if (!accountsForCurrency.length) {
+      if (form.account_id) {
+        setForm((f) => ({ ...f, account_id: "" }));
+      }
+      return;
+    }
+    if (
+      form.account_id &&
+      !accountsForCurrency.some((acc) => String(acc.id) === form.account_id)
+    ) {
+      setForm((f) => ({ ...f, account_id: "" }));
+      return;
+    }
+    if (accountsForCurrency.length === 1 && !form.account_id) {
+      setForm((f) => ({ ...f, account_id: String(accountsForCurrency[0].id) }));
+    }
+  }, [accountsForCurrency, form.account_id]);
 
   const totalAmount = useMemo(() => {
     return items.reduce(
@@ -104,6 +159,7 @@ const PurchasesConfig = () => {
 
   const handleSave = async () => {
     if (!form.provider_id) return toast.error("Selecciona un proveedor");
+    if (!form.account_id) return toast.error("Selecciona una cuenta");
     if (!items.length) return toast.error("Agrega al menos un producto");
 
     const currency = form.currency;
@@ -130,6 +186,27 @@ const PurchasesConfig = () => {
 
     if (error) {
       toast.error("No se pudo registrar la compra", { description: error.message });
+      return;
+    }
+
+    const { error: paymentError } = await supabase
+      .from("purchase_payments")
+      .insert([
+        {
+          purchase_id: purchase.id,
+          account_id: Number(form.account_id),
+          amount: totalAmount,
+          currency,
+          amount_ars: totalAmountArs,
+          fx_rate_used: currency === "USD" ? fxRate : null,
+          notes: form.notes || null,
+        },
+      ]);
+
+    if (paymentError) {
+      toast.error("Compra creada, pero falló el pago", {
+        description: paymentError.message,
+      });
       return;
     }
 
@@ -164,6 +241,33 @@ const PurchasesConfig = () => {
     setPurchases(list || []);
   };
 
+  const openPurchaseDetail = async (purchase) => {
+    if (!purchase?.id) return;
+    setDetailOpen(true);
+    setDetailLoading(true);
+    setDetailPurchase(purchase);
+    setDetailItems([]);
+
+    const { data, error } = await supabase
+      .from("purchase_items")
+      .select(
+        "id, quantity, unit_cost, subtotal, product_variants(variant_name, color, storage, ram, products(name))"
+      )
+      .eq("purchase_id", purchase.id)
+      .order("id", { ascending: true });
+
+    if (error) {
+      toast.error("No se pudieron cargar los items", {
+        description: error.message,
+      });
+      setDetailLoading(false);
+      return;
+    }
+
+    setDetailItems(data || []);
+    setDetailLoading(false);
+  };
+
   if (!isOwner) {
     return <Navigate to="/unauthorized" replace />;
   }
@@ -182,7 +286,7 @@ const PurchasesConfig = () => {
           <CardTitle>Registrar compra</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-5">
             <Input
               type="date"
               value={form.purchase_date}
@@ -219,6 +323,28 @@ const PurchasesConfig = () => {
               <SelectContent>
                 <SelectItem value="ARS">ARS</SelectItem>
                 <SelectItem value="USD">USD</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={form.account_id}
+              onValueChange={(value) =>
+                setForm((f) => ({ ...f, account_id: value }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Cuenta" />
+              </SelectTrigger>
+              <SelectContent>
+                {accountsForCurrency.length === 0 && (
+                  <SelectItem value="none" disabled>
+                    Sin cuentas para {form.currency}
+                  </SelectItem>
+                )}
+                {accountsForCurrency.map((acc) => (
+                  <SelectItem key={acc.id} value={String(acc.id)}>
+                    {acc.name} ({acc.currency})
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Input
@@ -355,7 +481,11 @@ const PurchasesConfig = () => {
               </TableHeader>
               <TableBody>
                 {purchases.map((p) => (
-                  <TableRow key={p.id}>
+                  <TableRow
+                    key={p.id}
+                    className="cursor-pointer"
+                    onClick={() => openPurchaseDetail(p)}
+                  >
                     <TableCell>{p.purchase_date}</TableCell>
                     <TableCell>{p.providers?.name || "-"}</TableCell>
                     <TableCell>
@@ -378,6 +508,75 @@ const PurchasesConfig = () => {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Detalle de compra</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <div><strong>Proveedor:</strong> {detailPurchase?.providers?.name || "-"}</div>
+            <div><strong>Fecha:</strong> {detailPurchase?.purchase_date || "-"}</div>
+            <div>
+              <strong>Total:</strong>{" "}
+              {detailPurchase?.currency === "USD"
+                ? formatUSD(detailPurchase?.total_amount)
+                : formatARS(detailPurchase?.total_amount)}
+            </div>
+          </div>
+          <div className="rounded-md border overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Producto</TableHead>
+                  <TableHead>Variante</TableHead>
+                  <TableHead>Cantidad</TableHead>
+                  <TableHead>Costo unit.</TableHead>
+                  <TableHead>Subtotal</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detailLoading && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      Cargando items...
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!detailLoading &&
+                  detailItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{item.product_variants?.products?.name || "-"}</TableCell>
+                      <TableCell>
+                        {[item.product_variants?.variant_name, item.product_variants?.color]
+                          .filter(Boolean)
+                          .join(" ")}
+                      </TableCell>
+                      <TableCell>{item.quantity}</TableCell>
+                      <TableCell>
+                        {detailPurchase?.currency === "USD"
+                          ? formatUSD(item.unit_cost)
+                          : formatARS(item.unit_cost)}
+                      </TableCell>
+                      <TableCell>
+                        {detailPurchase?.currency === "USD"
+                          ? formatUSD(item.subtotal)
+                          : formatARS(item.subtotal)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                {!detailLoading && detailItems.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      No hay items registrados.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

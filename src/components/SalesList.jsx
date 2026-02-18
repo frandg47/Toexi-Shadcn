@@ -825,7 +825,7 @@ export function SalesList() {
                     if (!open) closeEditSale();
                 }}
             >
-                <DialogContent className="max-w-md">
+                <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
                     <DialogHeader>
                         <DialogTitle>Editar venta</DialogTitle>
                     </DialogHeader>

@@ -16,7 +16,22 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
   if (!sale) return null;
 
   // Helper para detectar método USD
-  const isUSDMethod = (methodName) => methodName?.toUpperCase() === "USD";
+  const getPaymentDisplayCurrency = (methodName) => {
+    const upper = methodName?.toUpperCase();
+    if (upper === "USDT") return "USDT";
+    if (upper === "USD") return "USD";
+    return "ARS";
+  };
+
+  const isUSDMethod = (methodName) =>
+    ["USD", "USDT"].includes(methodName?.toUpperCase());
+
+  const getPaymentFxRate = (methodName) => {
+    const upper = methodName?.toUpperCase();
+    if (upper === "USDT") return safeSale.fx_rate_usdt || safeSale.fx_rate_used;
+    if (upper === "USD") return safeSale.fx_rate_used;
+    return 1;
+  };
 
   // Convertimos datos a seguros
   const safeSale = {
@@ -327,12 +342,14 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     safeSale.payments.forEach((p) => {
-      const isUSD = isUSDMethod(p.method_name);
+      const displayCurrency = getPaymentDisplayCurrency(p.method_name);
+      const isUsdLike = displayCurrency !== "ARS";
       const amount = Number(p.amount);
-      const displayAmount = isUSD 
-        ? `USD ${amount.toFixed(2)}`
+      const displayAmount = isUsdLike
+        ? `${displayCurrency} ${amount.toFixed(2)}`
         : `$ ${amount.toLocaleString("es-AR")}`;
-      const arsEquivalent = isUSD && safeSale.fx_rate_used 
+      const rate = isUsdLike ? getPaymentFxRate(p.method_name) : null;
+      const arsEquivalent = isUsdLike && rate
         ? ` (≈ $ ${(amount * safeSale.fx_rate_used).toLocaleString("es-AR")})`
         : "";
       
@@ -415,9 +432,12 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
           <div className="border rounded p-2 max-h-32 overflow-y-auto text-xs">
             <strong>Métodos de pago:</strong>
             {safeSale.payments.map((p, i) => {
-              const isUSD = isUSDMethod(p.method_name);
+              const displayCurrency = getPaymentDisplayCurrency(p.method_name);
+              const isUsdLike = displayCurrency !== "ARS";
               const amount = Number(p.amount);
-              const arsEquivalent = isUSD && safeSale.fx_rate_used ? (amount * safeSale.fx_rate_used).toFixed(2) : amount;
+              const rate = isUsdLike ? getPaymentFxRate(p.method_name) : null;
+              const arsEquivalent = isUsdLike && rate ? (amount * rate).toFixed(2) : amount;
+              const isUSD = false;
               
               return (
                 <div key={i} className="flex justify-between border-b py-1">
@@ -427,7 +447,9 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
                   </span>
                   <div className="text-right">
                     <div>
-                      {isUSD ? `USD ${amount.toFixed(2)}` : `$ ${amount.toLocaleString("es-AR")}`}
+                      {isUsdLike
+                        ? `${displayCurrency} ${amount.toFixed(2)}`
+                        : `$ ${amount.toLocaleString("es-AR")}`}
                     </div>
                     {isUSD && <div className="text-muted-foreground">≈ $ {Number(arsEquivalent).toLocaleString("es-AR")}</div>}
                   </div>
