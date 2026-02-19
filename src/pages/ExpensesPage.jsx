@@ -575,7 +575,7 @@ export default function ExpensesPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Cuenta" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[9999]">
                     {accounts.map((acc) => (
                       <SelectItem key={acc.id} value={String(acc.id)}>
                         {acc.name} ({acc.currency})
@@ -596,7 +596,7 @@ export default function ExpensesPage() {
                     <SelectTrigger>
                       <SelectValue placeholder="Categoria" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[9999]">
                       {expenseCategories.map((cat) => (
                         <SelectItem key={cat.id} value={cat.name}>
                           {cat.name}
@@ -658,7 +658,7 @@ export default function ExpensesPage() {
                     <SelectTrigger>
                       <SelectValue placeholder="Periodo" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[9999]">
                       <SelectItem value="days">Dias</SelectItem>
                       <SelectItem value="weeks">Semanas</SelectItem>
                       <SelectItem value="months">Meses</SelectItem>
@@ -718,7 +718,7 @@ export default function ExpensesPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Categoria" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[9999]">
                   <SelectItem value="all">Todas</SelectItem>
                   {expenseCategories.map((cat) => (
                     <SelectItem key={cat.id} value={cat.name}>
@@ -736,7 +736,7 @@ export default function ExpensesPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Cuenta" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[9999]">
                   <SelectItem value="all">Todas</SelectItem>
                   {accounts.map((acc) => (
                     <SelectItem key={acc.id} value={String(acc.id)}>
@@ -754,7 +754,7 @@ export default function ExpensesPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[9999]">
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="overdue">En deuda</SelectItem>
                   <SelectItem value="paid">Pagados</SelectItem>
@@ -954,7 +954,7 @@ export default function ExpensesPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Cuenta" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[9999]">
                   {accounts.map((acc) => (
                     <SelectItem key={acc.id} value={String(acc.id)}>
                       {acc.name} ({acc.currency})
@@ -974,7 +974,7 @@ export default function ExpensesPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Categoria" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[9999]">
                     {incomeCategories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.name}>
                         {cat.name}
@@ -1081,7 +1081,7 @@ export default function ExpensesPage() {
               <SelectTrigger>
                 <SelectValue placeholder="Cuenta" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[9999]">
                 {accounts.map((acc) => (
                   <SelectItem key={acc.id} value={String(acc.id)}>
                     {acc.name} ({acc.currency})
@@ -1098,7 +1098,7 @@ export default function ExpensesPage() {
               <SelectTrigger>
                 <SelectValue placeholder="Categoria" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[9999]">
                 {expenseCategories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.name}>
                     {cat.name}
@@ -1132,7 +1132,7 @@ export default function ExpensesPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Periodo" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[9999]">
                     <SelectItem value="days">Dias</SelectItem>
                     <SelectItem value="weeks">Semanas</SelectItem>
                     <SelectItem value="months">Meses</SelectItem>
@@ -1189,7 +1189,7 @@ export default function ExpensesPage() {
               <SelectTrigger>
                 <SelectValue placeholder="Tipo" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[9999]">
                 <SelectItem value="expense">Gasto</SelectItem>
                 <SelectItem value="income">Ingreso</SelectItem>
               </SelectContent>
