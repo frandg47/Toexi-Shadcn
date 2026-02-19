@@ -47,6 +47,12 @@ const formatARS = (n) =>
     minimumFractionDigits: 2,
   }).format(n || 0);
 
+const formatUSDT = (n) =>
+  `USDT ${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n || 0)}`;
+
 const addInterval = (dateValue, amount, unit) => {
   if (!dateValue || !amount) return null;
   const date = new Date(dateValue);
@@ -95,6 +101,7 @@ export default function ExpensesPage() {
   const [section, setSection] = useState("expenses");
   const [loading, setLoading] = useState(false);
   const [fxRate, setFxRate] = useState(null);
+  const [usdtRate, setUsdtRate] = useState(null);
   const [accounts, setAccounts] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -151,6 +158,7 @@ export default function ExpensesPage() {
       setLoading(true);
       const [
         { data: rate },
+        { data: usdt },
         { data: accs },
         fixedRes,
         variableRes,
@@ -161,6 +169,12 @@ export default function ExpensesPage() {
           .select("rate")
           .eq("is_active", true)
           .eq("source", "blue")
+          .maybeSingle(),
+        supabase
+          .from("fx_rates")
+          .select("rate")
+          .eq("is_active", true)
+          .eq("source", "USDT")
           .maybeSingle(),
         supabase
           .from("accounts")
@@ -188,6 +202,7 @@ export default function ExpensesPage() {
       ]);
 
       setFxRate(rate?.rate ? Number(rate.rate) : null);
+      setUsdtRate(usdt?.rate ? Number(usdt.rate) : null);
       setAccounts(accs || []);
       setCategories(categoriesRes?.data || []);
       const fixedExpenses = fixedRes?.data || [];
@@ -290,10 +305,12 @@ export default function ExpensesPage() {
     if (!amount || Number.isNaN(amount)) return toast.error("Monto invalido");
 
     const currency = selectedAccount.currency || "ARS";
-    if (currency === "USD" && !fxRate) {
-      return toast.error("No hay cotizacion activa para USD");
+    const rate =
+      currency === "USD" ? fxRate : currency === "USDT" ? usdtRate : null;
+    if (currency !== "ARS" && !rate) {
+      return toast.error(`No hay cotizacion activa para ${currency}`);
     }
-    const amountARS = currency === "USD" ? amount * fxRate : amount;
+    const amountARS = currency === "ARS" ? amount : amount * rate;
 
     const { error } = await supabase.from("expenses").insert([
       {
@@ -311,7 +328,7 @@ export default function ExpensesPage() {
             : null,
         frequency_unit:
           expenseForm.type === "fixed" ? expenseForm.frequency_unit : null,
-        fx_rate_used: currency === "USD" ? fxRate : null,
+        fx_rate_used: currency === "ARS" ? null : rate,
       },
     ]);
 
@@ -349,11 +366,13 @@ export default function ExpensesPage() {
     if (!amount || Number.isNaN(amount)) return toast.error("Monto invalido");
 
     const currency = selectedIncomeAccount.currency || "ARS";
-    if (currency === "USD" && !fxRate) {
-      return toast.error("No hay cotizacion activa para USD");
+    const rate =
+      currency === "USD" ? fxRate : currency === "USDT" ? usdtRate : null;
+    if (currency !== "ARS" && !rate) {
+      return toast.error(`No hay cotizacion activa para ${currency}`);
     }
 
-    const amountARS = currency === "USD" ? amount * fxRate : amount;
+    const amountARS = currency === "ARS" ? amount : amount * rate;
     const notes = [
       incomeForm.category ? `Categoria: ${incomeForm.category}` : "",
       incomeForm.notes,
@@ -369,7 +388,7 @@ export default function ExpensesPage() {
         amount,
         currency,
         amount_ars: amountARS,
-        fx_rate_used: currency === "USD" ? fxRate : null,
+        fx_rate_used: currency === "ARS" ? null : rate,
         related_table: "manual_income",
         notes: notes || null,
       },
@@ -422,10 +441,12 @@ export default function ExpensesPage() {
     }
 
     const currency = selectedEditAccount.currency || "ARS";
-    if (currency === "USD" && !fxRate) {
-      return toast.error("No hay cotizacion activa para USD");
+    const rate =
+      currency === "USD" ? fxRate : currency === "USDT" ? usdtRate : null;
+    if (currency !== "ARS" && !rate) {
+      return toast.error(`No hay cotizacion activa para ${currency}`);
     }
-    const amountARS = currency === "USD" ? amount * fxRate : amount;
+    const amountARS = currency === "ARS" ? amount : amount * rate;
 
     const payload = {
       expense_date: editForm.expense_date,
@@ -862,7 +883,9 @@ export default function ExpensesPage() {
                           <TableCell>
                             {exp.currency === "USD"
                               ? `USD ${Number(exp.amount).toFixed(2)}`
-                              : formatARS(exp.amount)}
+                              : exp.currency === "USDT"
+                                ? formatUSDT(exp.amount)
+                                : formatARS(exp.amount)}
                           </TableCell>
                           <TableCell>{formatARS(exp.amount_ars)}</TableCell>
                           <TableCell className="text-right">
@@ -935,7 +958,9 @@ export default function ExpensesPage() {
                         <TableCell>
                           {exp.currency === "USD"
                             ? `USD ${Number(exp.amount).toFixed(2)}`
-                            : formatARS(exp.amount)}
+                            : exp.currency === "USDT"
+                              ? formatUSDT(exp.amount)
+                              : formatARS(exp.amount)}
                         </TableCell>
                         <TableCell>{formatARS(exp.amount_ars)}</TableCell>
                         <TableCell className="text-right">

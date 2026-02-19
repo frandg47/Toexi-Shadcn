@@ -1,10 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -36,9 +53,17 @@ const formatUSD = (n) =>
     minimumFractionDigits: 2,
   }).format(n || 0);
 
+const formatUSDT = (n) =>
+  `USDT ${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n || 0)}`;
+
 export default function AccountsConfig() {
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState([]);
+  const [fxRate, setFxRate] = useState(null);
+  const [usdtRate, setUsdtRate] = useState(null);
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState({
     name: "",
@@ -52,12 +77,34 @@ export default function AccountsConfig() {
     notes: "",
     include_in_balance: true,
   });
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [confirmTransferOpen, setConfirmTransferOpen] = useState(false);
+  const [transferForm, setTransferForm] = useState({
+    from_account_id: "",
+    to_account_id: "",
+    amount: "",
+  });
 
   const loadAccounts = async () => {
-    const { data, error } = await supabase
-      .from("accounts")
-      .select("id, name, currency, initial_balance, notes, include_in_balance")
-      .order("name", { ascending: true });
+    const [{ data, error }, { data: rate }, { data: usdt }] =
+      await Promise.all([
+        supabase
+          .from("accounts")
+          .select("id, name, currency, initial_balance, notes, include_in_balance")
+          .order("name", { ascending: true }),
+        supabase
+          .from("fx_rates")
+          .select("rate")
+          .eq("is_active", true)
+          .eq("source", "blue")
+          .maybeSingle(),
+        supabase
+          .from("fx_rates")
+          .select("rate")
+          .eq("is_active", true)
+          .eq("source", "USDT")
+          .maybeSingle(),
+      ]);
 
     if (error) {
       toast.error("No se pudieron cargar las cuentas", {
@@ -67,6 +114,8 @@ export default function AccountsConfig() {
     }
 
     setAccounts(data || []);
+    setFxRate(rate?.rate ? Number(rate.rate) : null);
+    setUsdtRate(usdt?.rate ? Number(usdt.rate) : null);
   };
 
   useEffect(() => {
@@ -160,6 +209,106 @@ export default function AccountsConfig() {
     setLoading(false);
   };
 
+  const fromAccount = useMemo(
+    () =>
+      accounts.find(
+        (acc) => String(acc.id) === String(transferForm.from_account_id)
+      ),
+    [accounts, transferForm.from_account_id]
+  );
+  const toAccount = useMemo(
+    () =>
+      accounts.find(
+        (acc) => String(acc.id) === String(transferForm.to_account_id)
+      ),
+    [accounts, transferForm.to_account_id]
+  );
+
+  const getRateForCurrency = (currency) => {
+    if (currency === "ARS") return 1;
+    if (currency === "USD") return fxRate;
+    if (currency === "USDT") return usdtRate;
+    return null;
+  };
+
+  const transferAmount = Number(transferForm.amount || 0);
+  const canConvert =
+    fromAccount &&
+    toAccount &&
+    fromAccount.currency !== toAccount.currency &&
+    getRateForCurrency(fromAccount.currency) &&
+    getRateForCurrency(toAccount.currency);
+
+  const convertedAmount = canConvert
+    ? (transferAmount * getRateForCurrency(fromAccount.currency)) /
+      getRateForCurrency(toAccount.currency)
+    : null;
+
+  const handleCreateTransfer = async () => {
+    if (!fromAccount || !toAccount) {
+      toast.error("Selecciona cuentas de origen y destino");
+      return;
+    }
+    if (fromAccount.id === toAccount.id) {
+      toast.error("La cuenta de origen y destino no pueden ser la misma");
+      return;
+    }
+    if (!transferAmount || Number.isNaN(transferAmount) || transferAmount <= 0) {
+      toast.error("Ingresa un monto valido");
+      return;
+    }
+
+    const fromRate = getRateForCurrency(fromAccount.currency);
+    const toRate = getRateForCurrency(toAccount.currency);
+    if (!fromRate || !toRate) {
+      toast.error("No hay cotizacion activa para la moneda seleccionada");
+      return;
+    }
+
+    const amountInARS = transferAmount * fromRate;
+    const amountTo = amountInARS / toRate;
+
+    setLoading(true);
+    const { error } = await supabase.from("account_movements").insert([
+      {
+        movement_date: new Date().toISOString().slice(0, 10),
+        account_id: fromAccount.id,
+        type: "expense",
+        amount: transferAmount,
+        currency: fromAccount.currency,
+        amount_ars: amountInARS,
+        fx_rate_used: fromAccount.currency === "ARS" ? null : fromRate,
+        related_table: "account_transfer",
+        notes: `Transferencia a ${toAccount.name}`,
+      },
+      {
+        movement_date: new Date().toISOString().slice(0, 10),
+        account_id: toAccount.id,
+        type: "income",
+        amount: amountTo,
+        currency: toAccount.currency,
+        amount_ars: amountInARS,
+        fx_rate_used: toAccount.currency === "ARS" ? null : toRate,
+        related_table: "account_transfer",
+        notes: `Transferencia desde ${fromAccount.name}`,
+      },
+    ]);
+
+    if (error) {
+      setLoading(false);
+      toast.error("No se pudo registrar la transferencia", {
+        description: error.message,
+      });
+      return;
+    }
+
+    toast.success("Transferencia registrada");
+    setLoading(false);
+    setConfirmTransferOpen(false);
+    setTransferOpen(false);
+    setTransferForm({ from_account_id: "", to_account_id: "", amount: "" });
+  };
+
   return (
     <Card className="mt-6">
       <CardHeader>
@@ -194,6 +343,7 @@ export default function AccountsConfig() {
             <SelectContent>
               <SelectItem value="ARS">ARS</SelectItem>
               <SelectItem value="USD">USD</SelectItem>
+              <SelectItem value="USDT">USDT</SelectItem>
             </SelectContent>
           </Select>
           <div className="flex items-center gap-2">
@@ -211,9 +361,18 @@ export default function AccountsConfig() {
           value={form.notes}
           onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
         />
-        <Button onClick={handleCreateAccount} disabled={loading}>
-          Crear cuenta
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={handleCreateAccount} disabled={loading}>
+            Crear cuenta
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setTransferOpen(true)}
+            disabled={loading}
+          >
+            Nueva transferencia
+          </Button>
+        </div>
 
         <div className="rounded-md border">
           <Table>
@@ -255,6 +414,7 @@ export default function AccountsConfig() {
                         <SelectContent>
                           <SelectItem value="ARS">ARS</SelectItem>
                           <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="USDT">USDT</SelectItem>
                         </SelectContent>
                       </Select>
                     ) : (
@@ -276,6 +436,8 @@ export default function AccountsConfig() {
                       />
                     ) : acc.currency === "USD" ? (
                       formatUSD(acc.initial_balance)
+                    ) : acc.currency === "USDT" ? (
+                      formatUSDT(acc.initial_balance)
                     ) : (
                       formatARS(acc.initial_balance)
                     )}
@@ -322,6 +484,138 @@ export default function AccountsConfig() {
           </Table>
         </div>
       </CardContent>
+
+      <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
+        <DialogContent className="w-[90vw] sm:max-w-lg max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Nueva transferencia</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid gap-1">
+              <span className="text-xs text-muted-foreground">Cuenta origen</span>
+              <Select
+                value={transferForm.from_account_id}
+                onValueChange={(value) =>
+                  setTransferForm((f) => ({ ...f, from_account_id: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Cuenta origen" />
+                </SelectTrigger>
+                <SelectContent className="z-[9999]">
+                  {accounts.map((acc) => (
+                    <SelectItem key={acc.id} value={String(acc.id)}>
+                      {acc.name} ({acc.currency})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1">
+              <span className="text-xs text-muted-foreground">Cuenta destino</span>
+              <Select
+                value={transferForm.to_account_id}
+                onValueChange={(value) =>
+                  setTransferForm((f) => ({ ...f, to_account_id: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Cuenta destino" />
+                </SelectTrigger>
+                <SelectContent className="z-[9999]">
+                  {accounts.map((acc) => (
+                    <SelectItem key={acc.id} value={String(acc.id)}>
+                      {acc.name} ({acc.currency})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1">
+              <span className="text-xs text-muted-foreground">Monto</span>
+              <Input
+                type="number"
+                step="0.01"
+                value={transferForm.amount}
+                onChange={(e) =>
+                  setTransferForm((f) => ({ ...f, amount: e.target.value }))
+                }
+              />
+            </div>
+            {fromAccount &&
+              toAccount &&
+              fromAccount.currency !== toAccount.currency && (
+                <div className="rounded-md border p-3 text-sm">
+                  {canConvert ? (
+                    <div>
+                      Se acreditaran{" "}
+                      <strong>
+                        {toAccount.currency === "USDT"
+                          ? formatUSDT(convertedAmount)
+                          : toAccount.currency === "USD"
+                            ? formatUSD(convertedAmount)
+                            : formatARS(convertedAmount)}
+                      </strong>{" "}
+                      en la cuenta destino.
+                    </div>
+                  ) : (
+                    <div className="text-muted-foreground">
+                      No hay cotizacion activa para convertir.
+                    </div>
+                  )}
+                </div>
+              )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setTransferOpen(false)}
+              disabled={loading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => setConfirmTransferOpen(true)}
+              disabled={loading}
+            >
+              Continuar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={confirmTransferOpen}
+        onOpenChange={setConfirmTransferOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar transferencia</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vas a transferir{" "}
+              <strong>
+                {fromAccount?.currency === "USDT"
+                  ? formatUSDT(transferAmount)
+                  : fromAccount?.currency === "USD"
+                    ? formatUSD(transferAmount)
+                    : formatARS(transferAmount)}
+              </strong>{" "}
+              desde <strong>{fromAccount?.name || "-"}</strong> hacia{" "}
+              <strong>{toAccount?.name || "-"}</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCreateTransfer}
+              disabled={loading}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

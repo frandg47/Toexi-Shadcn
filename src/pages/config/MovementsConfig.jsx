@@ -37,6 +37,12 @@ import { IconCalendar } from "@tabler/icons-react";
 
 const formatCurrency = (value, currency) => {
   const safe = Number(value || 0);
+  if (currency === "USDT") {
+    return `USDT ${new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(safe)}`;
+  }
   const formatCurrency = currency === "USD" ? "USD" : "ARS";
   return new Intl.NumberFormat(currency === "USD" ? "en-US" : "es-AR", {
     style: "currency",
@@ -177,10 +183,11 @@ export default function MovementsConfig() {
       (acc, item) => {
         if (!item.include_in_balance) return acc;
         if (item.currency === "USD") acc.usd += item.current_balance;
+        else if (item.currency === "USDT") acc.usdt += item.current_balance;
         else acc.ars += item.current_balance;
         return acc;
       },
-      { ars: 0, usd: 0 }
+      { ars: 0, usd: 0, usdt: 0 }
     );
   }, [accountBalances]);
 
@@ -235,7 +242,7 @@ export default function MovementsConfig() {
 
   return (
     <div className=" mt-6 space-y-6">
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Balance total ARS</CardTitle>
@@ -250,6 +257,14 @@ export default function MovementsConfig() {
           </CardHeader>
           <CardContent className="text-2xl font-semibold">
             {formatCurrency(totalBalances.usd, "USD")}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Balance total USDT</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">
+            {formatCurrency(totalBalances.usdt, "USDT")}
           </CardContent>
         </Card>
       </div>

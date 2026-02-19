@@ -36,6 +36,12 @@ const formatUSD = (n) =>
     minimumFractionDigits: 2,
   }).format(n || 0);
 
+const formatUSDT = (n) =>
+  `USDT ${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n || 0)}`;
+
 const PurchasesConfig = () => {
   const { role } = useAuth();
   const isOwner = role?.toLowerCase() === "owner";
@@ -43,6 +49,7 @@ const PurchasesConfig = () => {
   const [variants, setVariants] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [fxRate, setFxRate] = useState(null);
+  const [usdtRate, setUsdtRate] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailPurchase, setDetailPurchase] = useState(null);
@@ -66,6 +73,7 @@ const PurchasesConfig = () => {
         { data: prov },
         { data: vars },
         { data: rate },
+        { data: usdt },
         { data: list },
         { data: accountsData },
       ] =
@@ -83,6 +91,12 @@ const PurchasesConfig = () => {
             .eq("source", "blue")
             .maybeSingle(),
           supabase
+            .from("fx_rates")
+            .select("rate")
+            .eq("is_active", true)
+            .eq("source", "USDT")
+            .maybeSingle(),
+          supabase
             .from("purchases")
             .select(
               "id, purchase_date, total_amount, currency, providers(name), notes"
@@ -98,6 +112,7 @@ const PurchasesConfig = () => {
       setProviders(prov || []);
       setVariants(vars || []);
       setFxRate(rate?.rate ? Number(rate.rate) : null);
+      setUsdtRate(usdt?.rate ? Number(usdt.rate) : null);
       setPurchases(list || []);
       setAccounts(accountsData || []);
     };
@@ -163,10 +178,12 @@ const PurchasesConfig = () => {
     if (!items.length) return toast.error("Agrega al menos un producto");
 
     const currency = form.currency;
-    if (currency === "USD" && !fxRate) {
-      return toast.error("No hay cotizacion activa para USD");
+    const rate =
+      currency === "USD" ? fxRate : currency === "USDT" ? usdtRate : null;
+    if (currency !== "ARS" && !rate) {
+      return toast.error(`No hay cotizacion activa para ${currency}`);
     }
-    const totalAmountArs = currency === "USD" ? totalAmount * fxRate : totalAmount;
+    const totalAmountArs = currency === "ARS" ? totalAmount : totalAmount * rate;
 
     const { data: purchase, error } = await supabase
       .from("purchases")
@@ -177,7 +194,7 @@ const PurchasesConfig = () => {
           currency,
           total_amount: totalAmount,
           total_amount_ars: totalAmountArs,
-          fx_rate_used: currency === "USD" ? fxRate : null,
+          fx_rate_used: currency === "ARS" ? null : rate,
           notes: form.notes || null,
         },
       ])
@@ -198,7 +215,7 @@ const PurchasesConfig = () => {
           amount: totalAmount,
           currency,
           amount_ars: totalAmountArs,
-          fx_rate_used: currency === "USD" ? fxRate : null,
+          fx_rate_used: currency === "ARS" ? null : rate,
           notes: form.notes || null,
         },
       ]);
@@ -323,6 +340,7 @@ const PurchasesConfig = () => {
               <SelectContent className="z-[9999]">
                 <SelectItem value="ARS">ARS</SelectItem>
                 <SelectItem value="USD">USD</SelectItem>
+                <SelectItem value="USDT">USDT</SelectItem>
               </SelectContent>
             </Select>
             <Select
@@ -352,6 +370,8 @@ const PurchasesConfig = () => {
               value={
                 form.currency === "USD"
                   ? `USD ${totalAmount.toFixed(2)}`
+                  : form.currency === "USDT"
+                    ? formatUSDT(totalAmount)
                   : formatARS(totalAmount)
               }
               readOnly
@@ -430,6 +450,11 @@ const PurchasesConfig = () => {
                     <TableCell>
                       {form.currency === "USD"
                         ? `USD ${(Number(item.quantity || 0) * Number(item.unit_cost || 0)).toFixed(2)}`
+                        : form.currency === "USDT"
+                          ? formatUSDT(
+                              Number(item.quantity || 0) *
+                                Number(item.unit_cost || 0)
+                            )
                         : formatARS(Number(item.quantity || 0) * Number(item.unit_cost || 0))}
                     </TableCell>
                     <TableCell className="text-right">
@@ -491,6 +516,8 @@ const PurchasesConfig = () => {
                     <TableCell>
                       {p.currency === "USD"
                         ? `USD ${Number(p.total_amount || 0).toFixed(2)}`
+                        : p.currency === "USDT"
+                          ? formatUSDT(p.total_amount)
                         : formatARS(p.total_amount)}
                     </TableCell>
                     <TableCell>{p.notes || "-"}</TableCell>
@@ -521,6 +548,8 @@ const PurchasesConfig = () => {
               <strong>Total:</strong>{" "}
               {detailPurchase?.currency === "USD"
                 ? formatUSD(detailPurchase?.total_amount)
+                : detailPurchase?.currency === "USDT"
+                  ? formatUSDT(detailPurchase?.total_amount)
                 : formatARS(detailPurchase?.total_amount)}
             </div>
           </div>
@@ -556,11 +585,15 @@ const PurchasesConfig = () => {
                       <TableCell>
                         {detailPurchase?.currency === "USD"
                           ? formatUSD(item.unit_cost)
+                          : detailPurchase?.currency === "USDT"
+                            ? formatUSDT(item.unit_cost)
                           : formatARS(item.unit_cost)}
                       </TableCell>
                       <TableCell>
                         {detailPurchase?.currency === "USD"
                           ? formatUSD(item.subtotal)
+                          : detailPurchase?.currency === "USDT"
+                            ? formatUSDT(item.subtotal)
                           : formatARS(item.subtotal)}
                       </TableCell>
                     </TableRow>
