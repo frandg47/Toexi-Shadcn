@@ -11,6 +11,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
+import { es } from "date-fns/locale";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -25,6 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { IconCalendar } from "@tabler/icons-react";
 
 const formatCurrency = (value, currency) => {
   const safe = Number(value || 0);
@@ -48,10 +57,12 @@ export default function MovementsConfig() {
   const [detailMovement, setDetailMovement] = useState(null);
   const [detailData, setDetailData] = useState(null);
   const [filters, setFilters] = useState({
-    dateFrom: "",
-    dateTo: "",
     accountId: "all",
     type: "all",
+  });
+  const [dateRange, setDateRange] = useState({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
   });
 
   const loadAccounts = useCallback(async () => {
@@ -91,11 +102,17 @@ export default function MovementsConfig() {
     if (filters.type !== "all") {
       query = query.eq("type", filters.type);
     }
-    if (filters.dateFrom) {
-      query = query.gte("movement_date", filters.dateFrom);
+    if (dateRange?.from) {
+      query = query.gte(
+        "movement_date",
+        dateRange.from.toISOString().slice(0, 10)
+      );
     }
-    if (filters.dateTo) {
-      query = query.lte("movement_date", filters.dateTo);
+    if (dateRange?.to) {
+      query = query.lte(
+        "movement_date",
+        dateRange.to.toISOString().slice(0, 10)
+      );
     }
 
     const { data, error, count } = await query;
@@ -111,7 +128,7 @@ export default function MovementsConfig() {
     setMovements(data || []);
     setTotalCount(count || 0);
     setLoading(false);
-  }, [filters, page, pageSize]);
+  }, [filters, page, pageSize, dateRange]);
 
   useEffect(() => {
     loadAccounts();
@@ -123,7 +140,14 @@ export default function MovementsConfig() {
 
   useEffect(() => {
     setPage(1);
-  }, [filters.accountId, filters.type, filters.dateFrom, filters.dateTo]);
+  }, [filters.accountId, filters.type, dateRange]);
+
+  const handleWeekFilter = () => {
+    setDateRange({
+      from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+      to: endOfWeek(new Date(), { weekStartsOn: 1 }),
+    });
+  };
 
   const accountBalances = useMemo(() => {
     const totals = new Map();
@@ -279,53 +303,85 @@ export default function MovementsConfig() {
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-4">
-            <Input
-              type="date"
-              value={filters.dateFrom}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, dateFrom: e.target.value }))
-              }
-            />
-            <Input
-              type="date"
-              value={filters.dateTo}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, dateTo: e.target.value }))
-              }
-            />
-            <Select
-              value={filters.accountId}
-              onValueChange={(value) =>
-                setFilters((f) => ({ ...f, accountId: value }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Cuenta" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las cuentas</SelectItem>
-                {accounts.map((acc) => (
-                  <SelectItem key={acc.id} value={String(acc.id)}>
-                    {acc.name} ({acc.currency})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={filters.type}
-              onValueChange={(value) => setFilters((f) => ({ ...f, type: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="income">Ingresos</SelectItem>
-                <SelectItem value="expense">Egresos</SelectItem>
-                <SelectItem value="transfer">Transferencias</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="grid gap-1">
+                <span className="text-xs text-muted-foreground">Fecha</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2 min-w-[220px]"
+                    >
+                      <IconCalendar className="h-4 w-4" />
+                      {dateRange?.from && dateRange?.to
+                        ? `${dateRange.from.toLocaleDateString(
+                            "es-AR"
+                          )} - ${dateRange.to.toLocaleDateString("es-AR")}`
+                        : "Filtrar por fecha"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="p-3" align="start">
+                    <Calendar
+                      mode="range"
+                      selected={dateRange}
+                      onSelect={setDateRange}
+                      locale={es}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="grid gap-1">
+                <span className="text-xs text-muted-foreground">Semana</span>
+                <Button variant="outline" onClick={handleWeekFilter}>
+                  Semana actual
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 md:justify-end">
+              <div className="grid gap-1">
+                <span className="text-xs text-muted-foreground">Cuenta</span>
+                <Select
+                  value={filters.accountId}
+                  onValueChange={(value) =>
+                    setFilters((f) => ({ ...f, accountId: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Cuenta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las cuentas</SelectItem>
+                    {accounts.map((acc) => (
+                      <SelectItem key={acc.id} value={String(acc.id)}>
+                        {acc.name} ({acc.currency})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1">
+                <span className="text-xs text-muted-foreground">Tipo</span>
+                <Select
+                  value={filters.type}
+                  onValueChange={(value) =>
+                    setFilters((f) => ({ ...f, type: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="income">Ingresos</SelectItem>
+                    <SelectItem value="expense">Egresos</SelectItem>
+                    <SelectItem value="transfer">Transferencias</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
           <div className="rounded-md border">

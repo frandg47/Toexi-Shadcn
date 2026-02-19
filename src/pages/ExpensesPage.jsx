@@ -29,8 +29,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
+import { es } from "date-fns/locale";
 import { toast } from "sonner";
-import { IconEdit, IconPlus } from "@tabler/icons-react";
+import { IconEdit, IconPlus, IconCalendar } from "@tabler/icons-react";
 
 const formatARS = (n) =>
   new Intl.NumberFormat("es-AR", {
@@ -92,11 +100,13 @@ export default function ExpensesPage() {
   const [categories, setCategories] = useState([]);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
-    dateFrom: "",
-    dateTo: "",
     category: "all",
     account: "all",
     status: "all",
+  });
+  const [dateRange, setDateRange] = useState({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
   });
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
@@ -224,15 +234,11 @@ export default function ExpensesPage() {
   const applyFilters = useCallback(
     (list, includeStatus) => {
       return list.filter((exp) => {
-        if (filters.dateFrom) {
-          if (new Date(exp.expense_date) < new Date(filters.dateFrom)) {
-            return false;
-          }
+        if (dateRange?.from) {
+          if (new Date(exp.expense_date) < dateRange.from) return false;
         }
-        if (filters.dateTo) {
-          if (new Date(exp.expense_date) > new Date(filters.dateTo)) {
-            return false;
-          }
+        if (dateRange?.to) {
+          if (new Date(exp.expense_date) > dateRange.to) return false;
         }
         if (filters.category !== "all" && exp.category !== filters.category) {
           return false;
@@ -256,7 +262,7 @@ export default function ExpensesPage() {
         return true;
       });
     },
-    [filters]
+    [dateRange, filters]
   );
 
   const filteredFixedExpenses = useMemo(
@@ -268,6 +274,13 @@ export default function ExpensesPage() {
     () => applyFilters(variableExpenses, false),
     [applyFilters, variableExpenses]
   );
+
+  const handleWeekFilter = () => {
+    setDateRange({
+      from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+      to: endOfWeek(new Date(), { weekStartsOn: 1 }),
+    });
+  };
 
   const handleCreateExpense = async () => {
     if (!expenseForm.expense_date) return toast.error("Selecciona una fecha");
@@ -694,72 +707,107 @@ export default function ExpensesPage() {
             <CardHeader>
               <CardTitle>Filtros</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-5">
-              <Input
-                type="date"
-                value={filters.dateFrom}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, dateFrom: e.target.value }))
-                }
-              />
-              <Input
-                type="date"
-                value={filters.dateTo}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, dateTo: e.target.value }))
-                }
-              />
-              <Select
-                value={filters.category}
-                onValueChange={(value) =>
-                  setFilters((f) => ({ ...f, category: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Categoria" />
-                </SelectTrigger>
-                <SelectContent className="z-[9999]">
-                  <SelectItem value="all">Todas</SelectItem>
-                  {expenseCategories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.name}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={filters.account}
-                onValueChange={(value) =>
-                  setFilters((f) => ({ ...f, account: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Cuenta" />
-                </SelectTrigger>
-                <SelectContent className="z-[9999]">
-                  <SelectItem value="all">Todas</SelectItem>
-                  {accounts.map((acc) => (
-                    <SelectItem key={acc.id} value={String(acc.id)}>
-                      {acc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={filters.status}
-                onValueChange={(value) =>
-                  setFilters((f) => ({ ...f, status: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
-                <SelectContent className="z-[9999]">
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="overdue">En deuda</SelectItem>
-                  <SelectItem value="paid">Pagados</SelectItem>
-                </SelectContent>
-              </Select>
+            <CardContent className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="grid gap-1">
+                  <span className="text-xs text-muted-foreground">Fecha</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="flex items-center gap-2 min-w-[220px]"
+                      >
+                        <IconCalendar className="h-4 w-4" />
+                        {dateRange?.from && dateRange?.to
+                          ? `${dateRange.from.toLocaleDateString(
+                              "es-AR"
+                            )} - ${dateRange.to.toLocaleDateString("es-AR")}`
+                          : "Filtrar por fecha"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-3" align="start">
+                      <Calendar
+                        mode="range"
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        locale={es}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="grid gap-1">
+                  <span className="text-xs text-muted-foreground">Semana</span>
+                  <Button variant="outline" onClick={handleWeekFilter}>
+                    Semana actual
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3 md:justify-end">
+                <div className="grid gap-1">
+                  <span className="text-xs text-muted-foreground">
+                    Categoria
+                  </span>
+                  <Select
+                    value={filters.category}
+                    onValueChange={(value) =>
+                      setFilters((f) => ({ ...f, category: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Categoria" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[9999]">
+                      <SelectItem value="all">Todas</SelectItem>
+                      {expenseCategories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.name}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1">
+                  <span className="text-xs text-muted-foreground">Cuenta</span>
+                  <Select
+                    value={filters.account}
+                    onValueChange={(value) =>
+                      setFilters((f) => ({ ...f, account: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Cuenta" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[9999]">
+                      <SelectItem value="all">Todas</SelectItem>
+                      {accounts.map((acc) => (
+                        <SelectItem key={acc.id} value={String(acc.id)}>
+                          {acc.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1">
+                  <span className="text-xs text-muted-foreground">Estado</span>
+                  <Select
+                    value={filters.status}
+                    onValueChange={(value) =>
+                      setFilters((f) => ({ ...f, status: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Estado" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[9999]">
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="overdue">En deuda</SelectItem>
+                      <SelectItem value="paid">Pagados</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardContent>
           </Card>
           <Card>

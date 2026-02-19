@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -12,6 +14,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +31,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { IconRefresh, IconTrash, IconUser, IconPhone, IconMapPin } from "@tabler/icons-react";
+import {
+  IconEdit,
+  IconRefresh,
+  IconTrash,
+  IconUser,
+  IconPhone,
+  IconMapPin,
+} from "@tabler/icons-react";
 
 const ProvidersTable = ({ onAdd }) => {
   const [filter, setFilter] = useState("");
@@ -32,6 +48,18 @@ const ProvidersTable = ({ onAdd }) => {
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
     provider: null,
+  });
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    id: null,
+    name: "",
+    contact_name: "",
+    phone: "",
+    email: "",
+    address: "",
+    city: "",
+    notes: "",
+    is_active: true,
   });
 
   const fetchProviders = useCallback(async (showSkeleton = false) => {
@@ -84,6 +112,62 @@ const ProvidersTable = ({ onAdd }) => {
       setDeleteDialog({ open: false, provider: null });
     }
   }, [fetchProviders, deleteDialog.provider]);
+
+  const handleOpenEdit = (provider) => {
+    if (!provider) return;
+    setEditForm({
+      id: provider.id,
+      name: provider.name || "",
+      contact_name: provider.contact_name || "",
+      phone: provider.phone || "",
+      email: provider.email || "",
+      address: provider.address || "",
+      city: provider.city || "",
+      notes: provider.notes || "",
+      is_active: !!provider.is_active,
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editForm.id) return;
+    if (!editForm.name.trim()) {
+      toast.error("El nombre es obligatorio");
+      return;
+    }
+
+    try {
+      setRefreshing(true);
+      const payload = {
+        name: editForm.name.trim(),
+        contact_name: editForm.contact_name?.trim() || null,
+        phone: editForm.phone?.trim() || null,
+        email: editForm.email?.trim() || null,
+        address: editForm.address?.trim() || null,
+        city: editForm.city?.trim() || null,
+        notes: editForm.notes?.trim() || null,
+        is_active: editForm.is_active,
+      };
+
+      const { error } = await supabase
+        .from("providers")
+        .update(payload)
+        .eq("id", editForm.id);
+
+      if (error) throw error;
+
+      toast.success("Proveedor actualizado");
+      setEditDialogOpen(false);
+      await fetchProviders(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo actualizar el proveedor", {
+        description: error.message,
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const filtered = providers.filter((p) =>
     `${p.name || ""} ${p.contact_name || ""}`
@@ -179,13 +263,24 @@ const ProvidersTable = ({ onAdd }) => {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => setDeleteDialog({ open: true, provider: p })}
-                    >
-                      <IconTrash className="h-4 w-4" />
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEdit(p)}
+                      >
+                        <IconEdit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() =>
+                          setDeleteDialog({ open: true, provider: p })
+                        }
+                      >
+                        <IconTrash className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -218,6 +313,99 @@ const ProvidersTable = ({ onAdd }) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Editar proveedor</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-1">
+              <span className="text-xs text-muted-foreground">Nombre</span>
+              <Input
+                value={editForm.name}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, name: e.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-1">
+              <span className="text-xs text-muted-foreground">Contacto</span>
+              <Input
+                value={editForm.contact_name}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, contact_name: e.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-1">
+              <span className="text-xs text-muted-foreground">Telefono</span>
+              <Input
+                value={editForm.phone}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, phone: e.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-1">
+              <span className="text-xs text-muted-foreground">Email</span>
+              <Input
+                value={editForm.email}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, email: e.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-1">
+              <span className="text-xs text-muted-foreground">Direccion</span>
+              <Input
+                value={editForm.address}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, address: e.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-1">
+              <span className="text-xs text-muted-foreground">Ciudad</span>
+              <Input
+                value={editForm.city}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, city: e.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-1 md:col-span-2">
+              <span className="text-xs text-muted-foreground">Notas</span>
+              <Textarea
+                value={editForm.notes}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, notes: e.target.value }))
+                }
+              />
+            </div>
+            <div className="flex items-center gap-2 md:col-span-2">
+              <Switch
+                checked={editForm.is_active}
+                onCheckedChange={(checked) =>
+                  setEditForm((f) => ({ ...f, is_active: checked }))
+                }
+              />
+              <span className="text-sm">Activo</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={refreshing}>
+              Guardar cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

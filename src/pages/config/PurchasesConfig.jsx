@@ -303,7 +303,7 @@ const PurchasesConfig = () => {
               <SelectTrigger>
                 <SelectValue placeholder="Proveedor" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[9999]">
                 {providers.map((p) => (
                   <SelectItem key={p.id} value={String(p.id)}>
                     {p.name}
@@ -320,7 +320,7 @@ const PurchasesConfig = () => {
               <SelectTrigger>
                 <SelectValue placeholder="Moneda" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[9999]">
                 <SelectItem value="ARS">ARS</SelectItem>
                 <SelectItem value="USD">USD</SelectItem>
               </SelectContent>
@@ -334,7 +334,7 @@ const PurchasesConfig = () => {
               <SelectTrigger>
                 <SelectValue placeholder="Cuenta" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[9999]">
                 {accountsForCurrency.length === 0 && (
                   <SelectItem value="none" disabled>
                     Sin cuentas para {form.currency}
