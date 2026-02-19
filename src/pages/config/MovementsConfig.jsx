@@ -431,7 +431,13 @@ export default function MovementsConfig() {
                     </TableCell>
                     <TableCell>{formatCurrency(m.amount, m.currency)}</TableCell>
                     <TableCell>
-                      {m.related_table ? `${m.related_table} #${m.related_id}` : "-"}
+                      {m.related_table === "account_transfer"
+                        ? "Transferencia"
+                        : m.related_table === "sale_payments"
+                          ? "Venta"
+                          : m.related_table
+                            ? `${m.related_table} ${m.related_id ? `#${m.related_id}` : ""}`
+                            : "-"}
                     </TableCell>
                     <TableCell>{m.notes || "-"}</TableCell>
                   </TableRow>
@@ -491,7 +497,21 @@ export default function MovementsConfig() {
             <div>
               <strong>Origen:</strong>{" "}
               {detailMovement?.related_table
-                ? `${detailMovement.related_table === "sale_payments" ? "Venta" : detailMovement.related_table === "purchase_payments" ? "Compra" : detailMovement.related_table === "expenses" ? "Gasto" : detailMovement.related_table === ""} #${detailMovement.related_id}`
+                ? detailMovement.related_table === "sale_payments"
+                  ? `Venta${detailData?.sale_id ? ` #${detailData.sale_id}` : ""}`
+                  : `${
+                      detailMovement.related_table === "purchase_payments"
+                        ? "Compra"
+                        : detailMovement.related_table === "expenses"
+                          ? "Gasto"
+                          : detailMovement.related_table === "account_transfer"
+                            ? "Transferencia"
+                            : detailMovement.related_table
+                    }${
+                      detailMovement.related_id
+                        ? ` #${detailMovement.related_id}`
+                        : ""
+                    }`
                 : "Manual"}
             </div>
             {detailMovement?.notes && (

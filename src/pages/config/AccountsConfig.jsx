@@ -64,6 +64,7 @@ export default function AccountsConfig() {
   const [accounts, setAccounts] = useState([]);
   const [fxRate, setFxRate] = useState(null);
   const [usdtRate, setUsdtRate] = useState(null);
+  const [movements, setMovements] = useState([]);
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState({
     name: "",
@@ -86,7 +87,7 @@ export default function AccountsConfig() {
   });
 
   const loadAccounts = async () => {
-    const [{ data, error }, { data: rate }, { data: usdt }] =
+    const [{ data, error }, { data: rate }, { data: usdt }, movementsResponse] =
       await Promise.all([
         supabase
           .from("accounts")
@@ -104,6 +105,9 @@ export default function AccountsConfig() {
           .eq("is_active", true)
           .eq("source", "USDT")
           .maybeSingle(),
+        supabase
+          .from("account_movements")
+          .select("id, account_id, type, amount"),
       ]);
 
     if (error) {
@@ -116,6 +120,14 @@ export default function AccountsConfig() {
     setAccounts(data || []);
     setFxRate(rate?.rate ? Number(rate.rate) : null);
     setUsdtRate(usdt?.rate ? Number(usdt.rate) : null);
+    if (movementsResponse?.error) {
+      toast.error("No se pudieron cargar movimientos", {
+        description: movementsResponse.error.message,
+      });
+      setMovements([]);
+    } else {
+      setMovements(movementsResponse?.data || []);
+    }
   };
 
   useEffect(() => {
@@ -231,7 +243,49 @@ export default function AccountsConfig() {
     return null;
   };
 
+  const accountBalances = useMemo(() => {
+    const totals = new Map();
+    movements.forEach((movement) => {
+      const entry = totals.get(movement.account_id) || {
+        income: 0,
+        expense: 0,
+      };
+      if (movement.type === "income") {
+        entry.income += Number(movement.amount || 0);
+      } else if (movement.type === "expense") {
+        entry.expense += Number(movement.amount || 0);
+      }
+      totals.set(movement.account_id, entry);
+    });
+
+    return accounts.map((acc) => {
+      const totalsForAccount = totals.get(acc.id) || {
+        income: 0,
+        expense: 0,
+      };
+      const current =
+        Number(acc.initial_balance || 0) +
+        totalsForAccount.income -
+        totalsForAccount.expense;
+      return {
+        ...acc,
+        current_balance: current,
+      };
+    });
+  }, [accounts, movements]);
+
+  const balanceByAccountId = useMemo(() => {
+    return new Map(accountBalances.map((acc) => [acc.id, acc.current_balance]));
+  }, [accountBalances]);
+
   const transferAmount = Number(transferForm.amount || 0);
+  const isSameAccount =
+    fromAccount &&
+    toAccount &&
+    String(fromAccount.id) === String(toAccount.id);
+  const availableFromBalance = fromAccount
+    ? balanceByAccountId.get(fromAccount.id) ?? 0
+    : 0;
   const canConvert =
     fromAccount &&
     toAccount &&
@@ -255,6 +309,10 @@ export default function AccountsConfig() {
     }
     if (!transferAmount || Number.isNaN(transferAmount) || transferAmount <= 0) {
       toast.error("Ingresa un monto valido");
+      return;
+    }
+    if (transferAmount > availableFromBalance) {
+      toast.error("Saldo insuficiente");
       return;
     }
 
@@ -307,6 +365,7 @@ export default function AccountsConfig() {
     setConfirmTransferOpen(false);
     setTransferOpen(false);
     setTransferForm({ from_account_id: "", to_account_id: "", amount: "" });
+    await loadAccounts();
   };
 
   return (
@@ -381,12 +440,14 @@ export default function AccountsConfig() {
                 <TableHead>Cuenta</TableHead>
                 <TableHead>Moneda</TableHead>
                 <TableHead>Saldo inicial</TableHead>
+                <TableHead>Saldo actual</TableHead>
+                <TableHead>Saldo disponible</TableHead>
                 <TableHead>Incluir</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {accounts.map((acc) => (
+              {accountBalances.map((acc) => (
                 <TableRow key={acc.id}>
                   <TableCell>
                     {editId === acc.id ? (
@@ -442,6 +503,20 @@ export default function AccountsConfig() {
                       formatARS(acc.initial_balance)
                     )}
                   </TableCell>
+                  <TableCell>
+                    {acc.currency === "USD"
+                      ? formatUSD(acc.current_balance)
+                      : acc.currency === "USDT"
+                        ? formatUSDT(acc.current_balance)
+                        : formatARS(acc.current_balance)}
+                  </TableCell>
+                  <TableCell>
+                    {acc.currency === "USD"
+                      ? formatUSD(acc.current_balance)
+                      : acc.currency === "USDT"
+                        ? formatUSDT(acc.current_balance)
+                        : formatARS(acc.current_balance)}
+                  </TableCell>
                   <TableCell>{acc.include_in_balance ? "Si" : "No"}</TableCell>
                   <TableCell className="text-right">
                     {editId === acc.id ? (
@@ -470,10 +545,10 @@ export default function AccountsConfig() {
                   </TableCell>
                 </TableRow>
               ))}
-              {accounts.length === 0 && (
+              {accountBalances.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={7}
                     className="text-center text-muted-foreground"
                   >
                     No hay cuentas creadas.
@@ -542,6 +617,26 @@ export default function AccountsConfig() {
                 }
               />
             </div>
+            {fromAccount && (
+              <div className="text-xs text-muted-foreground">
+                Disponible:{" "}
+                {fromAccount.currency === "USDT"
+                  ? formatUSDT(availableFromBalance)
+                  : fromAccount.currency === "USD"
+                    ? formatUSD(availableFromBalance)
+                    : formatARS(availableFromBalance)}
+              </div>
+            )}
+            {isSameAccount && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-600">
+                La cuenta origen y destino no pueden ser la misma.
+              </div>
+            )}
+            {fromAccount && transferAmount > availableFromBalance && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-600">
+                Saldo insuficiente
+              </div>
+            )}
             {fromAccount &&
               toAccount &&
               fromAccount.currency !== toAccount.currency && (
@@ -576,7 +671,14 @@ export default function AccountsConfig() {
             </Button>
             <Button
               onClick={() => setConfirmTransferOpen(true)}
-              disabled={loading}
+              disabled={
+                loading ||
+                !fromAccount ||
+                !toAccount ||
+                isSameAccount ||
+                transferAmount <= 0 ||
+                transferAmount > availableFromBalance
+              }
             >
               Continuar
             </Button>
@@ -608,7 +710,14 @@ export default function AccountsConfig() {
             <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleCreateTransfer}
-              disabled={loading}
+              disabled={
+                loading ||
+                !fromAccount ||
+                !toAccount ||
+                isSameAccount ||
+                transferAmount <= 0 ||
+                transferAmount > availableFromBalance
+              }
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               Confirmar
