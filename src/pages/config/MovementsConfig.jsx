@@ -241,7 +241,7 @@ export default function MovementsConfig() {
   }, []);
 
   return (
-    <div className=" mt-6 space-y-6">
+    <div className="@container/main flex flex-1 flex-col gap-4 py-6">
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>

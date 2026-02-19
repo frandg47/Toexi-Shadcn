@@ -369,7 +369,7 @@ export default function AccountsConfig() {
   };
 
   return (
-    <Card className="mt-6">
+    <Card className="@container/main flex flex-1 flex-col gap-4 py-6 mt-6">
       <CardHeader>
         <CardTitle>Cuentas</CardTitle>
       </CardHeader>

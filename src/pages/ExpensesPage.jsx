@@ -549,7 +549,7 @@ export default function ExpensesPage() {
   }
 
   return (
-    <div className="space-y-6 py-6">
+    <div className="@container/main flex flex-1 flex-col gap-4 py-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card
           className={`cursor-pointer transition-all hover:shadow-md ${
