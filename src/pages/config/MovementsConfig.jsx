@@ -206,7 +206,7 @@ export default function MovementsConfig() {
       detailResponse = await supabase
         .from("sale_payments")
         .select(
-          "id, sale_id, amount_ars, amount_usd, payment_method_id, installments, reference, created_at, payment_methods(name), sales(id, total_ars, customer_id)"
+          "id, sale_id, amount_ars, amount_usd, payment_method_id, installments, reference, created_at, payment_methods(name), sales(id, total_ars, customer_id, customers:customers!sales_customer_id_fkey(name, last_name))"
         )
         .eq("id", movement.related_id)
         .maybeSingle();
@@ -498,7 +498,7 @@ export default function MovementsConfig() {
               <strong>Origen:</strong>{" "}
               {detailMovement?.related_table
                 ? detailMovement.related_table === "sale_payments"
-                  ? `Venta${detailData?.sale_id ? ` #${detailData.sale_id}` : ""}`
+                  ? `Venta`
                   : `${
                       detailMovement.related_table === "purchase_payments"
                         ? "Compra"
@@ -528,6 +528,16 @@ export default function MovementsConfig() {
                 {detailMovement?.related_table === "sale_payments" && (
                   <>
                     <div><strong>Venta:</strong> #{detailData.sale_id}</div>
+                    <div>
+                      <strong>Cliente:</strong>{" "}
+                      {detailData?.sales?.customers
+                        ? `${detailData.sales.customers.name || ""} ${
+                            detailData.sales.customers.last_name || ""
+                          }`.trim() || "Sin cliente"
+                        : detailData?.sales?.customer_id
+                          ? `Cliente #${detailData.sales.customer_id}`
+                          : "Sin cliente"}
+                    </div>
                     <div><strong>Metodo:</strong> {detailData.payment_methods?.name || "-"}</div>
                     <div><strong>Cuotas:</strong> {detailData.installments || "-"}</div>
                     {detailData.reference && (
