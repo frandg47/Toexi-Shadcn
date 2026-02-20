@@ -114,9 +114,14 @@ const getProductInitials = (name) => {
 
 const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [products, setProducts] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 30;
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -168,27 +173,25 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
     [sortDir]
   );
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
   const fetchProducts = useCallback(async (showSkeleton = false) => {
     if (showSkeleton) setLoading(true);
     else setRefreshing(true);
 
     try {
-      const [
-        fxRatesRes,
-        productsRes,
-        paymentMethodsRes,
-        brandsRes,
-        categoriesRes,
-        commissionRulesRes,
-      ] = await Promise.all([
-        supabase
-          .from("fx_rates")
-          .select("id, source, rate, is_active, created_at")
-          .eq("source", "blue"),
-        supabase
-          .from("products")
-          .select(
-            `
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let productsQuery = supabase
+        .from("products")
+        .select(
+          `
              id,
              name,
              brand_id,
@@ -226,9 +229,45 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                 camera_main,
                 camera_front
               )
-           `
-          )
-          .order("name"),
+           `,
+          { count: "exact" }
+        )
+        .order("active", { ascending: false })
+        .order("name")
+        .range(from, to);
+
+      if (isSellerView) {
+        productsQuery = productsQuery.eq("active", true);
+      }
+      if (!isSellerView && statusFilter !== "all") {
+        productsQuery = productsQuery.eq("active", statusFilter === "active");
+      }
+      if (selectedBrand) {
+        productsQuery = productsQuery.eq("brand_id", Number(selectedBrand));
+      }
+      if (selectedCategory) {
+        productsQuery = productsQuery.eq("category_id", Number(selectedCategory));
+      }
+      if (debouncedSearch) {
+        const term = `%${debouncedSearch}%`;
+        productsQuery = productsQuery.or(
+          `name.ilike.${term},brands.name.ilike.${term}`
+        );
+      }
+
+      const [
+        fxRatesRes,
+        productsRes,
+        paymentMethodsRes,
+        brandsRes,
+        categoriesRes,
+        commissionRulesRes,
+      ] = await Promise.all([
+        supabase
+          .from("fx_rates")
+          .select("id, source, rate, is_active, created_at")
+          .eq("source", "blue"),
+        productsQuery,
         supabase
           .from("payment_methods")
           .select(
@@ -270,6 +309,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       }
 
       const rules = commissionRulesRes?.data || [];
+      setTotalCount(productsRes?.count ?? 0);
       const methodsRaw = paymentMethodsRes?.data || [];
 
       // 🔹 Separar métodos e installments
@@ -373,7 +413,14 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [
+    debouncedSearch,
+    isSellerView,
+    page,
+    selectedBrand,
+    selectedCategory,
+    statusFilter,
+  ]);
 
   const handleToggleActive = useCallback(
     async (product) => {
@@ -409,6 +456,17 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   useEffect(() => {
     fetchProducts(refreshToken === 0);
   }, [fetchProducts, refreshToken]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    debouncedSearch,
+    selectedBrand,
+    selectedCategory,
+    statusFilter,
+    refreshToken,
+    isSellerView,
+  ]);
 
   const handleRefresh = () => fetchProducts(false);
 
@@ -458,20 +516,6 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
   // FIN REEMPLAZO 5
 
   const filteredProducts = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    const filtered = products.filter((p) => {
-      if (isSellerView && !p.active) return false;
-      const matchesSearch =
-        !term ||
-        p.name.toLowerCase().includes(term) ||
-        p.brandName.toLowerCase().includes(term);
-      const matchesBrand =
-        !selectedBrand || p.brand_id === parseInt(selectedBrand);
-      const matchesCategory =
-        !selectedCategory || p.category_id === parseInt(selectedCategory);
-      return matchesSearch && matchesBrand && matchesCategory;
-    });
-
     const dir = sortDir === "asc" ? 1 : -1;
 
     const compareValues = (a, b, col) => {
@@ -486,27 +530,12 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       return a.name.localeCompare(b.name) * dir;
     };
 
-    const sorted = filtered.slice().sort((a, b) => {
-      // Priorizar activos: si difieren, activo primero
+    return products.slice().sort((a, b) => {
       if (a.active !== b.active) return a.active ? -1 : 1;
-
-      // Si hay una columna seleccionada, aplicar orden adicional
       if (sortBy) return compareValues(a, b, sortBy);
-
-      // Default: nombre asc
       return a.name.localeCompare(b.name);
     });
-
-    return sorted;
-  }, [
-    products,
-    searchTerm,
-    selectedBrand,
-    selectedCategory,
-    isSellerView,
-    sortBy,
-    sortDir,
-  ]);
+  }, [products, sortBy, sortDir]);
 
   const getRateBadge = () => {
     if (rateDiff === null) return null;
@@ -537,6 +566,10 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       timeStyle: "short",
     }).format(date);
   };
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, totalCount);
 
   return (
     <TooltipProvider>
@@ -612,6 +645,21 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                   ))}
                 </SelectContent>
               </Select>
+              {!isSellerView && (
+                <Select
+                  value={statusFilter}
+                  onValueChange={(v) => setStatusFilter(v)}
+                >
+                  <SelectTrigger className="w-full md:w-auto min-w-[180px]">
+                    <SelectValue placeholder="Estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="active">Activos</SelectItem>
+                    <SelectItem value="inactive">Inactivos</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* 🟨 FILA 3 — Botones (sm–lg alineados al final, xl también pero en la misma fila única) */}
@@ -946,6 +994,32 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
               )}
             </TableBody>
           </Table>
+        </div>
+        <div className="flex flex-col items-center justify-between gap-3 py-3 sm:flex-row">
+          <div className="text-sm text-muted-foreground">
+            Mostrando {rangeStart}-{rangeEnd} de {totalCount}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+            >
+              Anterior
+            </Button>
+            <div className="text-sm">
+              {page} / {totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages || loading}
+            >
+              Siguiente
+            </Button>
+          </div>
         </div>
       </div>
 

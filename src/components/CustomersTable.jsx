@@ -76,7 +76,11 @@ const TABLE_COLUMNS = [
 
 const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
   const [filter, setFilter] = useState("");
+  const [debouncedFilter, setDebouncedFilter] = useState("");
   const [customers, setCustomers] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 30;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState({
@@ -100,6 +104,13 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
     setVisibleColumns(baseColumns.map((col) => col.id));
   }, [baseColumns]);
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedFilter(filter.trim());
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [filter]);
+
   // Obtener clientes desde Supabase
   const fetchCustomers = useCallback(
     async (showSkeleton = false) => {
@@ -107,15 +118,30 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
       else setRefreshing(true);
 
       try {
-        const { data, error } = await supabase
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+
+        let query = supabase
           .from("customers")
           .select(
-            "id, name, last_name, dni, phone, email, address, city, notes, is_active, created_at"
+            "id, name, last_name, dni, phone, email, address, city, notes, is_active, created_at",
+            { count: "exact" }
           )
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .range(from, to);
+
+        if (debouncedFilter) {
+          const term = `%${debouncedFilter}%`;
+          query = query.or(
+            `name.ilike.${term},last_name.ilike.${term},dni.ilike.${term},phone.ilike.${term},email.ilike.${term}`
+          );
+        }
+
+        const { data, error, count } = await query;
 
         if (error) throw error;
         setCustomers(data ?? []);
+        setTotalCount(count ?? 0);
       } catch (error) {
         console.error(error);
         toast.error("Error al cargar clientes", {
@@ -126,12 +152,16 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
         setRefreshing(false);
       }
     },
-    []
+    [debouncedFilter, page]
   );
 
   useEffect(() => {
     fetchCustomers(refreshToken === 0);
   }, [fetchCustomers, refreshToken]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedFilter, refreshToken]);
 
   // Eliminar cliente
   const handleConfirmDelete = useCallback(async () => {
@@ -159,14 +189,6 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
     }
   }, [fetchCustomers, deleteDialog.customer]);
 
-  // Filtrado
-  const filtered = useMemo(() => {
-    if (!filter.trim()) return customers;
-    return customers.filter((c) =>
-      buildFullName(c).toLowerCase().includes(filter.toLowerCase())
-    );
-  }, [customers, filter]);
-
   const toggleColumn = useCallback((columnName) => {
     setVisibleColumns((current) =>
       current.includes(columnName)
@@ -176,6 +198,9 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
   }, []);
 
   const columnCount = visibleColumns.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, totalCount);
 
   return (
     <div className="space-y-4">
@@ -272,7 +297,7 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
                 </TableRow>
               ))}
 
-            {!loading && filtered.length === 0 && (
+            {!loading && customers.length === 0 && (
               <TableRow>
                 <TableCell
                   colSpan={columnCount}
@@ -284,7 +309,7 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
             )}
 
             {!loading &&
-              filtered.map((c) => (
+              customers.map((c) => (
                 <TableRow key={c.id} className="align-top">
                   {visibleColumns.includes("name") && (
                     <TableCell className="font-semibold">
@@ -388,6 +413,33 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
               ))}
           </TableBody>
         </Table>
+      </div>
+
+      <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
+        <div className="text-sm text-muted-foreground">
+          Mostrando {rangeStart}-{rangeEnd} de {totalCount}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1 || loading}
+          >
+            Anterior
+          </Button>
+          <div className="text-sm">
+            {page} / {totalPages}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages || loading}
+          >
+            Siguiente
+          </Button>
+        </div>
       </div>
 
       <DialogEditCustomer

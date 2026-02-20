@@ -24,6 +24,13 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -98,7 +105,12 @@ const UsersTable = ({ refreshToken = 0 }) => {
     TABLE_COLUMNS.map((col) => col.id)
   );
   const [nameFilter, setNameFilter] = useState("");
+  const [debouncedFilter, setDebouncedFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [users, setUsers] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 30;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
@@ -109,6 +121,13 @@ const UsersTable = ({ refreshToken = 0 }) => {
     user: null,
   });
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedFilter(nameFilter.trim());
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [nameFilter]);
+
   const fetchUsers = useCallback(async (showSkeleton = false) => {
     if (showSkeleton) {
       setLoading(true);
@@ -117,13 +136,34 @@ const UsersTable = ({ refreshToken = 0 }) => {
     }
 
     try {
-      const { data, error } = await supabase
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let query = supabase
         .from("users")
-        .select("id, id_auth, name, avatar_url, last_name, email, role, is_active, phone, dni, adress, created_at")
-        .order("created_at", { ascending: false });
+        .select(
+          "id, id_auth, name, avatar_url, last_name, email, role, is_active, phone, dni, adress, created_at",
+          { count: "exact" }
+        )
+        .order("is_active", { ascending: false })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (debouncedFilter) {
+        const term = `%${debouncedFilter}%`;
+        query = query.or(
+          `name.ilike.${term},last_name.ilike.${term},email.ilike.${term},phone.ilike.${term},dni.ilike.${term}`
+        );
+      }
+      if (statusFilter !== "all") {
+        query = query.eq("is_active", statusFilter === "active");
+      }
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
       setUsers(data ?? []);
+      setTotalCount(count ?? 0);
     } catch (error) {
       console.error(error);
       // 🔄 REEMPLAZO 1: Usar toast para el error de carga
@@ -134,11 +174,15 @@ const UsersTable = ({ refreshToken = 0 }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [debouncedFilter, page, statusFilter]);
 
   useEffect(() => {
     fetchUsers(refreshToken === 0);
   }, [fetchUsers, refreshToken]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedFilter, refreshToken, statusFilter]);
 
   // const handleToggleActive = useCallback(
   //   async (user) => {
@@ -261,19 +305,22 @@ const UsersTable = ({ refreshToken = 0 }) => {
     );
   }, []);
 
-  const filteredUsers = useMemo(() => {
-    if (!nameFilter.trim()) return users;
-    return users.filter((user) =>
-      buildFullName(user).toLowerCase().includes(nameFilter.toLowerCase())
-    );
-  }, [users, nameFilter]);
+  const orderedUsers = useMemo(() => {
+    return users.slice().sort((a, b) => {
+      if (a.is_active === b.is_active) return 0;
+      return a.is_active ? -1 : 1;
+    });
+  }, [users]);
 
   const isEmpty = useMemo(
-    () => !loading && filteredUsers.length === 0,
-    [loading, filteredUsers]
+    () => !loading && orderedUsers.length === 0,
+    [loading, orderedUsers.length]
   );
 
   const columnCount = visibleColumns.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, totalCount);
 
   return (
     <div className="space-y-4">
@@ -289,6 +336,19 @@ const UsersTable = ({ refreshToken = 0 }) => {
 
         {/* 🔘 Botones */}
         <div className="flex flex-wrap gap-2 justify-end w-full lg:w-auto">
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => setStatusFilter(value)}
+          >
+            <SelectTrigger className="w-full lg:w-40">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="active">Activos</SelectItem>
+              <SelectItem value="inactive">Inactivos</SelectItem>
+            </SelectContent>
+          </Select>
 
           {/* Columnas */}
           <DropdownMenu>
@@ -377,7 +437,7 @@ const UsersTable = ({ refreshToken = 0 }) => {
             )}
 
             {!loading &&
-              filteredUsers.map((user) => (
+              orderedUsers.map((user) => (
                 <TableRow key={user.id}>
                   {visibleColumns.includes("avatar") && (
                     <TableCell className="w-[70px]">
@@ -473,6 +533,33 @@ const UsersTable = ({ refreshToken = 0 }) => {
               ))}
           </TableBody>
         </Table>
+
+        <div className="flex flex-col items-center justify-between gap-3 px-4 py-3 sm:flex-row">
+          <div className="text-sm text-muted-foreground">
+            Mostrando {rangeStart}-{rangeEnd} de {totalCount}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+            >
+              Anterior
+            </Button>
+            <div className="text-sm">
+              {page} / {totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages || loading}
+            >
+              Siguiente
+            </Button>
+          </div>
+        </div>
 
         <DialogEditUser
           open={!!editingUserId}
