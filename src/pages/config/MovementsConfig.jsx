@@ -465,27 +465,27 @@ export default function MovementsConfig() {
   return (
     <div className="@container/main flex flex-1 flex-col gap-4 py-6">
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+        <Card className="bg-blue-500">
           <CardHeader>
-            <CardTitle>Balance total ARS</CardTitle>
+            <CardTitle className="text-white">Balance total ARS</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">
+          <CardContent className="text-2xl font-semibold text-white">
             {formatCurrency(totalBalances.ars, "ARS")}
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-green-700">
           <CardHeader>
-            <CardTitle>Balance total USD</CardTitle>
+            <CardTitle className="text-white">Balance total USD</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">
+          <CardContent className="text-2xl text-white font-semibold">
             {formatCurrency(totalBalances.usd, "USD")}
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-purple-700">
           <CardHeader>
-            <CardTitle>Balance total USDT</CardTitle>
+            <CardTitle className="text-white">Balance total USDT</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">
+          <CardContent className="text-2xl font-semibold text-white">
             {formatCurrency(totalBalances.usdt, "USDT")}
           </CardContent>
         </Card>
@@ -644,7 +644,13 @@ export default function MovementsConfig() {
                 {movements.map((m) => (
                   <TableRow
                     key={m.id}
-                    className="cursor-pointer"
+                    className={`cursor-pointer ${
+                      m.type === "income"
+                        ? "bg-green-200"
+                        : m.type === "expense"
+                          ? "bg-red-200"
+                          : ""
+                    }`}
                     onClick={() => openMovementDetail(m)}
                   >
                     <TableCell>{m.movement_date}</TableCell>
@@ -664,8 +670,11 @@ export default function MovementsConfig() {
                         ? "Transferencia"
                         : m.related_table === "sale_payments"
                           ? "Venta"
-                          : m.related_table
-                            ? `${m.related_table} ${m.related_id ? `#${m.related_id}` : ""}`
+                          : m.related_table === "expenses"
+                            ? "Gasto"
+                            : m.related_table === "purchase_payments"
+                              ? "Compra" 
+                            : m.related_table ? `${m.related_table} ${m.related_id ? `#${m.related_id}` : ""}`
                             : "-"}
                     </TableCell>
                     <TableCell>{m.notes || "-"}</TableCell>
