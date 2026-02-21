@@ -25,6 +25,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Drawer,
+  DrawerContent,
+  DrawerClose,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import {
   Table,
   TableBody,
   TableCell,
@@ -32,8 +41,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  Tooltip as ChartTooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { toast } from "sonner";
-import { IconCalendar } from "@tabler/icons-react";
+import { IconCalendar, IconRefresh, IconChartBar } from "@tabler/icons-react";
 
 const formatCurrency = (value, currency) => {
   const safe = Number(value || 0);
@@ -52,9 +69,29 @@ const formatCurrency = (value, currency) => {
 };
 
 export default function MovementsConfig() {
+  const CHART_COLORS = [
+    "#16A34A",
+    "#059669",
+    "#0E7490",
+    "#2563EB",
+    "#7C3AED",
+    "#DB2777",
+    "#DC2626",
+    "#EA580C",
+    "#D97706",
+    "#65A30D",
+  ];
+
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState([]);
   const [movements, setMovements] = useState([]);
+  const [balanceMovementsAll, setBalanceMovementsAll] = useState([]);
+  const [balanceMovementsFiltered, setBalanceMovementsFiltered] = useState([]);
+  const [incomeChartData, setIncomeChartData] = useState([]);
+  const [expenseChartData, setExpenseChartData] = useState([]);
+  const [chartsLoading, setChartsLoading] = useState(false);
+  const [chartsOpen, setChartsOpen] = useState(false);
+  const [chartCurrency, setChartCurrency] = useState("ARS");
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
   const pageSize = 30;
@@ -86,6 +123,57 @@ export default function MovementsConfig() {
 
     setAccounts(accountsData || []);
   }, []);
+
+  const loadBalancesAll = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("account_movements")
+      .select("account_id, type, amount");
+
+    if (error) {
+      toast.error("No se pudo cargar el balance", {
+        description: error.message,
+      });
+      return;
+    }
+
+    setBalanceMovementsAll(data || []);
+  }, []);
+
+  const loadBalancesFiltered = useCallback(async () => {
+    let query = supabase
+      .from("account_movements")
+      .select("account_id, type, amount");
+
+    if (filters.accountId !== "all") {
+      query = query.eq("account_id", filters.accountId);
+    }
+    if (filters.type !== "all") {
+      query = query.eq("type", filters.type);
+    }
+    if (dateRange?.from) {
+      query = query.gte(
+        "movement_date",
+        dateRange.from.toISOString().slice(0, 10)
+      );
+    }
+    if (dateRange?.to) {
+      query = query.lte(
+        "movement_date",
+        dateRange.to.toISOString().slice(0, 10)
+      );
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      toast.error("No se pudo cargar el balance filtrado", {
+        description: error.message,
+      });
+      return;
+    }
+
+    setBalanceMovementsFiltered(data || []);
+  }, [filters, dateRange]);
 
   const loadMovements = useCallback(async () => {
     setLoading(true);
@@ -136,13 +224,124 @@ export default function MovementsConfig() {
     setLoading(false);
   }, [filters, page, pageSize, dateRange]);
 
+  const buildCategoryLabel = (movement, expensesMap) => {
+    if (movement.related_table === "sale_payments") return "Ventas";
+    if (movement.related_table === "purchase_payments") return "Compras";
+    if (movement.related_table === "account_transfer") return null;
+    if (movement.related_table === "expenses") {
+      return expensesMap.get(movement.related_id) || "Sin categoria";
+    }
+    if (movement.related_table === "manual_income") {
+      const match = movement.notes?.match(/Categoria:\s*([^|]+)/i);
+      if (match?.[1]) return match[1].trim();
+      return "Ingresos";
+    }
+    return "Otros";
+  };
+
+  const loadCharts = useCallback(async () => {
+    setChartsLoading(true);
+
+    let query = supabase
+      .from("account_movements")
+      .select(
+        "id, type, amount, currency, related_table, related_id, notes"
+      );
+
+    if (filters.accountId !== "all") {
+      query = query.eq("account_id", filters.accountId);
+    }
+    if (filters.type !== "all") {
+      query = query.eq("type", filters.type);
+    }
+    if (dateRange?.from) {
+      query = query.gte(
+        "movement_date",
+        dateRange.from.toISOString().slice(0, 10)
+      );
+    }
+    if (dateRange?.to) {
+      query = query.lte(
+        "movement_date",
+        dateRange.to.toISOString().slice(0, 10)
+      );
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      toast.error("No se pudieron cargar los graficos", {
+        description: error.message,
+      });
+      setChartsLoading(false);
+      return;
+    }
+
+    const movementsData = data || [];
+    const expenseIds = movementsData
+      .filter((m) => m.related_table === "expenses" && m.related_id)
+      .map((m) => m.related_id);
+
+    let expensesMap = new Map();
+    if (expenseIds.length) {
+      const { data: expensesData, error: expensesError } = await supabase
+        .from("expenses")
+        .select("id, category")
+        .in("id", expenseIds);
+
+      if (!expensesError) {
+        expensesMap = new Map(
+          (expensesData || []).map((item) => [item.id, item.category])
+        );
+      }
+    }
+
+    const groupByCategory = (type) => {
+      const grouped = new Map();
+      movementsData.forEach((movement) => {
+        if (movement.type !== type) return;
+        if (movement.currency !== chartCurrency) return;
+        const label = buildCategoryLabel(movement, expensesMap);
+        if (!label) return;
+        const currency = movement.currency || "ARS";
+        const value = Number(movement.amount ?? 0);
+        if (!value) return;
+        const key = `${label}__${currency}`;
+        grouped.set(key, (grouped.get(key) || 0) + value);
+      });
+
+      return Array.from(grouped.entries())
+        .map(([key, value]) => {
+          const [name, currency] = key.split("__");
+          return { name: `${name} (${currency})`, value, currency };
+        })
+        .sort((a, b) => b.value - a.value);
+    };
+
+    setIncomeChartData(groupByCategory("income"));
+    setExpenseChartData(groupByCategory("expense"));
+    setChartsLoading(false);
+  }, [dateRange, filters, chartCurrency]);
+
   useEffect(() => {
     loadAccounts();
   }, [loadAccounts]);
 
   useEffect(() => {
+    loadBalancesAll();
+  }, [loadBalancesAll]);
+
+  useEffect(() => {
     loadMovements();
   }, [loadMovements]);
+
+  useEffect(() => {
+    loadBalancesFiltered();
+  }, [loadBalancesFiltered]);
+
+  useEffect(() => {
+    loadCharts();
+  }, [loadCharts]);
 
   useEffect(() => {
     setPage(1);
@@ -155,9 +354,9 @@ export default function MovementsConfig() {
     });
   };
 
-  const accountBalances = useMemo(() => {
+  const accountBalancesAll = useMemo(() => {
     const totals = new Map();
-    movements.forEach((m) => {
+    balanceMovementsAll.forEach((m) => {
       const entry = totals.get(m.account_id) || { income: 0, expense: 0 };
       if (m.type === "income") entry.income += Number(m.amount || 0);
       if (m.type === "expense") entry.expense += Number(m.amount || 0);
@@ -176,10 +375,33 @@ export default function MovementsConfig() {
         current_balance: current,
       };
     });
-  }, [accounts, movements]);
+  }, [accounts, balanceMovementsAll]);
+
+  const accountBalancesFiltered = useMemo(() => {
+    const totals = new Map();
+    balanceMovementsFiltered.forEach((m) => {
+      const entry = totals.get(m.account_id) || { income: 0, expense: 0 };
+      if (m.type === "income") entry.income += Number(m.amount || 0);
+      if (m.type === "expense") entry.expense += Number(m.amount || 0);
+      totals.set(m.account_id, entry);
+    });
+
+    return accounts.map((acc) => {
+      const totalsForAccount = totals.get(acc.id) || { income: 0, expense: 0 };
+      const current = Number(acc.initial_balance || 0)
+        + totalsForAccount.income
+        - totalsForAccount.expense;
+      return {
+        ...acc,
+        income: totalsForAccount.income,
+        expense: totalsForAccount.expense,
+        current_balance: current,
+      };
+    });
+  }, [accounts, balanceMovementsFiltered]);
 
   const totalBalances = useMemo(() => {
-    return accountBalances.reduce(
+    return accountBalancesAll.reduce(
       (acc, item) => {
         if (!item.include_in_balance) return acc;
         if (item.currency === "USD") acc.usd += item.current_balance;
@@ -189,7 +411,7 @@ export default function MovementsConfig() {
       },
       { ars: 0, usd: 0, usdt: 0 }
     );
-  }, [accountBalances]);
+  }, [accountBalancesAll]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
@@ -287,7 +509,7 @@ export default function MovementsConfig() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {accountBalances.map((acc) => (
+                {accountBalancesFiltered.map((acc) => (
                   <TableRow key={acc.id}>
                     <TableCell>{acc.name}</TableCell>
                     <TableCell>{acc.currency}</TableCell>
@@ -297,7 +519,7 @@ export default function MovementsConfig() {
                     <TableCell>{formatCurrency(acc.current_balance, acc.currency)}</TableCell>
                   </TableRow>
                 ))}
-                {accountBalances.length === 0 && (
+                {accountBalancesFiltered.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground">
                       No hay cuentas disponibles.
@@ -313,9 +535,16 @@ export default function MovementsConfig() {
       <Card>
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <CardTitle>Movimientos</CardTitle>
-          <Button onClick={loadMovements} disabled={loading}>
-            {loading ? "Actualizando..." : "Actualizar"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => setChartsOpen(true)} variant="outline">
+              <IconChartBar className="h-4 w-4" />
+              Gráficos
+            </Button>
+            <Button onClick={loadMovements} disabled={loading}>
+              <IconRefresh className="h-4 w-4" />
+              {loading ? "Actualizando..." : "Actualizar"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -565,6 +794,122 @@ export default function MovementsConfig() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Drawer open={chartsOpen} onOpenChange={setChartsOpen}>
+        <DrawerContent className="max-h-[85svh]">
+          <DrawerHeader className="gap-1 relative">
+            <DrawerTitle>Gráficos</DrawerTitle>
+            <DrawerDescription>
+              {dateRange?.from && dateRange?.to
+                ? `${dateRange.from.toLocaleDateString(
+                    "es-AR"
+                  )} - ${dateRange.to.toLocaleDateString("es-AR")}`
+                : "Sin fecha seleccionada"}
+            </DrawerDescription>
+            <div className="absolute left-1/2 -bottom-6 w-[100px] -translate-x-1/2">
+              <Select
+                value={chartCurrency}
+                onValueChange={(value) => setChartCurrency(value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Moneda" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ARS">ARS</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="USDT">USDT</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </DrawerHeader>
+          <div className="">
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="flex flex-col items-center">
+                <div className="text-2xl font-semibold">Ingresos</div>
+                {chartsLoading ? (
+                  <div className="text-sm text-muted-foreground">
+                    Cargando grafico...
+                  </div>
+                ) : incomeChartData.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">Sin datos</div>
+                ) : (
+                  <div className="w-full h-[260px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={incomeChartData}
+                          dataKey="value"
+                          nameKey="name"
+                          outerRadius="80%"
+                          label
+                        >
+                          {incomeChartData.map((_, i) => (
+                            <Cell
+                              key={i}
+                              fill={CHART_COLORS[i % CHART_COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Legend verticalAlign="bottom" />
+                        <ChartTooltip
+                          formatter={(value, _name, props) => [
+                            formatCurrency(value, props.payload.currency),
+                            props.payload.name,
+                          ]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col items-center">
+                <div className="text-2xl font-semibold">Egresos</div>
+                {chartsLoading ? (
+                  <div className="text-sm text-muted-foreground">
+                    Cargando grafico...
+                  </div>
+                ) : expenseChartData.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">Sin datos</div>
+                ) : (
+                  <div className="w-full h-[260px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={expenseChartData}
+                          dataKey="value"
+                          nameKey="name"
+                          outerRadius="80%"
+                          label
+                        >
+                          {expenseChartData.map((_, i) => (
+                            <Cell
+                              key={i}
+                              fill={CHART_COLORS[i % CHART_COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Legend verticalAlign="bottom" />
+                        <ChartTooltip
+                          formatter={(value, _name, props) => [
+                            formatCurrency(value, props.payload.currency),
+                            props.payload.name,
+                          ]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <DrawerFooter>
+            <DrawerClose asChild>
+              <Button variant="outline" className="w-150 m-auto" >Cerrar</Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }
