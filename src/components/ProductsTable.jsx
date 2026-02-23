@@ -185,6 +185,15 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
     else setRefreshing(true);
 
     try {
+      let brandIds = [];
+      if (debouncedSearch) {
+        const { data: brandMatches } = await supabase
+          .from("brands")
+          .select("id")
+          .ilike("name", `%${debouncedSearch}%`);
+        brandIds = (brandMatches || []).map((b) => b.id);
+      }
+
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
@@ -250,9 +259,13 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
       }
       if (debouncedSearch) {
         const term = `%${debouncedSearch}%`;
-        productsQuery = productsQuery.or(
-          `name.ilike.${term},brands.name.ilike.${term}`
-        );
+        if (brandIds.length) {
+          productsQuery = productsQuery.or(
+            `name.ilike.${term},brand_id.in.(${brandIds.join(",")})`
+          );
+        } else {
+          productsQuery = productsQuery.ilike("name", term);
+        }
       }
 
       const [
