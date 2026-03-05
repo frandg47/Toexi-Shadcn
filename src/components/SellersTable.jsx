@@ -113,6 +113,11 @@ const formatCurrencyUSD = (value) => {
     }).format(value);
 };
 
+const formatCurrencyByCode = (value, currency) => {
+    if (currency === "USD") return formatCurrencyUSD(value);
+    return formatCurrency(value);
+};
+
 const getMonthName = (dateString) => {
     if (!dateString) return "-";
     try {
@@ -161,6 +166,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
     const [refreshing, setRefreshing] = useState(false);
     const [fxRate, setFxRate] = useState(null);
     const [accounts, setAccounts] = useState([]);
+    const [balanceMovements, setBalanceMovements] = useState([]);
     const [availableMonths, setAvailableMonths] = useState([]);
     const [paymentDialog, setPaymentDialog] = useState({
         open: false,
@@ -440,19 +446,67 @@ const SellersTable = ({ refreshToken = 0 }) => {
 
     useEffect(() => {
         const loadAccounts = async () => {
-            const { data, error } = await supabase
-                .from("accounts")
-                .select("id, name, currency")
-                .order("name", { ascending: true });
+            const [{ data, error }, movementsRes] = await Promise.all([
+                supabase
+                    .from("accounts")
+                    .select("id, name, currency, initial_balance")
+                    .order("name", { ascending: true }),
+                supabase
+                    .from("account_movements")
+                    .select("account_id, type, amount"),
+            ]);
             if (error) {
                 console.error(error);
                 return;
+            }
+            if (movementsRes?.error) {
+                console.error(movementsRes.error);
+                setBalanceMovements([]);
+            } else {
+                setBalanceMovements(movementsRes?.data || []);
             }
             setAccounts(data || []);
         };
 
         loadAccounts();
     }, []);
+
+    const accountBalances = useMemo(() => {
+        const totals = new Map();
+        balanceMovements.forEach((movement) => {
+            const entry = totals.get(movement.account_id) || {
+                income: 0,
+                expense: 0,
+            };
+            if (movement.type === "income") {
+                entry.income += Number(movement.amount || 0);
+            } else if (movement.type === "expense") {
+                entry.expense += Number(movement.amount || 0);
+            }
+            totals.set(movement.account_id, entry);
+        });
+
+        return accounts.map((acc) => {
+            const totalsForAccount = totals.get(acc.id) || {
+                income: 0,
+                expense: 0,
+            };
+            const current =
+                Number(acc.initial_balance || 0) +
+                totalsForAccount.income -
+                totalsForAccount.expense;
+            return {
+                ...acc,
+                current_balance: current,
+            };
+        });
+    }, [accounts, balanceMovements]);
+
+    const selectedPaymentAccount = useMemo(() => {
+        return accountBalances.find(
+            (acc) => String(acc.id) === String(paymentAccountId)
+        );
+    }, [accountBalances, paymentAccountId]);
 
     const handlePayment = useCallback(async (paymentRecord) => {
         try {
@@ -845,19 +899,38 @@ const SellersTable = ({ refreshToken = 0 }) => {
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    {selectedPaymentAccount && (
+                                        <div className="text-xs text-muted-foreground">
+                                            Saldo disponible:{" "}
+                                            {formatCurrencyByCode(
+                                                selectedPaymentAccount.current_balance,
+                                                selectedPaymentAccount.currency
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => handlePayment(paymentDialog.paymentRecord)}
-                            className="bg-green-600 hover:bg-green-700"
-                            disabled={!paymentAccountId}
-                        >
-                            Confirmar pago
-                        </AlertDialogAction>
+            <AlertDialogAction
+                onClick={() => handlePayment(paymentDialog.paymentRecord)}
+                className="bg-green-600 hover:bg-green-700"
+                disabled={
+                    !paymentAccountId ||
+                    (selectedPaymentAccount &&
+                        Number(paymentDialog.paymentRecord?.commissions_total_ars || 0) >
+                        Number(selectedPaymentAccount.current_balance || 0) &&
+                        selectedPaymentAccount.currency === "ARS") ||
+                    (selectedPaymentAccount &&
+                        Number(paymentDialog.paymentRecord?.commissions_total_usd || 0) >
+                        Number(selectedPaymentAccount.current_balance || 0) &&
+                        selectedPaymentAccount.currency === "USD")
+                }
+            >
+                Confirmar pago
+            </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
@@ -946,3 +1019,11 @@ const addDaysToDateKey = (dateKey, days) => {
 };
 
 export default SellersTable;
+            if (
+                selectedPaymentAccount &&
+                amount >
+                Number(selectedPaymentAccount.current_balance || 0)
+            ) {
+                toast.error("Saldo insuficiente");
+                return;
+            }

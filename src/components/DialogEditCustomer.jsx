@@ -105,10 +105,11 @@ export default function DialogEditCustomer({
   // 🔹 Guardar cambios
   const onSubmit = async (values) => {
     try {
+      const { id: _id, ...rest } = values;
       const formattedValues = {
-        ...values,
-        name: formatNamePart(values.name),
-        last_name: formatNamePart(values.last_name),
+        ...rest,
+        name: formatNamePart(rest.name),
+        last_name: formatNamePart(rest.last_name),
       };
       const { error } = await supabase
         .from("customers")

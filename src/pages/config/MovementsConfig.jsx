@@ -153,13 +153,13 @@ export default function MovementsConfig() {
     if (dateRange?.from) {
       query = query.gte(
         "movement_date",
-        dateRange.from.toISOString().slice(0, 10)
+        dateRange.from.toISOString().slice(0, 10),
       );
     }
     if (dateRange?.to) {
       query = query.lte(
         "movement_date",
-        dateRange.to.toISOString().slice(0, 10)
+        dateRange.to.toISOString().slice(0, 10),
       );
     }
 
@@ -184,7 +184,7 @@ export default function MovementsConfig() {
       .from("account_movements")
       .select(
         "id, created_at, movement_date, account_id, type, amount, currency, amount_ars, related_table, related_id, notes, accounts(name, currency)",
-        { count: "exact" }
+        { count: "exact" },
       )
       .order("movement_date", { ascending: false })
       .order("id", { ascending: false })
@@ -199,13 +199,13 @@ export default function MovementsConfig() {
     if (dateRange?.from) {
       query = query.gte(
         "movement_date",
-        dateRange.from.toISOString().slice(0, 10)
+        dateRange.from.toISOString().slice(0, 10),
       );
     }
     if (dateRange?.to) {
       query = query.lte(
         "movement_date",
-        dateRange.to.toISOString().slice(0, 10)
+        dateRange.to.toISOString().slice(0, 10),
       );
     }
 
@@ -244,9 +244,7 @@ export default function MovementsConfig() {
 
     let query = supabase
       .from("account_movements")
-      .select(
-        "id, type, amount, currency, related_table, related_id, notes"
-      );
+      .select("id, type, amount, currency, related_table, related_id, notes");
 
     if (filters.accountId !== "all") {
       query = query.eq("account_id", filters.accountId);
@@ -257,13 +255,13 @@ export default function MovementsConfig() {
     if (dateRange?.from) {
       query = query.gte(
         "movement_date",
-        dateRange.from.toISOString().slice(0, 10)
+        dateRange.from.toISOString().slice(0, 10),
       );
     }
     if (dateRange?.to) {
       query = query.lte(
         "movement_date",
-        dateRange.to.toISOString().slice(0, 10)
+        dateRange.to.toISOString().slice(0, 10),
       );
     }
 
@@ -291,7 +289,7 @@ export default function MovementsConfig() {
 
       if (!expensesError) {
         expensesMap = new Map(
-          (expensesData || []).map((item) => [item.id, item.category])
+          (expensesData || []).map((item) => [item.id, item.category]),
         );
       }
     }
@@ -365,9 +363,10 @@ export default function MovementsConfig() {
 
     return accounts.map((acc) => {
       const totalsForAccount = totals.get(acc.id) || { income: 0, expense: 0 };
-      const current = Number(acc.initial_balance || 0)
-        + totalsForAccount.income
-        - totalsForAccount.expense;
+      const current =
+        Number(acc.initial_balance || 0) +
+        totalsForAccount.income -
+        totalsForAccount.expense;
       return {
         ...acc,
         income: totalsForAccount.income,
@@ -388,9 +387,10 @@ export default function MovementsConfig() {
 
     return accounts.map((acc) => {
       const totalsForAccount = totals.get(acc.id) || { income: 0, expense: 0 };
-      const current = Number(acc.initial_balance || 0)
-        + totalsForAccount.income
-        - totalsForAccount.expense;
+      const current =
+        Number(acc.initial_balance || 0) +
+        totalsForAccount.income -
+        totalsForAccount.expense;
       return {
         ...acc,
         income: totalsForAccount.income,
@@ -409,7 +409,7 @@ export default function MovementsConfig() {
         else acc.ars += item.current_balance;
         return acc;
       },
-      { ars: 0, usd: 0, usdt: 0 }
+      { ars: 0, usd: 0, usdt: 0 },
     );
   }, [accountBalancesAll]);
 
@@ -428,7 +428,7 @@ export default function MovementsConfig() {
       detailResponse = await supabase
         .from("sale_payments")
         .select(
-          "id, sale_id, amount_ars, amount_usd, payment_method_id, installments, reference, created_at, payment_methods(name), sales(id, total_ars, customer_id, customers:customers!sales_customer_id_fkey(name, last_name))"
+          "id, sale_id, amount_ars, amount_usd, payment_method_id, installments, reference, created_at, payment_methods(name), sales(id, total_ars, customer_id, customers:customers!sales_customer_id_fkey(name, last_name))",
         )
         .eq("id", movement.related_id)
         .maybeSingle();
@@ -436,7 +436,7 @@ export default function MovementsConfig() {
       detailResponse = await supabase
         .from("purchase_payments")
         .select(
-          "id, purchase_id, amount, currency, amount_ars, payment_method_id, created_at, purchases(purchase_date, total_amount, currency, providers(name)), payment_methods(name)"
+          "id, purchase_id, amount, currency, amount_ars, payment_method_id, created_at, purchases(purchase_date, total_amount, currency, providers(name)), payment_methods(name)",
         )
         .eq("id", movement.related_id)
         .maybeSingle();
@@ -444,7 +444,7 @@ export default function MovementsConfig() {
       detailResponse = await supabase
         .from("expenses")
         .select(
-          "id, expense_date, amount, currency, amount_ars, category, type, notes, account_id"
+          "id, expense_date, amount, currency, amount_ars, category, type, notes, account_id",
         )
         .eq("id", movement.related_id)
         .maybeSingle();
@@ -513,15 +513,26 @@ export default function MovementsConfig() {
                   <TableRow key={acc.id}>
                     <TableCell>{acc.name}</TableCell>
                     <TableCell>{acc.currency}</TableCell>
-                    <TableCell>{formatCurrency(acc.initial_balance, acc.currency)}</TableCell>
-                    <TableCell>{formatCurrency(acc.income, acc.currency)}</TableCell>
-                    <TableCell>{formatCurrency(acc.expense, acc.currency)}</TableCell>
-                    <TableCell>{formatCurrency(acc.current_balance, acc.currency)}</TableCell>
+                    <TableCell>
+                      {formatCurrency(acc.initial_balance, acc.currency)}
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(acc.income, acc.currency)}
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(acc.expense, acc.currency)}
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(acc.current_balance, acc.currency)}
+                    </TableCell>
                   </TableRow>
                 ))}
                 {accountBalancesFiltered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={6}
+                      className="text-center text-muted-foreground"
+                    >
                       No hay cuentas disponibles.
                     </TableCell>
                   </TableRow>
@@ -560,7 +571,7 @@ export default function MovementsConfig() {
                       <IconCalendar className="h-4 w-4" />
                       {dateRange?.from && dateRange?.to
                         ? `${dateRange.from.toLocaleDateString(
-                            "es-AR"
+                            "es-AR",
                           )} - ${dateRange.to.toLocaleDateString("es-AR")}`
                         : "Filtrar por fecha"}
                     </Button>
@@ -664,7 +675,9 @@ export default function MovementsConfig() {
                           ? "Egreso"
                           : "Transferencia"}
                     </TableCell>
-                    <TableCell>{formatCurrency(m.amount, m.currency)}</TableCell>
+                    <TableCell>
+                      {formatCurrency(m.amount, m.currency)}
+                    </TableCell>
                     <TableCell>
                       {m.related_table === "account_transfer"
                         ? "Transferencia"
@@ -673,16 +686,22 @@ export default function MovementsConfig() {
                           : m.related_table === "expenses"
                             ? "Gasto"
                             : m.related_table === "purchase_payments"
-                              ? "Compra" 
-                            : m.related_table ? `${m.related_table} ${m.related_id ? `#${m.related_id}` : ""}`
-                            : "-"}
+                              ? "Compra"
+                              : m.related_table === "commission_payments"
+                                ? "Pago de comisión"
+                                : m.related_table
+                                  ? `${m.related_table} ${m.related_id ? `#${m.related_id}` : ""}`
+                                  : "-"}
                     </TableCell>
                     <TableCell>{m.notes || "-"}</TableCell>
                   </TableRow>
                 ))}
                 {movements.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={6}
+                      className="text-center text-muted-foreground"
+                    >
                       No hay movimientos para mostrar.
                     </TableCell>
                   </TableRow>
@@ -692,7 +711,8 @@ export default function MovementsConfig() {
           </div>
           <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
             <div className="text-sm text-muted-foreground">
-              Mostrando {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, totalCount)} de {totalCount}
+              Mostrando {(page - 1) * pageSize + 1}-
+              {Math.min(page * pageSize, totalCount)} de {totalCount}
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -725,13 +745,24 @@ export default function MovementsConfig() {
             <DialogTitle>Detalle del movimiento</DialogTitle>
           </DialogHeader>
           <div className="space-y-2 text-sm">
-            <div><strong>Fecha:</strong> {detailMovement?.movement_date || "-"}</div>
-            <div><strong>Cuenta:</strong> {detailMovement?.accounts?.name || "-"}</div>
+            <div>
+              <strong>Fecha:</strong> {detailMovement?.movement_date || "-"}
+            </div>
+            <div>
+              <strong>Cuenta:</strong> {detailMovement?.accounts?.name || "-"}
+            </div>
             <div>
               <strong>Monto:</strong>{" "}
               {formatCurrency(detailMovement?.amount, detailMovement?.currency)}
             </div>
-            <div><strong>Tipo:</strong> {detailMovement?.type === "income" ? "Ingreso" : detailMovement?.type === "expense" ? "Egreso" : "Transferencia"}</div>
+            <div>
+              <strong>Tipo:</strong>{" "}
+              {detailMovement?.type === "income"
+                ? "Ingreso"
+                : detailMovement?.type === "expense"
+                  ? "Egreso"
+                  : "Transferencia"}
+            </div>
             <div>
               <strong>Origen:</strong>{" "}
               {detailMovement?.related_table
@@ -753,19 +784,27 @@ export default function MovementsConfig() {
                 : "Manual"}
             </div>
             {detailMovement?.notes && (
-              <div><strong>Notas:</strong> {detailMovement.notes}</div>
+              <div>
+                <strong>Notas:</strong> {detailMovement.notes}
+              </div>
             )}
           </div>
           <div className="rounded-md border p-3 text-sm">
-            {detailLoading && <div className="text-muted-foreground">Cargando detalle...</div>}
+            {detailLoading && (
+              <div className="text-muted-foreground">Cargando detalle...</div>
+            )}
             {!detailLoading && !detailData && (
-              <div className="text-muted-foreground">No hay detalle adicional.</div>
+              <div className="text-muted-foreground">
+                No hay detalle adicional.
+              </div>
             )}
             {!detailLoading && detailData && (
               <div className="space-y-2">
                 {detailMovement?.related_table === "sale_payments" && (
                   <>
-                    <div><strong>Venta:</strong> #{detailData.sale_id}</div>
+                    <div>
+                      <strong>Venta:</strong> #{detailData.sale_id}
+                    </div>
                     <div>
                       <strong>Cliente:</strong>{" "}
                       {detailData?.sales?.customers
@@ -776,26 +815,51 @@ export default function MovementsConfig() {
                           ? `Cliente #${detailData.sales.customer_id}`
                           : "Sin cliente"}
                     </div>
-                    <div><strong>Metodo:</strong> {detailData.payment_methods?.name || "-"}</div>
-                    <div><strong>Cuotas:</strong> {detailData.installments || "-"}</div>
+                    <div>
+                      <strong>Metodo:</strong>{" "}
+                      {detailData.payment_methods?.name || "-"}
+                    </div>
+                    <div>
+                      <strong>Cuotas:</strong> {detailData.installments || "-"}
+                    </div>
                     {detailData.reference && (
-                      <div><strong>Referencia:</strong> {detailData.reference}</div>
+                      <div>
+                        <strong>Referencia:</strong> {detailData.reference}
+                      </div>
                     )}
                   </>
                 )}
                 {detailMovement?.related_table === "purchase_payments" && (
                   <>
-                    <div><strong>Compra:</strong> #{detailData.purchase_id}</div>
-                    <div><strong>Proveedor:</strong> {detailData.purchases?.providers?.name || "-"}</div>
-                    <div><strong>Metodo:</strong> {detailData.payment_methods?.name || "-"}</div>
-                    <div><strong>Fecha compra:</strong> {detailData.purchases?.purchase_date || "-"}</div>
+                    <div>
+                      <strong>Compra:</strong> #{detailData.purchase_id}
+                    </div>
+                    <div>
+                      <strong>Proveedor:</strong>{" "}
+                      {detailData.purchases?.providers?.name || "-"}
+                    </div>
+                    <div>
+                      <strong>Metodo:</strong>{" "}
+                      {detailData.payment_methods?.name || "-"}
+                    </div>
+                    <div>
+                      <strong>Fecha compra:</strong>{" "}
+                      {detailData.purchases?.purchase_date || "-"}
+                    </div>
                   </>
                 )}
                 {detailMovement?.related_table === "expenses" && (
                   <>
-                    <div><strong>Categoria:</strong> {detailData.category || "-"}</div>
-                    <div><strong>Tipo:</strong> {detailData.type || "-"}</div>
-                    <div><strong>Fecha gasto:</strong> {detailData.expense_date || "-"}</div>
+                    <div>
+                      <strong>Categoria:</strong> {detailData.category || "-"}
+                    </div>
+                    <div>
+                      <strong>Tipo:</strong> {detailData.type || "-"}
+                    </div>
+                    <div>
+                      <strong>Fecha gasto:</strong>{" "}
+                      {detailData.expense_date || "-"}
+                    </div>
                   </>
                 )}
               </div>
@@ -811,7 +875,7 @@ export default function MovementsConfig() {
             <DrawerDescription>
               {dateRange?.from && dateRange?.to
                 ? `${dateRange.from.toLocaleDateString(
-                    "es-AR"
+                    "es-AR",
                   )} - ${dateRange.to.toLocaleDateString("es-AR")}`
                 : "Sin fecha seleccionada"}
             </DrawerDescription>
@@ -914,7 +978,9 @@ export default function MovementsConfig() {
           </div>
           <DrawerFooter>
             <DrawerClose asChild>
-              <Button variant="outline" className="w-150 m-auto" >Cerrar</Button>
+              <Button variant="outline" className="w-150 m-auto">
+                Cerrar
+              </Button>
             </DrawerClose>
           </DrawerFooter>
         </DrawerContent>
