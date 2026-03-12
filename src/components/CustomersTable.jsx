@@ -397,7 +397,7 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
                         >
                           <IconEdit className="h-4 w-4" />
                         </Button>
-                        <Button
+                        {/* <Button
                           variant="destructive"
                           size="sm"
                           onClick={() =>
@@ -405,7 +405,7 @@ const CustomersTable = ({ refreshToken = 0, isSellerView }) => {
                           }
                         >
                           <IconTrash className="h-4 w-4" />
-                        </Button>
+                        </Button> */}
                       </div>
                     </TableCell>
                   )}

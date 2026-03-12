@@ -688,7 +688,7 @@ export default function MovementsConfig() {
                             : m.related_table === "purchase_payments"
                               ? "Compra"
                               : m.related_table === "commission_payments"
-                                ? "Pago de comisión"
+                                ? "Pago"
                                 : m.related_table
                                   ? `${m.related_table} ${m.related_id ? `#${m.related_id}` : ""}`
                                   : "-"}

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-// ✅ AGREGADO: Sonner para notificaciones
+// ? AGREGADO: Sonner para notificaciones
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/site-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -9,6 +9,13 @@ import ConcentricLoader from "@/components/ui/loading";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   IconCreditCard,
   IconPlus,
@@ -23,11 +30,22 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-// ❌ ELIMINADO: import Swal from "sweetalert2";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+// ? ELIMINADO: import Swal from "sweetalert2";
 
 export default function PaymentMethodsConfig() {
   const [methods, setMethods] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("active");
   const [methodModal, setMethodModal] = useState({
     open: false,
     editId: null,
@@ -42,19 +60,32 @@ export default function PaymentMethodsConfig() {
     percent: "",
     description: "",
   });
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    methodId: null,
+    name: "",
+  });
 
-  // 🔹 Obtener métodos con sus cuotas
+  // ?? Obtener métodos con sus cuotas
   const fetchMethods = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from("payment_methods")
       .select(
-        "id, name, multiplier, payment_installments(id, installments, multiplier, description)"
+        "id, name, multiplier, is_active, payment_installments(id, installments, multiplier, description)"
       )
       .order("id");
 
+    if (statusFilter === "active") {
+      query = query.eq("is_active", true);
+    } else if (statusFilter === "inactive") {
+      query = query.eq("is_active", false);
+    }
+
+    const { data, error } = await query;
+
     if (error) {
-      // 🔄 REEMPLAZO 1: Usar toast para error de carga
+      // ?? REEMPLAZO 1: Usar toast para error de carga
       toast.error("Error de carga", {
         description: "No se pudieron cargar los métodos de pago.",
       });
@@ -66,13 +97,13 @@ export default function PaymentMethodsConfig() {
 
   useEffect(() => {
     fetchMethods();
-  }, []);
+  }, [statusFilter]);
 
-  // 🔹 Guardar o actualizar método
+  // ?? Guardar o actualizar método
   const handleSaveMethod = async () => {
     const { name, percent, editId } = methodModal;
     if (!name) {
-      // 🔄 REEMPLAZO 2: Usar toast para campos requeridos
+      // ?? REEMPLAZO 2: Usar toast para campos requeridos
       toast.warning("Campos requeridos", {
         description: "Completá el nombre del método.",
       });
@@ -97,12 +128,12 @@ export default function PaymentMethodsConfig() {
     }
 
     if (error) {
-      // 🔄 REEMPLAZO 3: Usar toast para error al guardar
+      // ?? REEMPLAZO 3: Usar toast para error al guardar
       toast.error("Error al guardar", {
         description: "No se pudo guardar el método de pago.",
       });
     } else {
-      // 🔄 REEMPLAZO 4: Usar toast para éxito
+      // ?? REEMPLAZO 4: Usar toast para éxito
       toast.success("Éxito", {
         description: `Método "${name}" ${
           editId ? "actualizado" : "creado"
@@ -113,45 +144,35 @@ export default function PaymentMethodsConfig() {
     }
   };
 
-  // 🔹 Eliminar método
-  const handleDeleteMethod = async (id, name) => {
-    // 🔄 REEMPLAZO 5: Usar un toast.custom para confirmación o simplificar a una advertencia con un diálogo
-    // Por simplicidad, se usará un diálogo interno o la confirmación de la librería de UI preferida.
-    // Aquí, para mantener la lógica de confirmación, se usará una promesa simple con `window.confirm` para un ejemplo de reemplazo rápido, aunque en un entorno Shadcn/ui se preferiría un Dialog o un componente de confirmación customizado de Sonner.
-
-    if (
-      !window.confirm(
-        `¿Estás seguro de que quieres eliminar el método "${name}"? Se eliminarán también sus cuotas asociadas.`
-      )
-    ) {
-      return;
-    }
+  // ?? Desactivar método
+  const handleDeleteMethod = async () => {
+    if (!deleteDialog.methodId) return;
 
     const { error } = await supabase
       .from("payment_methods")
-      .delete()
-      .eq("id", id);
+      .update({ is_active: false })
+      .eq("id", deleteDialog.methodId);
 
     if (error) {
-      // 🔄 REEMPLAZO 6: Usar toast para error al eliminar
+      // ?? REEMPLAZO 6: Usar toast para error al eliminar
       toast.error("Error al eliminar", {
         description: "No se pudo eliminar el método de pago.",
       });
     } else {
-      // 🔄 REEMPLAZO 7: Usar toast para éxito
-      toast.success("Eliminado", {
-        description: `Método "${name}" y sus cuotas asociadas eliminados.`,
+      toast.success("Desactivado", {
+        description: `Método "${deleteDialog.name}" desactivado.`,
       });
       fetchMethods();
     }
+    setDeleteDialog({ open: false, methodId: null, name: "" });
   };
 
-  // 🔹 Guardar o actualizar cuota
+  // ?? Guardar o actualizar cuota
   const handleSaveInstallment = async () => {
     const { methodId, installments, percent, description, editId } =
       installmentModal;
     if (!installments) {
-      // 🔄 REEMPLAZO 8: Usar toast para campos requeridos
+      // ?? REEMPLAZO 8: Usar toast para campos requeridos
       toast.warning("Campos requeridos", {
         description: "Completá la cantidad de cuotas.",
       });
@@ -181,12 +202,12 @@ export default function PaymentMethodsConfig() {
     }
 
     if (error) {
-      // 🔄 REEMPLAZO 9: Usar toast para error al guardar cuota
+      // ?? REEMPLAZO 9: Usar toast para error al guardar cuota
       toast.error("Error al guardar", {
         description: "No se pudo guardar la configuración de la cuota.",
       });
     } else {
-      // 🔄 REEMPLAZO 10: Usar toast para éxito
+      // ?? REEMPLAZO 10: Usar toast para éxito
       toast.success("Éxito", {
         description: `Cuota de ${installments} ${
           editId ? "actualizada" : "creada"
@@ -204,9 +225,9 @@ export default function PaymentMethodsConfig() {
     }
   };
 
-  // 🔹 Eliminar cuota
+  // ?? Eliminar cuota
   const handleDeleteInstallment = async (id, installments) => {
-    // 🔄 REEMPLAZO 11: Usar un toast.custom para confirmación o simplificar a una advertencia con un diálogo
+    // ?? REEMPLAZO 11: Usar un toast.custom para confirmación o simplificar a una advertencia con un diálogo
     if (
       !window.confirm(
         `¿Estás seguro de que quieres eliminar la cuota de ${installments}? Esta acción no se puede deshacer.`
@@ -221,12 +242,12 @@ export default function PaymentMethodsConfig() {
       .eq("id", id);
 
     if (error) {
-      // 🔄 REEMPLAZO 12: Usar toast para error al eliminar cuota
+      // ?? REEMPLAZO 12: Usar toast para error al eliminar cuota
       toast.error("Error al eliminar", {
         description: "No se pudo eliminar la cuota.",
       });
     } else {
-      // 🔄 REEMPLAZO 13: Usar toast para éxito
+      // ?? REEMPLAZO 13: Usar toast para éxito
       toast.success("Eliminada", {
         description: "Cuota eliminada correctamente.",
       });
@@ -238,6 +259,16 @@ export default function PaymentMethodsConfig() {
     <>
       {/* <SiteHeader titulo="Configuración de Métodos de Pago" /> */}
       <div className="mt-6 flex justify-end items-center gap-3">
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Activos</SelectItem>
+            <SelectItem value="inactive">Inactivos</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
+          </SelectContent>
+        </Select>
         <Button variant="outline" onClick={fetchMethods}>
           <IconRefresh className="h-4 w-4" /> Refrescar
         </Button>
@@ -279,7 +310,13 @@ export default function PaymentMethodsConfig() {
                 <Button
                   size="sm"
                   variant="destructive"
-                  onClick={() => handleDeleteMethod(method.id, method.name)}
+                  onClick={() =>
+                    setDeleteDialog({
+                      open: true,
+                      methodId: method.id,
+                      name: method.name,
+                    })
+                  }
                 >
                   <IconTrash className="h-4 w-4" />
                 </Button>
@@ -402,7 +439,7 @@ export default function PaymentMethodsConfig() {
         )}
       </div>
 
-      {/* 💳 Modal Método */}
+      {/* ?? Modal Método */}
       <Dialog
         open={methodModal.open}
         onOpenChange={() =>
@@ -467,7 +504,7 @@ export default function PaymentMethodsConfig() {
         </DialogContent>
       </Dialog>
 
-      {/* 💰 Modal Cuotas */}
+      {/* ?? Modal Cuotas */}
       <Dialog
         open={installmentModal.open}
         onOpenChange={() =>
@@ -559,6 +596,34 @@ export default function PaymentMethodsConfig() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) =>
+          !open && setDeleteDialog({ open: false, methodId: null, name: "" })
+        }
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desactivar método de pago</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás por desactivar el método{" "}
+              <strong>{deleteDialog.name}</strong>. Las cuotas asociadas
+              quedarán inactivas. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={handleDeleteMethod}
+            >
+              Desactivar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
+

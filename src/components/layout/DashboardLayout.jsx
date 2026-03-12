@@ -6,18 +6,15 @@ import { SiteHeader } from "@/components/site-header";
 
 import {
   IconDashboard,
-  IconCategory2,
   IconShoppingCart,
   IconUsers,
   IconSettings,
-  IconMenu4,
-  IconBrandApple,
   IconMedal,
   IconUsersGroup,
   IconReport,
   IconCash,
   IconCalculator,
-  IconFileDollar,
+  IconChartBar,
 } from "@tabler/icons-react";
 
 import SheetNewSale from "@/components/SheetNewSale";
@@ -33,21 +30,13 @@ const showDevelopmentToast = (feature) =>
 const navMainBase = [
   { title: "Panel principal", url: "/dashboard", icon: IconDashboard },
   { title: "Productos", url: "/dashboard/products", icon: IconReport },
-  {
-    title: "Catalogo",
-    icon: IconMenu4,
-    items: [
-      { title: "Marcas", url: "/dashboard/catalog/brands", icon: IconBrandApple },
-      { title: "Categorias", url: "/dashboard/catalog/categories", icon: IconCategory2 },
-    ],
-  },
   { title: "Pedidos", url: "/dashboard/orders", icon: IconShoppingCart },
+  { title: "Ventas", url: "/dashboard/sales", icon: IconChartBar },
   { title: "Clientes", url: "/dashboard/customers", icon: IconUsers },
   { title: "Equipo", url: "/dashboard/team", icon: IconUsersGroup },
   { title: "Top Vendedores", url: "/dashboard/top-sellers", icon: IconMedal },
-  { title: "Pagos a Vendedores", url: "/dashboard/sellers-payments", icon: IconCash },
-  { title: "Presupuestos", url: "/dashboard/payment-calculator", icon: IconFileDollar },
   { title: "Cotizador", url: "/dashboard/quick-payment-calculator", icon: IconCalculator },
+  { title: "Movimientos", url: "/dashboard/movements", icon: IconCash },
 ];
 
 const navSecondary = [
@@ -58,8 +47,7 @@ export default function DashboardLayout() {
   const [saleOpen, setSaleOpen] = useState(false);
   const [leadOpen, setLeadOpen] = useState(false);
   const location = useLocation();
-  const { user, role } = useAuth();
-  const isOwner = role?.toLowerCase() === "owner";
+  const { user } = useAuth();
 
   const pageTitles = {
     "/dashboard": "Panel principal",
@@ -71,19 +59,16 @@ export default function DashboardLayout() {
     "/dashboard/team": "Equipo",
     "/dashboard/top-sellers": "Top Vendedores",
     "/dashboard/settings": "Configuracion",
-    "/dashboard/sellers-payments": "Pagos a Vendedores",
+    "/dashboard/settings/sellers-payments": "Pagos a Vendedores",
     "/dashboard/settings/comission": "Comisiones",
     "/dashboard/settings/fx-rates": "Cotizaciones",
-    "/dashboard/expenses": "Gastos",
+    "/dashboard/sales": "Ventas",
+    "/dashboard/payment-calculator": "Presupuestos",
+    "/dashboard/settings/expenses": "Gastos",
     "/dashboard/settings/movements": "Movimientos",
   };
 
-  const navMain = [
-    ...navMainBase,
-    ...(isOwner
-      ? [{ title: "Ingresos/Gastos", url: "/dashboard/expenses", icon: IconCash }]
-      : []),
-  ];
+  const navMain = navMainBase;
 
   const tituloActual = pageTitles[location.pathname] || "Dashboard";
 

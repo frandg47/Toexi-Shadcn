@@ -21,21 +21,21 @@ import { formatNamePart } from "@/utils/formatName";
 // ✅ Esquema de validación con Yup
 const schema = yup.object({
   name: yup.string().required("El nombre es obligatorio."),
-  last_name: yup.string().optional(),
+  last_name: yup.string().required("El apellido es obligatorio."),
   dni: yup
     .string()
     .matches(/^[0-9]*$/, "Solo se permiten números.")
-    .nullable()
+    .required("El DNI es obligatorio.")
     .transform((v) => (v === "" ? null : v)),
   phone: yup
     .string()
     .matches(/^[0-9+()\s-]*$/, "Formato de teléfono inválido.")
-    .nullable()
+    .required("El telefono es obligatorio.")
     .transform((v) => (v === "" ? null : v)),
   email: yup
     .string()
     .email("Correo electrónico inválido.")
-    .nullable()
+    .required("El email es obligatorio.")
     .transform((v) => (v === "" ? null : v)),
   address: yup.string().nullable(),
   city: yup.string().nullable(),
@@ -109,7 +109,7 @@ export default function DialogAddCustomer({ open, onClose, onSuccess }) {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="name">Nombre *</Label>
-              <Input id="name" {...register("name")} />
+              <Input id="name" {...register("name")} required />
               {errors.name && (
                 <p className="text-xs text-red-500 mt-1">
                   {errors.name.message}
@@ -118,13 +118,18 @@ export default function DialogAddCustomer({ open, onClose, onSuccess }) {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="last_name">Apellido</Label>
-              <Input id="last_name" {...register("last_name")} />
+              <Label htmlFor="last_name">Apellido *</Label>
+              <Input id="last_name" {...register("last_name")} required />
+              {errors.last_name && (
+                <p className="text-xs text-red-500 mt-1">
+                  {errors.last_name.message}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="dni">DNI</Label>
-              <Input id="dni" {...register("dni")} />
+              <Label htmlFor="dni">DNI *</Label>
+              <Input id="dni" {...register("dni")} required />
               {errors.dni && (
                 <p className="text-xs text-red-500 mt-1">
                   {errors.dni.message}
@@ -133,8 +138,8 @@ export default function DialogAddCustomer({ open, onClose, onSuccess }) {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="phone">Teléfono</Label>
-              <Input id="phone" {...register("phone")} />
+              <Label htmlFor="phone">Teléfono *</Label>
+              <Input id="phone" {...register("phone")} required />
               {errors.phone && (
                 <p className="text-xs text-red-500 mt-1">
                   {errors.phone.message}
@@ -143,8 +148,8 @@ export default function DialogAddCustomer({ open, onClose, onSuccess }) {
             </div>
 
             <div className="col-span-2 flex flex-col gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" {...register("email")} />
+              <Label htmlFor="email">Email *</Label>
+              <Input id="email" type="email" {...register("email")} required />
               {errors.email && (
                 <p className="text-xs text-red-500 mt-1">
                   {errors.email.message}

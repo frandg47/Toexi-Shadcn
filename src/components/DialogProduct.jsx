@@ -20,6 +20,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { IconPlus } from "@tabler/icons-react";
+import DialogCatalog from "@/components/DialogCatalog";
 
 export default function DialogProduct({ open, onClose, product, onSave }) {
   const isEditing = !!product;
@@ -41,6 +43,10 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
   const [categories, setCategories] = useState([]);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [catalogModal, setCatalogModal] = useState({
+    open: false,
+    type: "",
+  });
 
   // Mostrar imagen existente al abrir y limpiar selección previa
   useEffect(() => {
@@ -126,6 +132,37 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
       const { error } = await supabase.from("products").insert([payload]);
       if (error) throw new Error("Error al crear el producto.");
     }
+  };
+
+  const handleCreateCatalogItem = async (name) => {
+    const type = catalogModal.type;
+    if (!type) return;
+    const table = type === "brand" ? "brands" : "categories";
+
+    const { data, error } = await supabase
+      .from(table)
+      .insert([{ name }])
+      .select();
+
+    if (error) {
+      toast.error(
+        `Error al agregar ${type === "brand" ? "marca" : "categoría"}`
+      );
+      return;
+    }
+
+    const item = data?.[0];
+    if (!item) return;
+
+    if (type === "brand") {
+      setBrands((prev) => [...prev, item]);
+      setForm((prev) => ({ ...prev, brand_id: item.id.toString() }));
+    } else {
+      setCategories((prev) => [...prev, item]);
+      setForm((prev) => ({ ...prev, category_id: item.id.toString() }));
+    }
+
+    setCatalogModal({ open: false, type: "" });
   };
 
   const handleSubmit = async () => {
@@ -235,7 +272,17 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
           {/* Marca y categoría */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
-              <Label>Marca</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label>Marca</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCatalogModal({ open: true, type: "brand" })}
+                >
+                  <IconPlus className="h-4 w-4" />
+                </Button>
+              </div>
               <Select
                 value={form.brand_id?.toString() || ""}
                 onValueChange={(v) =>
@@ -256,7 +303,19 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label>Categoría</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label>Categoría</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() =>
+                    setCatalogModal({ open: true, type: "category" })
+                  }
+                >
+                  <IconPlus className="h-4 w-4" />
+                </Button>
+              </div>
               <Select
                 value={form.category_id?.toString() || ""}
                 onValueChange={(v) =>
@@ -412,6 +471,16 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
               </div>
             </div>
           )}
+
+          <DialogCatalog
+            open={catalogModal.open}
+            onClose={() => setCatalogModal({ open: false, type: "" })}
+            onConfirm={handleCreateCatalogItem}
+            label={`Agregar ${
+              catalogModal.type === "brand" ? "Marca" : "Categoría"
+            }`}
+            initialValue=""
+          />
         </div>
 
         <DialogFooter className="mt-3 flex flex-col sm:flex-row gap-2 sm:gap-0">

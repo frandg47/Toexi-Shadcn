@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { getAdminSales } from "../utils/getAdminSales";
 
 import {
@@ -87,8 +87,11 @@ export function SalesList() {
     const [sales, setSales] = useState([]);
     const [page, setPage] = useState(1);
     const [count, setCount] = useState(0);
-    const { role } = useAuth();
-    const isOwner = role?.toLowerCase() === "owner";
+    const { role, id_auth } = useAuth();
+    const normalizedRole = `${role || ""}`.trim().toLowerCase();
+    const isOwner = normalizedRole === "owner";
+    console.log("[SalesList] role:", role, "normalized:", normalizedRole, "isOwner:", isOwner);
+    const [auditUsers, setAuditUsers] = useState({});
     const [sellerOptions, setSellerOptions] = useState([]);
     const [editOpen, setEditOpen] = useState(false);
     const [editingSale, setEditingSale] = useState(null);
@@ -98,6 +101,79 @@ export function SalesList() {
     const [editChannelId, setEditChannelId] = useState("");
     const [savingEdit, setSavingEdit] = useState(false);
     const [channels, setChannels] = useState([]);
+    const getAuditUserLabel = (userId) => {
+        if (!userId) return "-";
+        const user = auditUsers[userId];
+        if (!user) return userId;
+        const name = formatPersonName(user.name, user.last_name);
+        return name || user.email || userId;
+    };
+    const sellerLabelById = useMemo(() => {
+        const map = {};
+        (sellerOptions || []).forEach((seller) => {
+            map[seller.id_auth] =
+                [seller.name, seller.last_name].filter(Boolean).join(" ") ||
+                seller.email ||
+                seller.id_auth;
+        });
+        return map;
+    }, [sellerOptions]);
+    const channelLabelById = useMemo(() => {
+        const map = {};
+        (channels || []).forEach((ch) => {
+            map[String(ch.id)] = ch.name || String(ch.id);
+        });
+        return map;
+    }, [channels]);
+    const renderUpdatedField = (fieldKey, payload) => {
+        const oldValue = payload?.old ?? "-";
+        const newValue = payload?.new ?? "-";
+        if (fieldKey === "seller_id") {
+            return (
+                <span>
+                    Vendedor: {sellerLabelById[oldValue] || oldValue} →{" "}
+                    {sellerLabelById[newValue] || newValue}
+                </span>
+            );
+        }
+        if (fieldKey === "sales_channel_id") {
+            return (
+                <span>
+                    Canal: {channelLabelById[String(oldValue)] || oldValue} →{" "}
+                    {channelLabelById[String(newValue)] || newValue}
+                </span>
+            );
+        }
+        if (fieldKey === "sale_date") {
+            const oldDate = oldValue
+                ? new Date(oldValue).toLocaleString("es-AR", {
+                      timeZone: AR_TIMEZONE,
+                  })
+                : "-";
+            const newDate = newValue
+                ? new Date(newValue).toLocaleString("es-AR", {
+                      timeZone: AR_TIMEZONE,
+                  })
+                : "-";
+            return <span>Fecha: {oldDate} → {newDate}</span>;
+        }
+        return (
+            <span>
+                {fieldKey}: {String(oldValue)} → {String(newValue)}
+            </span>
+        );
+    };
+    const normalizeUpdatedFields = (value) => {
+        if (!value) return null;
+        if (typeof value === "object") return value;
+        if (typeof value !== "string") return null;
+        try {
+            return JSON.parse(value);
+        } catch (error) {
+            return null;
+        }
+    };
+
 
     // �️ Estados para anulación
     const [cancelOpen, setCancelOpen] = useState(false);
@@ -190,8 +266,32 @@ export function SalesList() {
         try {
             setRefreshing(true);
             const { data, count } = await getAdminSales(page, filters);
-            setSales(data || []);
+            const rows = data || [];
+            setSales(rows);
             setCount(count || 0);
+
+            const auditIds = Array.from(
+                new Set(
+                    rows
+                        .flatMap((s) => [s?.voided_by, s?.updated_by])
+                        .filter(Boolean)
+                )
+            );
+            if (auditIds.length > 0) {
+                const { data: usersData, error: usersError } = await supabase
+                    .from("users")
+                    .select("id_auth, name, last_name, email")
+                    .in("id_auth", auditIds);
+                if (!usersError) {
+                    const mapped = {};
+                    (usersData || []).forEach((u) => {
+                        mapped[u.id_auth] = u;
+                    });
+                    setAuditUsers(mapped);
+                }
+            } else {
+                setAuditUsers({});
+            }
         } catch (err) {
             toast.error("Error al cargar ventas");
         } finally {
@@ -255,12 +355,33 @@ export function SalesList() {
 
         try {
             setSavingEdit(true);
-            const { error } = await supabase
+            const auditPayload = {
+                ...payload,
+                ...(id_auth ? { updated_by: id_auth } : {}),
+                updated_at: new Date().toISOString(),
+            };
+
+            let { error } = await supabase
                 .from("sales")
-                .update(payload)
+                .update(auditPayload)
                 .eq("id", editingSale.sale_id);
 
+            if (error) {
+                const msg = `${error?.message || ""}`.toLowerCase();
+                if (
+                    msg.includes("column") &&
+                    (msg.includes("updated_by") || msg.includes("updated_at"))
+                ) {
+                    ({ error } = await supabase
+                        .from("sales")
+                        .update(payload)
+                        .eq("id", editingSale.sale_id));
+                }
+            }
+
             if (error) throw error;
+            console.log("payload edit", payload, editingSale);
+
 
             toast.success("Venta actualizada");
             closeEditSale();
@@ -639,7 +760,9 @@ export function SalesList() {
 
             {/* 🧾 LISTA DE TICKETS */}
             <div className="space-y-6">
-                {sales.length !== 0 ? sales.map((s) => (
+                {sales.length !== 0 ? sales.map((s) => {
+                    const updatedFields = normalizeUpdatedFields(s.updated_fields);
+                    return (
                     <Card key={s.sale_id} className="p-5 shadow-md w-full">
                         <div className="flex justify-between">
                             <h2 className="font-bold text-lg">Venta #{s.sale_id}</h2>
@@ -732,6 +855,46 @@ export function SalesList() {
                             </div>
                         )}
 
+                        {(s.updated_by || updatedFields) && (
+                            <div className="text-xs border-l-2 border-blue-500 rounded p-3 mt-3 bg-blue-50 dark:bg-blue-950/20">
+                                <div className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                                    🧾 Información de modificación
+                                </div>
+                                <div className="space-y-1 text-blue-700 dark:text-blue-300">
+                                    <p>
+                                        <strong>Modificado el:</strong>{" "}
+                                        {s.updated_at
+                                            ? new Date(s.updated_at).toLocaleString("es-AR", {
+                                                timeZone: AR_TIMEZONE,
+                                            })
+                                            : "-"}
+                                    </p>
+                                    <p>
+                                        <strong>Modificado por:</strong>{" "}
+                                        {getAuditUserLabel(s.updated_by)}
+                                    </p>
+                                    {updatedFields &&
+                                        Object.keys(updatedFields).length > 0 && (
+                                            <div className="pt-1">
+                                                <strong>Cambios:</strong>
+                                                <ul className="mt-1 space-y-1">
+                                                    {Object.entries(updatedFields).map(
+                                                        ([fieldKey, payload]) => (
+                                                            <li key={fieldKey}>
+                                                                {renderUpdatedField(
+                                                                    fieldKey,
+                                                                    payload
+                                                                )}
+                                                            </li>
+                                                        )
+                                                    )}
+                                                </ul>
+                                            </div>
+                                        )}
+                                </div>
+                            </div>
+                        )}
+
                         {s.status === "anulado" && (
                             <div className="text-xs border-l-2 border-red-500 rounded p-3 mt-3 bg-red-50 dark:bg-red-950/20">
                                 <div className="font-semibold text-red-700 dark:text-red-300 mb-2">
@@ -748,6 +911,10 @@ export function SalesList() {
                                                 timeZone: AR_TIMEZONE,
                                             })
                                             : "-"}
+                                    </p>
+                                    <p>
+                                        <strong>Anulado por:</strong>{" "}
+                                        {getAuditUserLabel(s.voided_by)}
                                     </p>
                                     <p>
                                         <strong>Stock devuelto a:</strong>{" "}
@@ -813,7 +980,8 @@ export function SalesList() {
                             </Button>
                         </div>
                     </Card>
-                )) :
+                    );
+                }) :
                     (
                         <p className="text-center text-muted-foreground">No se encontraron ventas para los filtros seleccionados.</p>
                     )}

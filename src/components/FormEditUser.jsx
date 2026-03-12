@@ -174,9 +174,9 @@ export default function FormEditUser({ userId, onClose, onSuccess }) {
                 <SelectValue placeholder="Seleccionar rol" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="superadmin">Administrador</SelectItem>
-                <SelectItem value="seller">Vendedor</SelectItem>
-                <SelectItem value="owner">Owner</SelectItem>
+                <SelectItem value="superadmin">Vendedor</SelectItem>
+                <SelectItem value="seller">Integrante</SelectItem>
+                <SelectItem value="owner">Administrador</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -476,7 +476,7 @@ const UsersTable = ({ refreshToken = 0 }) => {
                           className="bg-amber-500 text-white dark:bg-amber-600"
                         >
                           <IconUserShield className="h-4 w-4" />
-                          Owner
+                          Administrador
                         </Badge>
                       ) : user.role === "superadmin" ? (
                         <Badge
@@ -484,12 +484,12 @@ const UsersTable = ({ refreshToken = 0 }) => {
                           className="bg-blue-500 text-white dark:bg-blue-600"
                         >
                           <IconUserShield className="h-4 w-4" />
-                          Admin
+                          Vendedor
                         </Badge>
                       ) : (
                         <Badge variant="outline">
                           <IconBriefcase className="h-4 w-4" />
-                          Vendedor
+                          Integrante
                         </Badge>
                       )}
                     </TableCell>
@@ -517,7 +517,7 @@ const UsersTable = ({ refreshToken = 0 }) => {
                         >
                           <IconEdit className="h-4 w-4" />
                         </Button>
-                        <Button
+                        {/* <Button
                           variant="destructive"
                           size="sm"
                           // 🔄 REEMPLAZO 6: Usar la función para abrir el diálogo
@@ -525,7 +525,7 @@ const UsersTable = ({ refreshToken = 0 }) => {
                           disabled={refreshing}
                         >
                           <IconTrash className="h-4 w-4" />
-                        </Button>
+                        </Button> */}
                       </div>
                     </TableCell>
                   )}

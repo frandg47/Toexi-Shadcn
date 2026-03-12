@@ -1,19 +1,19 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { toast } from "sonner";
 import {
   IconCurrencyDollar,
   IconSettingsDollar,
   IconCreditCard,
-  IconBox,
-  IconChartBar,
   IconRoute2,
-  IconInfoCircle,
   IconTruck,
   IconReceipt,
   IconBuildingBank,
   IconArrowsExchange,
+  IconBrandApple,
+  IconCategory2,
+  IconFileDollar,
+  IconCash,
 } from "@tabler/icons-react";
 
 const ConfigurationPage = () => {
@@ -51,12 +51,6 @@ const ConfigurationPage = () => {
     //   path: "/dashboard/settings/inventory",
     // },
     {
-      id: "sales",
-      label: "Ventas",
-      icon: <IconChartBar className="h-10 w-10 text-rose-600" />,
-      path: "/dashboard/settings/sales",
-    },
-    {
       id: "providers",
       label: "Proveedores",
       icon: <IconTruck className="h-10 w-10 text-slate-600" />,
@@ -79,6 +73,36 @@ const ConfigurationPage = () => {
       label: "Movimientos",
       icon: <IconArrowsExchange className="h-10 w-10 text-orange-600" />,
       path: "/dashboard/settings/movements",
+    },
+    {
+      id: "budgets",
+      label: "Presupuestos",
+      icon: <IconFileDollar className="h-10 w-10 text-emerald-600" />,
+      path: "/dashboard/payment-calculator",
+    },
+    {
+      id: "seller-payments",
+      label: "Pagos a Vendedores",
+      icon: <IconCash className="h-10 w-10 text-green-700" />,
+      path: "/dashboard/settings/sellers-payments",
+    },
+    {
+      id: "expenses",
+      label: "Ingresos/Gastos",
+      icon: <IconCash className="h-10 w-10 text-lime-600" />,
+      path: "/dashboard/settings/expenses",
+    },
+    {
+      id: "brands",
+      label: "Marcas",
+      icon: <IconBrandApple className="h-10 w-10 text-zinc-700" />,
+      path: "/dashboard/settings/catalog/brands",
+    },
+    {
+      id: "categories",
+      label: "Categorías",
+      icon: <IconCategory2 className="h-10 w-10 text-slate-700" />,
+      path: "/dashboard/settings/catalog/categories",
     },
   ];
 

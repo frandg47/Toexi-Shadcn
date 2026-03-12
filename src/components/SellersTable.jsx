@@ -372,7 +372,20 @@ const SellersTable = ({ refreshToken = 0 }) => {
 
             const paymentsMap = {};
             (paymentsForPeriod || []).forEach((p) => {
-                paymentsMap[p.seller_id] = p;
+                const entry = paymentsMap[p.seller_id] || {
+                    total_paid_usd: 0,
+                    last_paid_at: null,
+                };
+                if (p.paid_at) {
+                    entry.total_paid_usd += Number(p.total_amount || 0);
+                    if (
+                        !entry.last_paid_at ||
+                        new Date(p.paid_at) > new Date(entry.last_paid_at)
+                    ) {
+                        entry.last_paid_at = p.paid_at;
+                    }
+                }
+                paymentsMap[p.seller_id] = entry;
             });
 
             const sellerIdsWithSales = Object.keys(salesCountBySeller);
@@ -381,20 +394,30 @@ const SellersTable = ({ refreshToken = 0 }) => {
                 if (!seller) return null;
                 const payment = paymentsMap[sellerId];
                 const totalCommissionsUSD = Number(commissionsBySeller[sellerId] || 0);
-                const isPaid = !!payment?.paid_at;
+                const paidTotalUsd = Number(payment?.total_paid_usd || 0);
+                const outstandingUsd = Math.max(
+                    totalCommissionsUSD - paidTotalUsd,
+                    0
+                );
+                const isPaid = outstandingUsd <= 0;
+                const isPartial = !isPaid && paidTotalUsd > 0;
 
                 return {
-                    id: payment?.id || null,
+                    id: null,
                     seller_id: sellerId,
                     period_start: payment?.period_start || periodStart,
                     period_end: payment?.period_end || periodEnd,
-                    total_amount: payment?.total_amount || totalCommissionsUSD,
-                    paid_at: payment?.paid_at || null,
+                    total_amount: totalCommissionsUSD,
+                    paid_at: payment?.last_paid_at || null,
                     seller,
                     sales_count: salesCountBySeller[sellerId] || 0,
                     commissions_total_usd: totalCommissionsUSD,
                     commissions_total_ars: totalCommissionsUSD * (fxData?.rate || fxRate || 1),
+                    paid_total_usd: paidTotalUsd,
+                    outstanding_usd: outstandingUsd,
+                    outstanding_ars: outstandingUsd * (fxData?.rate || fxRate || 1),
                     isPaid,
+                    isPartial,
                 };
             });
 
@@ -531,13 +554,24 @@ const SellersTable = ({ refreshToken = 0 }) => {
             }
 
             const paidAt = new Date().toISOString();
+            const paidTotalUsd = Number(paymentRecord.paid_total_usd || 0);
+            const totalUsd = Number(paymentRecord.commissions_total_usd || 0);
+            const outstandingUsd = Math.max(totalUsd - paidTotalUsd, 0);
+            if (outstandingUsd <= 0) {
+                toast("La comision ya esta pagada");
+                return;
+            }
+
             let error;
             let paymentId = paymentRecord.id || null;
 
             if (paymentRecord.id) {
                 ({ error } = await supabase
                     .from("commission_payments")
-                    .update({ paid_at: paidAt })
+                    .update({
+                        total_amount: paidTotalUsd + outstandingUsd,
+                        paid_at: paidAt,
+                    })
                     .eq("id", paymentRecord.id));
             } else {
                 const insertRes = await supabase
@@ -547,7 +581,7 @@ const SellersTable = ({ refreshToken = 0 }) => {
                             seller_id: paymentRecord.seller_id,
                             period_start: paymentRecord.period_start,
                             period_end: paymentRecord.period_end,
-                            total_amount: paymentRecord.commissions_total_usd || 0,
+                            total_amount: outstandingUsd,
                             paid_at: paidAt,
                         },
                     ])
@@ -563,8 +597,8 @@ const SellersTable = ({ refreshToken = 0 }) => {
 
             const isUsdAccount = account.currency === "USD";
             const amount = isUsdAccount
-                ? Number(paymentRecord.commissions_total_usd || 0)
-                : Number(paymentRecord.commissions_total_ars || 0);
+                ? Number(outstandingUsd)
+                : Number(outstandingUsd * fxRate);
             const amountArs = isUsdAccount ? amount * fxRate : amount;
 
             const { error: movementError } = await supabase
@@ -815,9 +849,11 @@ const SellersTable = ({ refreshToken = 0 }) => {
                                     )}
                                     {visibleColumns.includes("payment_date") && (
                                         <TableCell className="text-center">
-                                            {payment.paid_at
+                                            {payment.isPaid
                                                 ? formatDate(payment.paid_at)
-                                                : "Pendiente"}
+                                                : payment.isPartial
+                                                    ? "Parcial"
+                                                    : "Pendiente"}
                                         </TableCell>
                                     )}
 
@@ -840,7 +876,11 @@ const SellersTable = ({ refreshToken = 0 }) => {
                                                 disabled={refreshing || payment.isPaid}
                                             >
                                                 <IconCreditCard className="h-4 w-4" />
-                                                {payment.isPaid ? "Pagado" : "Pagar"}
+                                                {payment.isPaid
+                                                    ? "Pagado"
+                                                    : payment.isPartial
+                                                        ? "Pagar restante"
+                                                        : "Pagar"}
                                             </Button>
 
                                         </TableCell>
@@ -876,6 +916,18 @@ const SellersTable = ({ refreshToken = 0 }) => {
                                     <p>
                                         <strong>Comisión ARS:</strong> {formatCurrency(paymentDialog.paymentRecord.commissions_total_ars)}
                                     </p>
+                                    {paymentDialog.paymentRecord.paid_total_usd > 0 && (
+                                        <p>
+                                            <strong>Pagado USD:</strong>{" "}
+                                            {formatCurrencyUSD(paymentDialog.paymentRecord.paid_total_usd)}
+                                        </p>
+                                    )}
+                                    {paymentDialog.paymentRecord.outstanding_usd > 0 && (
+                                        <p>
+                                            <strong>Restante USD:</strong>{" "}
+                                            {formatCurrencyUSD(paymentDialog.paymentRecord.outstanding_usd)}
+                                        </p>
+                                    )}
                                     <p className="text-sm text-amber-600 mt-4">
                                         ¿Confirmas que deseas registrar este pago?
                                     </p>
@@ -920,11 +972,11 @@ const SellersTable = ({ refreshToken = 0 }) => {
                 disabled={
                     !paymentAccountId ||
                     (selectedPaymentAccount &&
-                        Number(paymentDialog.paymentRecord?.commissions_total_ars || 0) >
+                        Number(paymentDialog.paymentRecord?.outstanding_ars || 0) >
                         Number(selectedPaymentAccount.current_balance || 0) &&
                         selectedPaymentAccount.currency === "ARS") ||
                     (selectedPaymentAccount &&
-                        Number(paymentDialog.paymentRecord?.commissions_total_usd || 0) >
+                        Number(paymentDialog.paymentRecord?.outstanding_usd || 0) >
                         Number(selectedPaymentAccount.current_balance || 0) &&
                         selectedPaymentAccount.currency === "USD")
                 }
@@ -1019,11 +1071,3 @@ const addDaysToDateKey = (dateKey, days) => {
 };
 
 export default SellersTable;
-            if (
-                selectedPaymentAccount &&
-                amount >
-                Number(selectedPaymentAccount.current_balance || 0)
-            ) {
-                toast.error("Saldo insuficiente");
-                return;
-            }

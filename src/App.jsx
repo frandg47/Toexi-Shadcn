@@ -127,19 +127,19 @@ export default function App() {
             <Route index element={<Dashboard />} />
             <Route path="products" element={<Products />} />
             <Route path="catalog" element={<CatalogPage />} />
-            <Route path="catalog/brands" element={<CatalogPage />} />
-            <Route path="catalog/categories" element={<CatalogPage />} />
+            <Route path="settings/catalog/brands" element={<CatalogPage />} />
+            <Route path="settings/catalog/categories" element={<CatalogPage />} />
             <Route path="customers" element={<CustomersPage />} />
             <Route path="team" element={<TeamPage />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="top-sellers" element={<TopSellersPage />} />
-            <Route path="sellers-payments" element={<SellersPayments />} />
+            <Route path="settings/sellers-payments" element={<SellersPayments />} />
             <Route path="payment-calculator" element={<PaymentCalculator />} />
             <Route
               path="quick-payment-calculator"
               element={<QuickPaymentCalculator />}
             />
-            <Route path="expenses" element={<ExpensesPage />} />
+            <Route path="settings/expenses" element={<ExpensesPage />} />
 
             {/* ⚙️ CONFIGURACIONES */}
             <Route
@@ -157,11 +157,11 @@ export default function App() {
               element={<SalesChannelsConfig />}
             />
             <Route path="settings/inventory" element={<InventoryConfig />} />
-            <Route path="settings/sales" element={<SalesConfig />} />
+            <Route path="sales" element={<SalesConfig />} />
             <Route path="settings/providers" element={<ProvidersConfig />} />
             <Route path="settings/purchases" element={<PurchasesConfig />} />
             <Route path="settings/accounts" element={<AccountsConfig />} />
-            <Route path="settings/movements" element={<MovementsConfig />} />
+            <Route path="movements" element={<MovementsConfig />} />
           </Route>
 
           {/* 🛍️ VISTA DE VENDEDORES */}

@@ -47,11 +47,24 @@ const formatARS = (n) =>
     minimumFractionDigits: 2,
   }).format(n || 0);
 
+const formatUSD = (n) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+  }).format(n || 0);
+
 const formatUSDT = (n) =>
   `USDT ${new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n || 0)}`;
+
+const formatCurrencyByCode = (amount, currency) => {
+  if (currency === "USD") return formatUSD(amount);
+  if (currency === "USDT") return formatUSDT(amount);
+  return formatARS(amount);
+};
 
 const addInterval = (dateValue, amount, unit) => {
   if (!dateValue || !amount) return null;
@@ -103,6 +116,7 @@ export default function ExpensesPage() {
   const [fxRate, setFxRate] = useState(null);
   const [usdtRate, setUsdtRate] = useState(null);
   const [accounts, setAccounts] = useState([]);
+  const [balanceMovements, setBalanceMovements] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -127,6 +141,9 @@ export default function ExpensesPage() {
     frequency_unit: "months",
     last_paid_at: null,
   });
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [payExpense, setPayExpense] = useState(null);
+  const [payAccountId, setPayAccountId] = useState("");
 
   const [incomeForm, setIncomeForm] = useState({
     movement_date: new Date().toISOString().slice(0, 10),
@@ -163,6 +180,7 @@ export default function ExpensesPage() {
         fixedRes,
         variableRes,
         categoriesRes,
+        movementsRes,
       ] = await Promise.all([
         supabase
           .from("fx_rates")
@@ -199,11 +217,22 @@ export default function ExpensesPage() {
           .from("finance_categories")
           .select("id, name, type, is_active, created_at")
           .order("name", { ascending: true }),
+        supabase
+          .from("account_movements")
+          .select("account_id, type, amount"),
       ]);
 
       setFxRate(rate?.rate ? Number(rate.rate) : null);
       setUsdtRate(usdt?.rate ? Number(usdt.rate) : null);
       setAccounts(accs || []);
+      if (movementsRes?.error) {
+        toast.error("No se pudieron cargar los movimientos", {
+          description: movementsRes.error.message,
+        });
+        setBalanceMovements([]);
+      } else {
+        setBalanceMovements(movementsRes?.data || []);
+      }
       setCategories(categoriesRes?.data || []);
       const fixedExpenses = fixedRes?.data || [];
       const variableExpenses = variableRes?.data || [];
@@ -227,6 +256,40 @@ export default function ExpensesPage() {
     () => accounts.find((a) => String(a.id) === String(incomeForm.account_id)),
     [accounts, incomeForm.account_id]
   );
+  const accountBalances = useMemo(() => {
+    const totals = new Map();
+    balanceMovements.forEach((movement) => {
+      const entry = totals.get(movement.account_id) || {
+        income: 0,
+        expense: 0,
+      };
+      if (movement.type === "income") {
+        entry.income += Number(movement.amount || 0);
+      } else if (movement.type === "expense") {
+        entry.expense += Number(movement.amount || 0);
+      }
+      totals.set(movement.account_id, entry);
+    });
+
+    return accounts.map((acc) => {
+      const totalsForAccount = totals.get(acc.id) || {
+        income: 0,
+        expense: 0,
+      };
+      const current =
+        Number(acc.initial_balance || 0) +
+        totalsForAccount.income -
+        totalsForAccount.expense;
+      return {
+        ...acc,
+        current_balance: current,
+      };
+    });
+  }, [accounts, balanceMovements]);
+
+  const balanceByAccountId = useMemo(() => {
+    return new Map(accountBalances.map((acc) => [acc.id, acc.current_balance]));
+  }, [accountBalances]);
   const expenseCategories = useMemo(
     () => categories.filter((c) => c.type === "expense" && c.is_active),
     [categories]
@@ -235,6 +298,24 @@ export default function ExpensesPage() {
     () => categories.filter((c) => c.type === "income" && c.is_active),
     [categories]
   );
+  const payAccountOptions = useMemo(() => {
+    if (!payExpense) return accounts;
+    if (!payExpense.currency) return accounts;
+    return accounts.filter((acc) => acc.currency === payExpense.currency);
+  }, [accounts, payExpense]);
+
+  const selectedPayAccount = useMemo(() => {
+    return accountBalances.find(
+      (acc) => String(acc.id) === String(payAccountId)
+    );
+  }, [accountBalances, payAccountId]);
+  const payRequiredAmount = payExpense ? Number(payExpense.amount || 0) : 0;
+  const selectedPayBalance = selectedPayAccount
+    ? Number(selectedPayAccount.current_balance || 0)
+    : 0;
+  const isPayInsufficient = selectedPayAccount
+    ? payRequiredAmount > selectedPayBalance
+    : false;
 
   const fixedExpenses = useMemo(
     () => expenses.filter((exp) => exp.type === "fixed"),
@@ -356,6 +437,16 @@ export default function ExpensesPage() {
       .order("expense_date", { ascending: false })
       .limit(50);
     setExpenses(data || []);
+    const movementsRes = await supabase
+      .from("account_movements")
+      .select("account_id, type, amount");
+    if (movementsRes?.error) {
+      toast.error("No se pudieron cargar los movimientos", {
+        description: movementsRes.error.message,
+      });
+    } else {
+      setBalanceMovements(movementsRes?.data || []);
+    }
   };
 
   const handleCreateIncome = async () => {
@@ -488,14 +579,55 @@ export default function ExpensesPage() {
       .order("expense_date", { ascending: false })
       .limit(50);
     setExpenses(data || []);
+    const movementsRes = await supabase
+      .from("account_movements")
+      .select("account_id, type, amount");
+    if (movementsRes?.error) {
+      toast.error("No se pudieron cargar los movimientos", {
+        description: movementsRes.error.message,
+      });
+    } else {
+      setBalanceMovements(movementsRes?.data || []);
+    }
   };
 
-  const handleMarkPaid = async (expenseId) => {
-    if (!expenseId) return;
+  const handleOpenPayDialog = (expense) => {
+    if (!expense) return;
+    setPayExpense(expense);
+    setPayAccountId(expense.account_id ? String(expense.account_id) : "");
+    setPayDialogOpen(true);
+  };
+
+  const handleConfirmPaid = async () => {
+    if (!payExpense) return;
+    if (!payAccountId) {
+      toast.error("Selecciona una cuenta");
+      return;
+    }
+
+    const selected = accountBalances.find(
+      (acc) => String(acc.id) === String(payAccountId)
+    );
+    if (!selected) {
+      toast.error("Selecciona una cuenta valida");
+      return;
+    }
+
+    const requiredAmount = Number(payExpense.amount || 0);
+    const available =
+      balanceByAccountId.get(selected.id) ?? selected.current_balance ?? 0;
+    if (requiredAmount > Number(available || 0)) {
+      toast.error("Saldo insuficiente");
+      return;
+    }
+
     const { error } = await supabase
       .from("expenses")
-      .update({ last_paid_at: new Date().toISOString() })
-      .eq("id", expenseId);
+      .update({
+        last_paid_at: new Date().toISOString(),
+        account_id: selected.id,
+      })
+      .eq("id", payExpense.id);
 
     if (error) {
       toast.error("No se pudo marcar como pagado", {
@@ -505,6 +637,9 @@ export default function ExpensesPage() {
     }
 
     toast.success("Gasto marcado como pagado");
+    setPayDialogOpen(false);
+    setPayExpense(null);
+    setPayAccountId("");
     const { data } = await supabase
       .from("expenses")
       .select(
@@ -513,6 +648,16 @@ export default function ExpensesPage() {
       .order("expense_date", { ascending: false })
       .limit(50);
     setExpenses(data || []);
+    const movementsRes = await supabase
+      .from("account_movements")
+      .select("account_id, type, amount");
+    if (movementsRes?.error) {
+      toast.error("No se pudieron cargar los movimientos", {
+        description: movementsRes.error.message,
+      });
+    } else {
+      setBalanceMovements(movementsRes?.data || []);
+    }
   };
 
   const handleCreateCategory = async () => {
@@ -907,7 +1052,7 @@ export default function ExpensesPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleMarkPaid(exp.id)}
+                                onClick={() => handleOpenPayDialog(exp)}
                                 disabled={isPaidCurrent}
                               >
                                 Marcar pagado
@@ -1236,6 +1381,93 @@ export default function ExpensesPage() {
               Cancelar
             </Button>
             <Button onClick={handleUpdateExpense}>Guardar cambios</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={payDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPayDialogOpen(false);
+            setPayExpense(null);
+            setPayAccountId("");
+          }
+        }}
+      >
+        <DialogContent className="w-[90vw] sm:max-w-lg max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Marcar gasto como pagado</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {payExpense && (
+              <div className="text-sm text-muted-foreground">
+                <div>
+                  <strong>Categoria:</strong> {payExpense.category || "-"}
+                </div>
+                <div>
+                  <strong>Monto:</strong>{" "}
+                  {formatCurrencyByCode(
+                    payRequiredAmount,
+                    payExpense.currency
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Cuenta</Label>
+              <Select value={payAccountId} onValueChange={setPayAccountId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar cuenta" />
+                </SelectTrigger>
+                <SelectContent className="z-[9999]">
+                  {payAccountOptions.map((acc) => (
+                    <SelectItem key={acc.id} value={String(acc.id)}>
+                      {acc.name} ({acc.currency})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {payAccountOptions.length === 0 && (
+                <p className="text-xs text-amber-600">
+                  No hay cuentas disponibles con la misma moneda.
+                </p>
+              )}
+              {selectedPayAccount && (
+                <p className="text-xs text-muted-foreground">
+                  Saldo disponible:{" "}
+                  {formatCurrencyByCode(
+                    selectedPayBalance,
+                    selectedPayAccount.currency
+                  )}
+                </p>
+              )}
+              {isPayInsufficient && (
+                <p className="text-xs text-red-600">Saldo insuficiente</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPayDialogOpen(false);
+                setPayExpense(null);
+                setPayAccountId("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmPaid}
+              disabled={
+                !payAccountId ||
+                payAccountOptions.length === 0 ||
+                isPayInsufficient
+              }
+            >
+              Confirmar pago
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

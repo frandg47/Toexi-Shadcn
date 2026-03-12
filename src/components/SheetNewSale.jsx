@@ -392,7 +392,8 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     const fetchPayments = async () => {
       const { data: methods } = await supabase
         .from("payment_methods")
-        .select("id, name, multiplier");
+        .select("id, name, multiplier")
+        .eq("is_active", true);
 
       const { data: installments } = await supabase
         .from("payment_installments")
@@ -562,11 +563,24 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     const fetchProducts = async () => {
       const { data } = await supabase
         .from("products")
-        .select("id, name")
+        .select("id, name, active, product_variants(stock)")
         .eq("active", true)
         .ilike("name", `%${q}%`)
         .limit(30);
-      setProducts(data || []);
+
+      const normalized = (data || []).map((product) => {
+        const stockTotal = (product.product_variants || []).reduce(
+          (sum, v) => sum + Number(v.stock || 0),
+          0
+        );
+        return {
+          id: product.id,
+          name: product.name,
+          stock: stockTotal,
+        };
+      });
+
+      setProducts(normalized);
     };
     fetchProducts();
   }, [focusProduct, searchProduct]);
@@ -1041,6 +1055,10 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                             key={p.id}
                             className="w-full text-left px-3 py-2 hover:bg-muted"
                             onClick={() => {
+                              if (Number(p.stock || 0) <= 0) {
+                                toast.warning("Producto sin stock");
+                                return;
+                              }
                               setSelectedProduct(p);
                               setFocusProduct(false);
                               setSearchProduct("");
@@ -1048,6 +1066,9 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                             }}
                           >
                             {p.name}
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              Stock: {Number(p.stock || 0)}
+                            </span>
                           </button>
                         ))
                       ) : (
