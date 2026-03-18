@@ -101,6 +101,7 @@ export default function SectionCardsProducts() {
           `
         id,
         category_id,
+        active,
         usd_price,
         product_variants (id, stock)
       `,
@@ -109,15 +110,13 @@ export default function SectionCardsProducts() {
 
       // 5️⃣ Calcular cantidad de productos por categoría
       const counts = categories.map((cat) => {
-        const productsInCat = products.filter((p) => p.category_id === cat.id);
-        const totalVariants = productsInCat.reduce((sum, p) => {
-          const variants = p.product_variants || [];
-          return sum + (variants.length > 0 ? variants.length : 1);
-        }, 0);
-        return { name: cat.name, value: totalVariants };
+        const productsInCat = (products || []).filter(
+          (p) => p.category_id === cat.id && p.active === true
+        );
+        return { name: cat.name, value: productsInCat.length };
       });
 
-      setCategoriesData(counts);
+      setCategoriesData(counts.filter((item) => item.value > 0));
 
       // 6) Vendedores activos
       const { count: activeSellersCount } = await supabase
