@@ -381,17 +381,24 @@ export default function ExpensesPage() {
 
   const handleCreateExpense = async () => {
     if (!expenseForm.expense_date) return toast.error("Selecciona una fecha");
-    if (!selectedAccount) return toast.error("Selecciona una cuenta");
 
     const amount = Number(expenseForm.amount || 0);
     if (!amount || Number.isNaN(amount)) return toast.error("Monto invalido");
 
-    const currency = selectedAccount.currency || "ARS";
-    const rate =
-      currency === "USD" ? fxRate : currency === "USDT" ? usdtRate : null;
-    if (currency !== "ARS" && !rate) {
-      return toast.error(`No hay cotizacion activa para ${currency}`);
+    let currency = "ARS";
+    let rate = null;
+    let accountId = null;
+
+    if (expenseForm.type !== "fixed") {
+      if (!selectedAccount) return toast.error("Selecciona una cuenta");
+      currency = selectedAccount.currency || "ARS";
+      rate = currency === "USD" ? fxRate : currency === "USDT" ? usdtRate : null;
+      if (currency !== "ARS" && !rate) {
+        return toast.error(`No hay cotizacion activa para ${currency}`);
+      }
+      accountId = selectedAccount.id;
     }
+
     const amountARS = currency === "ARS" ? amount : amount * rate;
 
     const { error } = await supabase.from("expenses").insert([
@@ -400,7 +407,7 @@ export default function ExpensesPage() {
         amount,
         currency,
         amount_ars: amountARS,
-        account_id: selectedAccount.id,
+        account_id: accountId,
         category: expenseForm.category || null,
         type: expenseForm.type,
         notes: expenseForm.notes || null,
@@ -751,9 +758,16 @@ export default function ExpensesPage() {
                   onValueChange={(value) =>
                     setExpenseForm((f) => ({ ...f, account_id: value }))
                   }
+                  disabled={expenseForm.type === "fixed"}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Cuenta" />
+                    <SelectValue
+                      placeholder={
+                        expenseForm.type === "fixed"
+                          ? "Cuenta (al pagar)"
+                          : "Cuenta"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent className="z-[9999]">
                     {accounts.map((acc) => (
@@ -801,6 +815,7 @@ export default function ExpensesPage() {
                       setExpenseForm((f) => ({
                         ...f,
                         type: checked ? "fixed" : "variable",
+                        account_id: checked ? "" : f.account_id,
                       }))
                     }
                   />
@@ -1009,10 +1024,16 @@ export default function ExpensesPage() {
                       return (
                         <TableRow
                           key={exp.id}
-                          className={isOverdue ? "bg-red-50" : ""}
+                          className={
+                            isPaidCurrent
+                              ? "bg-blue-50"
+                              : isOverdue
+                                ? "bg-red-50"
+                                : ""
+                          }
                         >
                           <TableCell>{exp.expense_date}</TableCell>
-                          <TableCell>{exp.accounts?.name || "Cuenta"}</TableCell>
+                          <TableCell>{exp.accounts?.name || "Sin cuenta"}</TableCell>
                           <TableCell>{exp.category || "-"}</TableCell>
                           <TableCell>
                             {exp.frequency_value

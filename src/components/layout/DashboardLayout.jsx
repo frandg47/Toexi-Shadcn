@@ -19,13 +19,7 @@ import {
 
 import SheetNewSale from "@/components/SheetNewSale";
 import SheetNewLead from "@/components/SheetNewLead";
-import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContextProvider";
-
-const showDevelopmentToast = (feature) =>
-  toast("Funcionalidad en desarrollo", {
-    description: `El modulo de ${feature} estara disponible proximamente.`,
-  });
 
 const navMainBase = [
   { title: "Panel principal", url: "/dashboard", icon: IconDashboard },
@@ -69,7 +63,6 @@ export default function DashboardLayout() {
   };
 
   const navMain = navMainBase;
-
   const tituloActual = pageTitles[location.pathname] || "Dashboard";
 
   return (

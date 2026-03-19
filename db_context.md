@@ -8,7 +8,7 @@ CREATE TABLE public.account_movements (
   account_id bigint NOT NULL,
   type text NOT NULL CHECK (type = ANY (ARRAY['income'::text, 'expense'::text, 'transfer'::text])),
   amount numeric NOT NULL,
-  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text])),
+  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text, 'USDT'::text])),
   amount_ars numeric,
   fx_rate_used numeric,
   related_table text,
@@ -20,7 +20,7 @@ CREATE TABLE public.account_movements (
 CREATE TABLE public.accounts (
   id bigint NOT NULL DEFAULT nextval('accounts_id_seq'::regclass),
   name text NOT NULL,
-  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text])),
+  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text, 'USDT'::text])),
   initial_balance numeric NOT NULL DEFAULT 0,
   notes text,
   include_in_balance boolean NOT NULL DEFAULT true,
@@ -161,6 +161,7 @@ CREATE TABLE public.payment_methods (
   id integer NOT NULL DEFAULT nextval('payment_methods_id_seq'::regclass),
   name text NOT NULL UNIQUE,
   multiplier numeric NOT NULL DEFAULT 1,
+  is_active boolean NOT NULL DEFAULT true,
   CONSTRAINT payment_methods_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.product_variants (
@@ -334,11 +335,15 @@ CREATE TABLE public.sales (
   surcharge_type text,
   surcharge_value numeric,
   surcharge_amount numeric,
+  updated_at timestamp with time zone DEFAULT now(),
+  updated_by uuid,
+  updated_fields jsonb,
   CONSTRAINT sales_pkey PRIMARY KEY (id),
   CONSTRAINT sales_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
   CONSTRAINT sales_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES public.user_roles(id_auth),
   CONSTRAINT sales_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id),
-  CONSTRAINT sales_sales_channel_id_fkey FOREIGN KEY (sales_channel_id) REFERENCES public.sales_channels(id)
+  CONSTRAINT sales_sales_channel_id_fkey FOREIGN KEY (sales_channel_id) REFERENCES public.sales_channels(id),
+  CONSTRAINT sales_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id)
 );
 CREATE TABLE public.sales_channels (
   id integer GENERATED ALWAYS AS IDENTITY NOT NULL,
