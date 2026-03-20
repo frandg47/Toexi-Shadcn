@@ -291,7 +291,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
   const getAccountsForPayment = (payment) => {
     if (!payment?.method_name) return accounts;
-    const currency = isUSDMethod(payment.method_name) ? "USD" : "ARS";
+    const currency = getPaymentDisplayCurrency(payment.method_name);
     return accounts.filter((acc) => acc.currency === currency);
   };
 
@@ -376,8 +376,9 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     const fetchSellers = async () => {
       const { data, error } = await supabase
         .from("users")
-        .select("id, id_auth, name, last_name, phone, email, role")
+        .select("id, id_auth, name, last_name, phone, email, role, is_active")
         .eq("role", "seller")
+        .eq("is_active", true)
         .order("name", { ascending: true });
 
       if (error) console.error("Error obteniendo vendedores:", error);
@@ -443,13 +444,14 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   }, []);
 
   useEffect(() => {
-    if (lead?.seller) {
+    if (lead?.seller && lead?.seller?.user?.is_active) {
       setSelectedSeller({
         id_auth: lead.seller.id_auth,
         name: lead.seller.user?.name,
         last_name: lead.seller.user?.last_name,
         phone: lead.seller.user?.phone,
         email: lead.seller.user?.email,
+        is_active: lead.seller.user?.is_active,
       });
     } else {
       setSelectedSeller(null);
@@ -765,15 +767,22 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     });
 
 
-    const sellerData = lead?.seller
-      ? {
-        id_auth: lead.seller.id_auth,
-        name: lead.seller.user?.name,
-        last_name: lead.seller.user?.last_name,
-        phone: lead.seller.user?.phone,
-        email: lead.seller.user?.email,
-      }
+      const sellerData = lead?.seller
+      ? lead?.seller?.user?.is_active
+        ? {
+            id_auth: lead.seller.id_auth,
+            name: lead.seller.user?.name,
+            last_name: lead.seller.user?.last_name,
+            phone: lead.seller.user?.phone,
+            email: lead.seller.user?.email,
+            is_active: lead.seller.user?.is_active,
+          }
+        : null
       : selectedSeller;
+
+    if (sellerData && sellerData.is_active === false) {
+      return toast.error("No se puede asignar una venta a un vendedor inactivo");
+    }
 
 
     const salePreview = {

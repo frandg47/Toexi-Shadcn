@@ -83,6 +83,40 @@ const toTimestampAR = (date) => {
     return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}${AR_OFFSET}`;
 };
 
+const buildSaleMovementHistory = (payment, movement) => {
+    const isUsdPayment = payment.amount_usd != null && Number(payment.amount_usd) !== 0;
+
+    return {
+        movement_date: movement?.movement_date || toDateKeyAR(new Date()),
+        account_id: payment.account_id,
+        type: "transfer",
+        amount: isUsdPayment ? Number(payment.amount_usd || 0) : Number(payment.amount_ars || 0),
+        currency: isUsdPayment ? "USD" : "ARS",
+        amount_ars: isUsdPayment ? null : Number(payment.amount_ars || 0),
+        fx_rate_used: null,
+        related_table: "sale_payment_history",
+        related_id: payment.id,
+        notes: `Historial de cobro de venta #${payment.sale_id}`,
+    };
+};
+
+const buildSaleReversalMovement = (payment, saleId, reason) => {
+    const isUsdPayment = payment.amount_usd != null && Number(payment.amount_usd) !== 0;
+
+    return {
+        movement_date: toDateKeyAR(new Date()),
+        account_id: payment.account_id,
+        type: "expense",
+        amount: isUsdPayment ? Number(payment.amount_usd || 0) : Number(payment.amount_ars || 0),
+        currency: isUsdPayment ? "USD" : "ARS",
+        amount_ars: isUsdPayment ? null : Number(payment.amount_ars || 0),
+        fx_rate_used: null,
+        related_table: "sale_reversal",
+        related_id: payment.id,
+        notes: `Anulacion de venta #${saleId}${reason ? ` | Motivo: ${reason}` : ""}`,
+    };
+};
+
 export function SalesList() {
     const [sales, setSales] = useState([]);
     const [page, setPage] = useState(1);
@@ -430,6 +464,30 @@ export function SalesList() {
 
         try {
             setCancelingProcess(true);
+            const { data: salePayments, error: salePaymentsError } = await supabase
+                .from("sale_payments")
+                .select("id, sale_id, account_id, amount_ars, amount_usd, created_at")
+                .eq("sale_id", cancelingSale.sale_id);
+
+            if (salePaymentsError) throw salePaymentsError;
+
+            const salePaymentIds = (salePayments || []).map((payment) => payment.id);
+            let paymentMovementsMap = new Map();
+
+            if (salePaymentIds.length > 0) {
+                const { data: paymentMovements, error: paymentMovementsError } = await supabase
+                    .from("account_movements")
+                    .select("related_id, movement_date")
+                    .eq("related_table", "sale_payments")
+                    .in("related_id", salePaymentIds);
+
+                if (paymentMovementsError) throw paymentMovementsError;
+
+                paymentMovementsMap = new Map(
+                    (paymentMovements || []).map((movement) => [movement.related_id, movement])
+                );
+            }
+
             const { error } = await supabase.rpc("void_sale", {
                 p_sale_id: cancelingSale.sale_id,
                 p_reason: cancelReason,
@@ -437,6 +495,49 @@ export function SalesList() {
             });
 
             if (error) throw error;
+
+            const historyMovements = (salePayments || [])
+                .filter((payment) => payment.account_id)
+                .map((payment) =>
+                    buildSaleMovementHistory(
+                        payment,
+                        paymentMovementsMap.get(payment.id)
+                    )
+                );
+
+            if (historyMovements.length > 0) {
+                const { error: historyError } = await supabase
+                    .from("account_movements")
+                    .insert(historyMovements);
+
+                if (historyError) {
+                    throw new Error(
+                        `La venta se anuló, pero no se pudo preservar el historial del cobro: ${historyError.message}`
+                    );
+                }
+            }
+
+            const reversalMovements = (salePayments || [])
+                .filter((payment) => payment.account_id)
+                .map((payment) =>
+                    buildSaleReversalMovement(
+                        payment,
+                        cancelingSale.sale_id,
+                        cancelReason
+                    )
+                );
+
+            if (reversalMovements.length > 0) {
+                const { error: reversalError } = await supabase
+                    .from("account_movements")
+                    .insert(reversalMovements);
+
+                if (reversalError) {
+                    throw new Error(
+                        `La venta se anuló, pero no se pudo registrar el movimiento inverso: ${reversalError.message}`
+                    );
+                }
+            }
 
             toast.success("Venta anulada correctamente");
             closeBucketDialog();

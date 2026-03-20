@@ -39,7 +39,23 @@ import { Calendar } from "@/components/ui/calendar";
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
-import { IconEdit, IconPlus, IconCalendar } from "@tabler/icons-react";
+import {
+  IconEdit,
+  IconPlus,
+  IconCalendar,
+  IconArchiveOff,
+  IconDotsVertical,
+  IconCash,
+} from "@tabler/icons-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const formatARS = (n) =>
   new Intl.NumberFormat("es-AR", {
@@ -67,6 +83,11 @@ const formatCurrencyByCode = (amount, currency) => {
   return formatARS(amount);
 };
 
+const getLocalDateInputValue = (date = new Date()) => {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 10);
+};
+
 const addInterval = (dateValue, amount, unit) => {
   if (!dateValue || !amount) return null;
   const date = new Date(dateValue);
@@ -86,6 +107,14 @@ const addInterval = (dateValue, amount, unit) => {
   return date;
 };
 
+const normalizeDate = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
 const formatDateOnly = (value) => {
   if (!value) return "-";
   const date = new Date(value);
@@ -95,16 +124,85 @@ const formatDateOnly = (value) => {
 
 const getDueDate = (expense) => {
   if (expense?.type !== "fixed") return null;
+  const anchorDate = normalizeDate(expense?.expense_date);
+  if (!anchorDate) return null;
+
   if (!expense?.frequency_value || !expense?.frequency_unit) {
-    return new Date(expense?.expense_date);
+    return anchorDate;
   }
-  if (!expense?.last_paid_at) {
-    return new Date(expense?.expense_date);
+
+  const paidAt = normalizeDate(expense?.last_paid_at);
+  if (!paidAt) {
+    return anchorDate;
   }
-  return addInterval(
-    expense.last_paid_at,
-    expense.frequency_value,
-    expense.frequency_unit
+
+  let dueDate = new Date(anchorDate);
+  let guard = 0;
+
+  while (dueDate <= paidAt && guard < 500) {
+    const nextDueDate = addInterval(
+      dueDate,
+      expense.frequency_value,
+      expense.frequency_unit
+    );
+
+    if (!nextDueDate) break;
+
+    dueDate = normalizeDate(nextDueDate);
+    guard += 1;
+  }
+
+  return dueDate;
+};
+
+const getFixedExpenseRowClassName = (isPaidCurrent, isOverdue) => {
+  if (isPaidCurrent) {
+    return "bg-sky-50/70 transition-colors hover:bg-sky-100/80";
+  }
+  if (isOverdue) {
+    return "bg-rose-50/80 transition-colors hover:bg-rose-100";
+  }
+  return "bg-amber-50/70 transition-colors hover:bg-amber-100/80";
+};
+
+const getFixedExpenseBadgeProps = (isPaidCurrent, isOverdue) => {
+  if (isPaidCurrent) {
+    return {
+      label: "Pagado",
+      className:
+        "border-sky-200 bg-sky-100 text-sky-800 hover:bg-sky-100",
+    };
+  }
+  if (isOverdue) {
+    return {
+      label: "En deuda",
+      className:
+        "border-rose-200 bg-rose-100 text-rose-800 hover:bg-rose-100",
+    };
+  }
+  return {
+    label: "Pendiente",
+    className:
+      "border-amber-200 bg-amber-100 text-amber-900 hover:bg-amber-100",
+  };
+};
+
+const normalizeExpenseCategory = (category, type) => {
+  const trimmedCategory = category?.trim() || "";
+  if (!trimmedCategory) return null;
+  return type === "fixed" ? trimmedCategory.toUpperCase() : trimmedCategory;
+};
+
+const renderCategoryBadge = (category) => {
+  if (!category) return "-";
+
+  return (
+    <Badge
+      variant="outline"
+      className="border-slate-200 bg-slate-100 text-slate-800 hover:bg-slate-100"
+    >
+      {category}
+    </Badge>
   );
 };
 
@@ -145,6 +243,8 @@ export default function ExpensesPage() {
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [payExpense, setPayExpense] = useState(null);
   const [payAccountId, setPayAccountId] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [expenseToDeactivate, setExpenseToDeactivate] = useState(null);
 
   const [incomeForm, setIncomeForm] = useState({
     movement_date: new Date().toISOString().slice(0, 10),
@@ -171,6 +271,65 @@ export default function ExpensesPage() {
     is_active: true,
   });
 
+  const reloadExpenses = useCallback(async () => {
+    const [fixedRes, variableRes] = await Promise.all([
+      supabase
+        .from("expenses")
+        .select(
+          "id, expense_date, amount, currency, amount_ars, category, type, notes, created_at, last_paid_at, frequency_value, frequency_unit, account_id, is_active, accounts(name, currency)"
+        )
+        .eq("type", "fixed")
+        .eq("is_active", true)
+        .order("expense_date", { ascending: false }),
+      supabase
+        .from("expenses")
+        .select(
+          "id, expense_date, amount, currency, amount_ars, category, type, notes, created_at, last_paid_at, frequency_value, frequency_unit, account_id, is_active, accounts(name, currency)"
+        )
+        .eq("type", "variable")
+        .order("expense_date", { ascending: false })
+        .limit(50),
+    ]);
+
+    if (fixedRes.error) {
+      toast.error("No se pudieron cargar los gastos fijos", {
+        description: fixedRes.error.message,
+      });
+    }
+
+    if (variableRes.error) {
+      toast.error("No se pudieron cargar los gastos variables", {
+        description: variableRes.error.message,
+      });
+    }
+
+    const fixedExpenses = fixedRes.data || [];
+    const variableExpenses = variableRes.data || [];
+    const combined = [...fixedExpenses, ...variableExpenses];
+
+    combined.sort((a, b) => {
+      if (a.type !== b.type) return a.type === "fixed" ? -1 : 1;
+      return new Date(b.expense_date) - new Date(a.expense_date);
+    });
+
+    setExpenses(combined);
+  }, []);
+
+  const reloadBalanceMovements = useCallback(async () => {
+    const movementsRes = await supabase
+      .from("account_movements")
+      .select("account_id, type, amount");
+
+    if (movementsRes?.error) {
+      toast.error("No se pudieron cargar los movimientos", {
+        description: movementsRes.error.message,
+      });
+      return;
+    }
+
+    setBalanceMovements(movementsRes?.data || []);
+  }, []);
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -178,8 +337,6 @@ export default function ExpensesPage() {
         { data: rate },
         { data: usdt },
         { data: accs },
-        fixedRes,
-        variableRes,
         categoriesRes,
         movementsRes,
       ] = await Promise.all([
@@ -199,21 +356,6 @@ export default function ExpensesPage() {
           .from("accounts")
           .select("id, name, currency, initial_balance, notes, include_in_balance")
           .order("name", { ascending: true }),
-          supabase
-            .from("expenses")
-            .select(
-              "id, expense_date, amount, currency, amount_ars, category, type, notes, created_at, last_paid_at, frequency_value, frequency_unit, account_id, accounts(name, currency)"
-            )
-            .eq("type", "fixed")
-            .order("expense_date", { ascending: false }),
-          supabase
-            .from("expenses")
-            .select(
-              "id, expense_date, amount, currency, amount_ars, category, type, notes, created_at, last_paid_at, frequency_value, frequency_unit, account_id, accounts(name, currency)"
-            )
-            .eq("type", "variable")
-            .order("expense_date", { ascending: false })
-            .limit(50),
         supabase
           .from("finance_categories")
           .select("id, name, type, is_active, created_at")
@@ -235,19 +377,12 @@ export default function ExpensesPage() {
         setBalanceMovements(movementsRes?.data || []);
       }
       setCategories(categoriesRes?.data || []);
-      const fixedExpenses = fixedRes?.data || [];
-      const variableExpenses = variableRes?.data || [];
-      const combined = [...fixedExpenses, ...variableExpenses];
-      combined.sort((a, b) => {
-        if (a.type !== b.type) return a.type === "fixed" ? -1 : 1;
-        return new Date(b.expense_date) - new Date(a.expense_date);
-      });
-      setExpenses(combined);
+      await reloadExpenses();
       setLoading(false);
     };
 
     load();
-  }, []);
+  }, [reloadExpenses]);
 
   const selectedAccount = useMemo(
     () => accounts.find((a) => String(a.id) === String(expenseForm.account_id)),
@@ -381,6 +516,7 @@ export default function ExpensesPage() {
 
   const handleCreateExpense = async () => {
     if (!expenseForm.expense_date) return toast.error("Selecciona una fecha");
+    if (!expenseForm.category) return toast.error("Selecciona una categoria");
 
     const amount = Number(expenseForm.amount || 0);
     if (!amount || Number.isNaN(amount)) return toast.error("Monto invalido");
@@ -400,6 +536,10 @@ export default function ExpensesPage() {
     }
 
     const amountARS = currency === "ARS" ? amount : amount * rate;
+    const normalizedCategory = normalizeExpenseCategory(
+      expenseForm.category,
+      expenseForm.type
+    );
 
     const { error } = await supabase.from("expenses").insert([
       {
@@ -408,7 +548,7 @@ export default function ExpensesPage() {
         currency,
         amount_ars: amountARS,
         account_id: accountId,
-        category: expenseForm.category || null,
+        category: normalizedCategory,
         type: expenseForm.type,
         notes: expenseForm.notes || null,
         frequency_value:
@@ -418,6 +558,7 @@ export default function ExpensesPage() {
         frequency_unit:
           expenseForm.type === "fixed" ? expenseForm.frequency_unit : null,
         fx_rate_used: currency === "ARS" ? null : rate,
+        is_active: true,
       },
     ]);
 
@@ -437,24 +578,8 @@ export default function ExpensesPage() {
       frequency_value: 1,
       frequency_unit: "months",
     }));
-    const { data } = await supabase
-      .from("expenses")
-      .select(
-        "id, expense_date, amount, currency, amount_ars, category, type, notes, created_at, last_paid_at, frequency_value, frequency_unit, account_id, accounts(name, currency)"
-      )
-      .order("expense_date", { ascending: false })
-      .limit(50);
-    setExpenses(data || []);
-    const movementsRes = await supabase
-      .from("account_movements")
-      .select("account_id, type, amount");
-    if (movementsRes?.error) {
-      toast.error("No se pudieron cargar los movimientos", {
-        description: movementsRes.error.message,
-      });
-    } else {
-      setBalanceMovements(movementsRes?.data || []);
-    }
+    await reloadExpenses();
+    await reloadBalanceMovements();
   };
 
   const handleCreateIncome = async () => {
@@ -546,6 +671,10 @@ export default function ExpensesPage() {
       return toast.error(`No hay cotizacion activa para ${currency}`);
     }
     const amountARS = currency === "ARS" ? amount : amount * rate;
+    const normalizedCategory = normalizeExpenseCategory(
+      editForm.category,
+      editingExpense.type
+    );
 
     const payload = {
       expense_date: editForm.expense_date,
@@ -553,7 +682,7 @@ export default function ExpensesPage() {
       currency,
       amount_ars: amountARS,
       account_id: selectedEditAccount.id,
-      category: editForm.category || null,
+      category: normalizedCategory,
       notes: editForm.notes || null,
       frequency_value:
         editingExpense.type === "fixed"
@@ -579,24 +708,8 @@ export default function ExpensesPage() {
     toast.success("Gasto actualizado");
     setEditDialogOpen(false);
     setEditingExpense(null);
-    const { data } = await supabase
-      .from("expenses")
-      .select(
-        "id, expense_date, amount, currency, amount_ars, category, type, notes, created_at, last_paid_at, frequency_value, frequency_unit, account_id, accounts(name, currency)"
-      )
-      .order("expense_date", { ascending: false })
-      .limit(50);
-    setExpenses(data || []);
-    const movementsRes = await supabase
-      .from("account_movements")
-      .select("account_id, type, amount");
-    if (movementsRes?.error) {
-      toast.error("No se pudieron cargar los movimientos", {
-        description: movementsRes.error.message,
-      });
-    } else {
-      setBalanceMovements(movementsRes?.data || []);
-    }
+    await reloadExpenses();
+    await reloadBalanceMovements();
   };
 
   const handleOpenPayDialog = (expense) => {
@@ -629,10 +742,13 @@ export default function ExpensesPage() {
       return;
     }
 
+    const localToday = getLocalDateInputValue();
+    const localPaidAt = new Date(`${localToday}T12:00:00`).toISOString();
+
     const { error } = await supabase
       .from("expenses")
       .update({
-        last_paid_at: new Date().toISOString(),
+        last_paid_at: localPaidAt,
         account_id: selected.id,
       })
       .eq("id", payExpense.id);
@@ -648,24 +764,8 @@ export default function ExpensesPage() {
     setPayDialogOpen(false);
     setPayExpense(null);
     setPayAccountId("");
-    const { data } = await supabase
-      .from("expenses")
-      .select(
-        "id, expense_date, amount, currency, amount_ars, category, type, notes, created_at, last_paid_at, frequency_value, frequency_unit, account_id, accounts(name, currency)"
-      )
-      .order("expense_date", { ascending: false })
-      .limit(50);
-    setExpenses(data || []);
-    const movementsRes = await supabase
-      .from("account_movements")
-      .select("account_id, type, amount");
-    if (movementsRes?.error) {
-      toast.error("No se pudieron cargar los movimientos", {
-        description: movementsRes.error.message,
-      });
-    } else {
-      setBalanceMovements(movementsRes?.data || []);
-    }
+    await reloadExpenses();
+    await reloadBalanceMovements();
   };
 
   const handleCreateCategory = async () => {
@@ -696,6 +796,136 @@ export default function ExpensesPage() {
       .order("name", { ascending: true });
     setCategories(data || []);
   };
+
+  const handleRequestDeactivateFixedExpense = (expense) => {
+    if (!expense || expense.type !== "fixed") return;
+    setExpenseToDeactivate(expense);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeactivateFixedExpense = async () => {
+    if (!expenseToDeactivate || expenseToDeactivate.type !== "fixed") return;
+
+    const { error } = await supabase
+      .from("expenses")
+      .update({ is_active: false })
+      .eq("id", expenseToDeactivate.id);
+
+    if (error) {
+      toast.error("No se pudo desactivar el gasto fijo", {
+        description: error.message,
+      });
+      return;
+    }
+
+    toast.success("Gasto fijo desactivado");
+    setDeleteDialogOpen(false);
+    setExpenseToDeactivate(null);
+    await reloadExpenses();
+  };
+
+  const handleCancelFixedExpensePayment = async (expenseParam = editingExpense) => {
+    const expense = expenseParam;
+    if (!expense || expense.type !== "fixed") return;
+    if (!expense.last_paid_at) return;
+    if (!expense.account_id) {
+      toast.error("No se encontro la cuenta del pago original");
+      return;
+    }
+
+    const localToday = getLocalDateInputValue();
+    const { data: originalExpenseMovement, error: originalMovementError } =
+      await supabase
+        .from("account_movements")
+        .select(
+          "movement_date, account_id, amount, currency, amount_ars, fx_rate_used, notes"
+        )
+        .eq("related_table", "expenses")
+        .eq("related_id", expense.id)
+        .maybeSingle();
+
+    if (originalMovementError) {
+      toast.error("No se pudo recuperar el movimiento original del gasto", {
+        description: originalMovementError.message,
+      });
+      return;
+    }
+
+    if (originalExpenseMovement) {
+      const { error: historyMovementError } = await supabase
+        .from("account_movements")
+        .insert([
+          {
+            movement_date: originalExpenseMovement.movement_date || localToday,
+            account_id: originalExpenseMovement.account_id,
+            type: "expense",
+            amount: Number(originalExpenseMovement.amount || expense.amount || 0),
+            currency: originalExpenseMovement.currency || expense.currency,
+            amount_ars: Number(
+              originalExpenseMovement.amount_ars || expense.amount_ars || 0
+            ),
+            fx_rate_used: originalExpenseMovement.fx_rate_used || null,
+            related_table: "expense_payment_history",
+            related_id: expense.id,
+            notes:
+              originalExpenseMovement.notes ||
+              `Pago historico de gasto fijo: ${expense.category || "Sin categoria"}`,
+          },
+        ]);
+
+      if (historyMovementError) {
+        toast.error("No se pudo preservar el movimiento original del gasto", {
+          description: historyMovementError.message,
+        });
+        return;
+      }
+    }
+
+    const { error: movementError } = await supabase
+      .from("account_movements")
+      .insert([
+        {
+          movement_date: localToday,
+          account_id: expense.account_id,
+          type: "income",
+          amount: Number(expense.amount || 0),
+          currency: expense.currency,
+          amount_ars: Number(expense.amount_ars || 0),
+          related_table: "expense_reversal",
+          related_id: expense.id,
+          notes: `Anulacion de pago de gasto fijo: ${expense.category || "Sin categoria"}`,
+        },
+      ]);
+
+    if (movementError) {
+      toast.error("No se pudo revertir el movimiento del gasto", {
+        description: movementError.message,
+      });
+      return;
+    }
+
+    const { error: expenseError } = await supabase
+      .from("expenses")
+      .update({ last_paid_at: null, account_id: null })
+      .eq("id", expense.id);
+
+    if (expenseError) {
+      toast.error("Se genero el movimiento inverso pero no se pudo anular el pago", {
+        description: expenseError.message,
+      });
+      return;
+    }
+
+    toast.success("Pago anulado");
+    if (editingExpense?.id === expense.id) {
+      setEditForm((f) => ({ ...f, last_paid_at: null }));
+      setEditDialogOpen(false);
+      setEditingExpense(null);
+    }
+    await reloadExpenses();
+    await reloadBalanceMovements();
+  };
+
 
   if (!isOwner) {
     return <Navigate to="/unauthorized" replace />;
@@ -1001,7 +1231,7 @@ export default function ExpensesPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Fecha</TableHead>
+                      <TableHead>Fecha ultimo pago</TableHead>
                       <TableHead>Cuenta</TableHead>
                       <TableHead>Categoria</TableHead>
                       <TableHead>Periodo</TableHead>
@@ -1024,17 +1254,14 @@ export default function ExpensesPage() {
                       return (
                         <TableRow
                           key={exp.id}
-                          className={
-                            isPaidCurrent
-                              ? "bg-blue-50"
-                              : isOverdue
-                                ? "bg-red-50"
-                                : ""
-                          }
+                          className={getFixedExpenseRowClassName(
+                            isPaidCurrent,
+                            isOverdue
+                          )}
                         >
-                          <TableCell>{exp.expense_date}</TableCell>
+                          <TableCell>{formatDateOnly(exp.last_paid_at)}</TableCell>
                           <TableCell>{exp.accounts?.name || "Sin cuenta"}</TableCell>
-                          <TableCell>{exp.category || "-"}</TableCell>
+                          <TableCell>{renderCategoryBadge(exp.category)}</TableCell>
                           <TableCell>
                             {exp.frequency_value
                               ? `${exp.frequency_value} ${
@@ -1056,30 +1283,71 @@ export default function ExpensesPage() {
                           </TableCell>
                           <TableCell>{formatARS(exp.amount_ars)}</TableCell>
                           <TableCell className="text-right">
-                            {isPaidCurrent
-                              ? "Pagado"
-                              : isOverdue
-                              ? "En deuda"
-                              : "Pendiente"}
+                            <Badge
+                              variant="outline"
+                              className={
+                                getFixedExpenseBadgeProps(
+                                  isPaidCurrent,
+                                  isOverdue
+                                ).className
+                              }
+                            >
+                              {
+                                getFixedExpenseBadgeProps(
+                                  isPaidCurrent,
+                                  isOverdue
+                                ).label
+                              }
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleOpenEdit(exp)}
-                              >
-                                <IconEdit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleOpenPayDialog(exp)}
-                                disabled={isPaidCurrent}
-                              >
-                                Marcar pagado
-                              </Button>
-                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 hover:bg-muted"
+                                >
+                                  <IconDotsVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-44">
+                                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="hover:border-sky-300 hover:bg-sky-50 hover:text-sky-900"
+                                  onClick={() => handleOpenEdit(exp)}
+                                >
+                                  <IconEdit className="h-4 w-4" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className={
+                                    isPaidCurrent
+                                      ? "hover:bg-sky-50 hover:text-sky-900"
+                                      : "hover:border-amber-300 hover:bg-amber-50 hover:text-amber-900"
+                                  }
+                                  onClick={() =>
+                                    isPaidCurrent
+                                      ? handleCancelFixedExpensePayment(exp)
+                                      : handleOpenPayDialog(exp)
+                                  }
+                                >
+                                  <IconCash className="h-4 w-4" />
+                                  {isPaidCurrent ? "Anular pago" : "Pagar"}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onClick={() =>
+                                    handleRequestDeactivateFixedExpense(exp)
+                                  }
+                                >
+                                  <IconArchiveOff className="h-4 w-4" />
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       );
@@ -1118,10 +1386,13 @@ export default function ExpensesPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredVariableExpenses.map((exp) => (
-                      <TableRow key={exp.id}>
+                      <TableRow
+                        key={exp.id}
+                        className="transition-colors hover:bg-muted/40"
+                      >
                         <TableCell>{exp.expense_date}</TableCell>
                         <TableCell>{exp.accounts?.name || "Cuenta"}</TableCell>
-                        <TableCell>{exp.category || "-"}</TableCell>
+                        <TableCell>{renderCategoryBadge(exp.category)}</TableCell>
                         <TableCell>
                           {exp.currency === "USD"
                             ? `USD ${Number(exp.amount).toFixed(2)}`
@@ -1134,6 +1405,7 @@ export default function ExpensesPage() {
                           <Button
                             variant="outline"
                             size="sm"
+                            className="hover:border-sky-300 hover:bg-sky-50 hover:text-sky-900"
                             onClick={() => handleOpenEdit(exp)}
                           >
                             <IconEdit className="h-4 w-4" />
@@ -1389,12 +1661,10 @@ export default function ExpensesPage() {
             }
           />
           <DialogFooter>
-            {editingExpense?.last_paid_at && (
+            {editingExpense?.type === "fixed" && editingExpense?.last_paid_at && (
               <Button
                 variant="outline"
-                onClick={() =>
-                  setEditForm((f) => ({ ...f, last_paid_at: null }))
-                }
+                onClick={handleCancelFixedExpensePayment}
               >
                 Anular pago
               </Button>
@@ -1489,6 +1759,48 @@ export default function ExpensesPage() {
               }
             >
               Confirmar pago
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) {
+            setExpenseToDeactivate(null);
+          }
+        }}
+      >
+        <DialogContent className="w-[90vw] sm:max-w-md rounded-2xl p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Eliminar gasto fijo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              Seguro desea eliminar este gasto fijo?
+            </p>
+            <p>
+              Se desactivara{" "}
+              <span className="font-medium text-foreground">
+                {expenseToDeactivate?.category || "Sin categoria"}
+              </span>{" "}
+              y se conservaran sus movimientos vinculados.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setExpenseToDeactivate(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeactivateFixedExpense}>
+              Eliminar
             </Button>
           </DialogFooter>
         </DialogContent>

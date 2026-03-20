@@ -9,22 +9,67 @@ import SectionCardsProducts from "../components/SectionCardsProducts";
 
 const ALERT_WINDOW_DAYS = 5;
 
+const addInterval = (dateValue, amount, unit) => {
+  if (!dateValue || !amount) return null;
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const value = Number(amount);
+  if (!value) return null;
+
+  if (unit === "weeks") {
+    date.setDate(date.getDate() + value * 7);
+    return date;
+  }
+
+  if (unit === "months") {
+    date.setMonth(date.getMonth() + value);
+    return date;
+  }
+
+  date.setDate(date.getDate() + value);
+  return date;
+};
+
+const normalizeDate = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
 const getFixedExpenseDueDate = (expense) => {
-  const rawDate = [
-    expense?.next_due_date,
-    expense?.due_date,
-    expense?.expense_date,
-    expense?.payment_date,
-    expense?.last_paid_at,
-    expense?.created_at,
-  ].find(Boolean);
+  const anchorDate = normalizeDate(
+    expense?.next_due_date || expense?.due_date || expense?.expense_date
+  );
+  if (!anchorDate) return null;
 
-  if (!rawDate) return null;
+  if (!expense?.frequency_value || !expense?.frequency_unit) {
+    return anchorDate;
+  }
 
-  const dueDate = new Date(rawDate);
-  if (Number.isNaN(dueDate.getTime())) return null;
+  const paidAt = normalizeDate(expense?.last_paid_at);
+  if (!paidAt) {
+    return anchorDate;
+  }
 
-  dueDate.setHours(0, 0, 0, 0);
+  let dueDate = new Date(anchorDate);
+  let guard = 0;
+
+  while (dueDate <= paidAt && guard < 500) {
+    const nextDueDate = addInterval(
+      dueDate,
+      expense.frequency_value,
+      expense.frequency_unit
+    );
+
+    if (!nextDueDate) break;
+
+    dueDate = normalizeDate(nextDueDate);
+    guard += 1;
+  }
+
   return dueDate;
 };
 
@@ -43,8 +88,6 @@ const Dashboard = () => {
     const fetchDueSoonFixedExpenses = async () => {
       const { data, error } = await supabase.from("expenses").select("*");
 
-      console.log("[Dashboard] fixed_expenses raw response", { data, error });
-
       if (error) {
         console.error("Error loading fixed_expenses", error);
         return;
@@ -57,18 +100,13 @@ const Dashboard = () => {
       limit.setDate(limit.getDate() + ALERT_WINDOW_DAYS);
 
       const upcoming = (data || [])
-        .filter((expense) => expense?.is_active !== false)
+        .filter(
+          (expense) => expense?.is_active !== false && expense?.type === "fixed"
+        )
         .map((expense, index) => {
           const dueDate = getFixedExpenseDueDate(expense);
-          console.log("[Dashboard] fixed_expense parsed", {
-            expense,
-            derivedLabel: getFixedExpenseLabel(expense, index),
-            dueDate,
-            today,
-            limit,
-          });
           if (!dueDate) return null;
-          if (dueDate < today || dueDate > limit) return null;
+          if (dueDate > limit) return null;
 
           return {
             ...expense,
@@ -79,7 +117,6 @@ const Dashboard = () => {
         .filter(Boolean)
         .sort((a, b) => a.dueDate - b.dueDate);
 
-      console.log("[Dashboard] fixed_expenses due soon", upcoming);
       setDueSoonExpenses(upcoming);
     };
 
@@ -106,7 +143,8 @@ const Dashboard = () => {
                     <p className="text-sm font-semibold text-amber-950">
                       Hay {dueSoonExpenses.length} gasto
                       {dueSoonExpenses.length === 1 ? "" : "s"} fijo
-                      {dueSoonExpenses.length === 1 ? "" : "s"} por vencer en{" "}
+                      {dueSoonExpenses.length === 1 ? "" : "s"} vencido
+                      {dueSoonExpenses.length === 1 ? "" : "s"} o por vencer en{" "}
                       {ALERT_WINDOW_DAYS} dias o menos
                     </p>
                     <p className="text-sm text-amber-900/80">

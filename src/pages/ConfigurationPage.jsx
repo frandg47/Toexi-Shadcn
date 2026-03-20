@@ -68,12 +68,7 @@ const ConfigurationPage = () => {
       icon: <IconBuildingBank className="h-10 w-10 text-indigo-600" />,
       path: "/dashboard/settings/accounts",
     },
-    {
-      id: "movements",
-      label: "Movimientos",
-      icon: <IconArrowsExchange className="h-10 w-10 text-orange-600" />,
-      path: "/dashboard/settings/movements",
-    },
+
     {
       id: "budgets",
       label: "Presupuestos",

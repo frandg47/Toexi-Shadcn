@@ -226,9 +226,15 @@ export default function MovementsConfig() {
 
   const buildCategoryLabel = (movement, expensesMap) => {
     if (movement.related_table === "sale_payments") return "Ventas";
+    if (movement.related_table === "sale_payment_history") return "Ventas";
+    if (movement.related_table === "sale_reversal") return "Anulaciones de venta";
     if (movement.related_table === "purchase_payments") return "Compras";
     if (movement.related_table === "account_transfer") return null;
-    if (movement.related_table === "expenses") {
+    if (
+      movement.related_table === "expenses" ||
+      movement.related_table === "expense_reversal" ||
+      movement.related_table === "expense_payment_history"
+    ) {
       return expensesMap.get(movement.related_id) || "Sin categoria";
     }
     if (movement.related_table === "manual_income") {
@@ -424,7 +430,11 @@ export default function MovementsConfig() {
     setDetailLoading(true);
 
     let detailResponse = null;
-    if (movement.related_table === "sale_payments") {
+    if (
+      movement.related_table === "sale_payments" ||
+      movement.related_table === "sale_payment_history" ||
+      movement.related_table === "sale_reversal"
+    ) {
       detailResponse = await supabase
         .from("sale_payments")
         .select(
@@ -440,7 +450,11 @@ export default function MovementsConfig() {
         )
         .eq("id", movement.related_id)
         .maybeSingle();
-    } else if (movement.related_table === "expenses") {
+    } else if (
+      movement.related_table === "expenses" ||
+      movement.related_table === "expense_reversal" ||
+      movement.related_table === "expense_payment_history"
+    ) {
       detailResponse = await supabase
         .from("expenses")
         .select(
@@ -669,7 +683,9 @@ export default function MovementsConfig() {
                       {m.accounts?.name || `Cuenta ${m.account_id}`}
                     </TableCell>
                     <TableCell>
-                      {m.type === "income"
+                      {m.related_table === "sale_payment_history"
+                        ? "Historial"
+                        : m.type === "income"
                         ? "Ingreso"
                         : m.type === "expense"
                           ? "Egreso"
@@ -683,8 +699,16 @@ export default function MovementsConfig() {
                         ? "Transferencia"
                         : m.related_table === "sale_payments"
                           ? "Venta"
+                          : m.related_table === "sale_payment_history"
+                            ? "Historial venta"
+                            : m.related_table === "sale_reversal"
+                              ? "Anulacion venta"
                           : m.related_table === "expenses"
                             ? "Gasto"
+                            : m.related_table === "expense_reversal"
+                              ? "Anulacion gasto"
+                              : m.related_table === "expense_payment_history"
+                                ? "Pago gasto"
                             : m.related_table === "purchase_payments"
                               ? "Compra"
                               : m.related_table === "commission_payments"
@@ -757,7 +781,9 @@ export default function MovementsConfig() {
             </div>
             <div>
               <strong>Tipo:</strong>{" "}
-              {detailMovement?.type === "income"
+              {detailMovement?.related_table === "sale_payment_history"
+                ? "Historial"
+                : detailMovement?.type === "income"
                 ? "Ingreso"
                 : detailMovement?.type === "expense"
                   ? "Egreso"
@@ -768,11 +794,19 @@ export default function MovementsConfig() {
               {detailMovement?.related_table
                 ? detailMovement.related_table === "sale_payments"
                   ? `Venta`
+                  : detailMovement.related_table === "sale_payment_history"
+                    ? "Historial venta"
+                    : detailMovement.related_table === "sale_reversal"
+                      ? "Anulacion venta"
                   : `${
                       detailMovement.related_table === "purchase_payments"
                         ? "Compra"
                         : detailMovement.related_table === "expenses"
                           ? "Gasto"
+                          : detailMovement.related_table === "expense_reversal"
+                            ? "Anulacion gasto"
+                            : detailMovement.related_table === "expense_payment_history"
+                              ? "Pago gasto"
                           : detailMovement.related_table === "account_transfer"
                             ? "Transferencia"
                             : detailMovement.related_table
@@ -800,7 +834,9 @@ export default function MovementsConfig() {
             )}
             {!detailLoading && detailData && (
               <div className="space-y-2">
-                {detailMovement?.related_table === "sale_payments" && (
+                {(detailMovement?.related_table === "sale_payments" ||
+                  detailMovement?.related_table === "sale_payment_history" ||
+                  detailMovement?.related_table === "sale_reversal") && (
                   <>
                     <div>
                       <strong>Venta:</strong> #{detailData.sale_id}
@@ -848,7 +884,9 @@ export default function MovementsConfig() {
                     </div>
                   </>
                 )}
-                {detailMovement?.related_table === "expenses" && (
+                {(detailMovement?.related_table === "expenses" ||
+                  detailMovement?.related_table === "expense_reversal" ||
+                  detailMovement?.related_table === "expense_payment_history") && (
                   <>
                     <div>
                       <strong>Categoria:</strong> {detailData.category || "-"}
