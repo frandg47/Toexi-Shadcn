@@ -291,6 +291,20 @@ const QuickPaymentCalculator = () => {
           <span>Restante:</span>
           <span>{formatARS(totals.remainingARS)}</span>
         </div>
+        {totals.interestMethod?.installments &&
+          Number(totals.interestMethod.installments) > 1 && (
+            <div className="flex justify-between text-blue-600 font-medium">
+              <span>
+                Valor por cuota ({totals.interestMethod.installments}):
+              </span>
+              <span>
+                {formatARS(
+                  totals.totalWithSurcharge /
+                    Number(totals.interestMethod.installments)
+                )}
+              </span>
+            </div>
+          )}
         <div className="flex justify-between font-bold text-lg">
           <span>Total:</span>
           <span>{formatARS(totals.totalWithSurcharge)}</span>
