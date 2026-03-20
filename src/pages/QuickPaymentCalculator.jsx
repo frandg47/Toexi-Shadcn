@@ -71,7 +71,8 @@ const QuickPaymentCalculator = () => {
     const fetchPayments = async () => {
       const { data: methods } = await supabase
         .from("payment_methods")
-        .select("id, name, multiplier");
+        .select("id, name, multiplier")
+        .eq("is_active", true);
       const { data: installments } = await supabase
         .from("payment_installments")
         .select("id, payment_method_id, installments, multiplier");
