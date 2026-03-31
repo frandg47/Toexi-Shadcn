@@ -47,6 +47,7 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
       "resolution",
       "battery",
       "color",
+      "cost_price_usd",
       "usd_price",
       "stock",
       "camera_main",
@@ -63,6 +64,7 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
       "resolution",
       "battery",
       "color",
+      "cost_price_usd",
       "usd_price",
       "stock",
       "camera_main",
@@ -85,16 +87,17 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
       "weight",
       "operating_system",
       "color",
+      "cost_price_usd",
       "usd_price",
       "stock",
       "wholesale_price"
     ],
 
-    Auriculares: ["color", "usd_price", "stock", "potency", "wholesale_price"],
+    Auriculares: ["color", "cost_price_usd", "usd_price", "stock", "potency", "wholesale_price"],
 
-    Accesorios: ["color", "usd_price", "stock", "potency", "wholesale_price"],
+    Accesorios: ["color", "cost_price_usd", "usd_price", "stock", "potency", "wholesale_price"],
 
-    default: ["color", "usd_price", "stock", "wholesale_price"],
+    default: ["color", "cost_price_usd", "usd_price", "stock", "wholesale_price"],
   };
 
 
@@ -161,6 +164,7 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
         stock: 0,
         image_url: "",
         active: true,
+        cost_price_usd: "",
         wholesale_price: 0,
         camera_main: "",
         camera_front: "",
@@ -210,6 +214,18 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
 
 
   const saveVariants = async () => {
+    const invalidVariantIndex = variants.findIndex(
+      (variant) =>
+        variant.cost_price_usd === "" ||
+        variant.cost_price_usd === null ||
+        Number.isNaN(Number(variant.cost_price_usd))
+    );
+
+    if (invalidVariantIndex !== -1) {
+      toast.error(`La variante ${invalidVariantIndex + 1} debe tener costo en USD`);
+      return;
+    }
+
     const inserts = variants.filter((v) => !v.id);
     const updates = variants.filter((v) => v.id);
 
@@ -511,17 +527,42 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
 
                       {visibleFields.includes("usd_price") && (
                         <div className="grid gap-2">
+                          <Label>Costo USD</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={v.cost_price_usd ?? ""}
+                            onChange={(e) =>
+                              handleChange(
+                                index,
+                                "cost_price_usd",
+                                e.target.value === ""
+                                  ? ""
+                                  : parseFloat(e.target.value)
+                              )
+                            }
+                          />
+                        </div>
+                      )}
+
+                      {visibleFields.includes("usd_price") && (
+                        <div className="grid gap-2">
                           <Label>Precio USD</Label>
                           <Input
                             type="number"
                             step="0.01"
+                            min="0"
                             placeholder="0.00"
                             value={v.usd_price || ""}
                             onChange={(e) =>
                               handleChange(
                                 index,
                                 "usd_price",
-                                parseFloat(e.target.value)
+                                e.target.value === ""
+                                  ? ""
+                                  : parseFloat(e.target.value)
                               )
                             }
                           />
@@ -534,13 +575,16 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
                           <Input
                             type="number"
                             step="1"
+                            min="0"
                             placeholder="0.00"
                             value={v.wholesale_price || ""}
                             onChange={(e) =>
                               handleChange(
                                 index,
                                 "wholesale_price",
-                                parseFloat(e.target.value)
+                                e.target.value === ""
+                                  ? ""
+                                  : parseFloat(e.target.value)
                               )
                             }
                           />
@@ -552,13 +596,16 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
                           <Label>Stock</Label>
                           <Input
                             type="number"
+                            min="0"
                             placeholder="0"
                             value={v.stock || 0}
                             onChange={(e) =>
                               handleChange(
                                 index,
                                 "stock",
-                                parseInt(e.target.value)
+                                e.target.value === ""
+                                  ? 0
+                                  : parseInt(e.target.value, 10)
                               )
                             }
                           />

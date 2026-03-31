@@ -90,12 +90,14 @@ export default function ProductDetailDialog({
 
   // 🔹 Relacionar métodos con sus cuotas
   const enrichedMethods = useMemo(() => {
-    return paymentMethods.map((m) => ({
-      ...m,
-      installments: paymentInstallments.filter(
-        (i) => i.payment_method_id === m.id
-      ),
-    }));
+    return paymentMethods
+      .filter((m) => m?.is_active !== false)
+      .map((m) => ({
+        ...m,
+        installments: paymentInstallments.filter(
+          (i) => i.payment_method_id === m.id
+        ),
+      }));
   }, [paymentMethods, paymentInstallments]);
 
   // Campos que queremos mostrar dinámicamente en las variantes
@@ -117,7 +119,17 @@ export default function ProductDetailDialog({
     camera_front: "Cámara frontal",
   };
 
+  const technicalSpecs = useMemo(() => {
+    if (!firstVariant) return [];
 
+    return Object.entries(VARIANT_DISPLAY_FIELDS)
+      .map(([field, label]) => {
+        const value = firstVariant[field];
+        if (!value) return null;
+        return { field, label, value };
+      })
+      .filter(Boolean);
+  }, [firstVariant]);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -404,18 +416,19 @@ export default function ProductDetailDialog({
           <div className="mt-6 p-4 border rounded-lg bg-muted/20">
             <h3 className="text-lg font-semibold mb-3">Características técnicas</h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {Object.entries(VARIANT_DISPLAY_FIELDS).map(([field, label]) => {
-                const value = firstVariant[field];
-                if (!value) return null;
-
-                return (
-                  <div key={field} className="text-sm">
-                    <span className="font-semibold">{label}:</span> {value}
+            {technicalSpecs.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {technicalSpecs.map((spec) => (
+                  <div key={spec.field} className="text-sm">
+                    <span className="font-semibold">{spec.label}:</span> {spec.value}
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No hay caracteristicas agregadas.
+              </p>
+            )}
           </div>
         )}
 

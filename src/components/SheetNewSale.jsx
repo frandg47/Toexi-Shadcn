@@ -412,7 +412,8 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     const fetchAccounts = async () => {
       const { data, error } = await supabase
         .from("accounts")
-        .select("id, name, currency")
+        .select("id, name, currency, is_reference_capital")
+        .eq("is_reference_capital", false)
         .order("name", { ascending: true });
 
       if (error) console.error("Error obteniendo cuentas:", error);

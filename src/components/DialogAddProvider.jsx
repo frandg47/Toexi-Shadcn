@@ -22,11 +22,18 @@ const schema = yup.object({
   contact_name: yup.string().required("El contacto es obligatorio."),
   phone: yup
     .string()
-    .matches(/^[0-9+()\s-]*$/, "Formato de teléfono inválido.")
-    .required("El teléfono es obligatorio."),
+    .transform((value) => {
+      const normalized = value?.trim();
+      return normalized ? normalized : null;
+    })
+    .nullable()
+    .matches(/^[0-9+()\s-]*$/, {
+      message: "Formato de telefono invalido.",
+      excludeEmptyString: true,
+    }),
   email: yup
     .string()
-    .email("Correo electrónico inválido.")
+    .email("Correo electronico invalido.")
     .required("El email es obligatorio."),
   address: yup.string().nullable(),
   city: yup.string().nullable(),
@@ -93,9 +100,7 @@ export default function DialogAddProvider({ open, onClose, onSuccess }) {
               <Label htmlFor="name">Nombre *</Label>
               <Input id="name" {...register("name")} required />
               {errors.name && (
-                <p className="text-xs text-red-500 mt-1">
-                  {errors.name.message}
-                </p>
+                <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>
               )}
             </div>
 
@@ -103,19 +108,17 @@ export default function DialogAddProvider({ open, onClose, onSuccess }) {
               <Label htmlFor="contact_name">Contacto *</Label>
               <Input id="contact_name" {...register("contact_name")} required />
               {errors.contact_name && (
-                <p className="text-xs text-red-500 mt-1">
+                <p className="mt-1 text-xs text-red-500">
                   {errors.contact_name.message}
                 </p>
               )}
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="phone">Teléfono *</Label>
-              <Input id="phone" {...register("phone")} required />
+              <Label htmlFor="phone">Telefono</Label>
+              <Input id="phone" {...register("phone")} />
               {errors.phone && (
-                <p className="text-xs text-red-500 mt-1">
-                  {errors.phone.message}
-                </p>
+                <p className="mt-1 text-xs text-red-500">{errors.phone.message}</p>
               )}
             </div>
 
@@ -123,14 +126,12 @@ export default function DialogAddProvider({ open, onClose, onSuccess }) {
               <Label htmlFor="email">Email *</Label>
               <Input id="email" type="email" {...register("email")} required />
               {errors.email && (
-                <p className="text-xs text-red-500 mt-1">
-                  {errors.email.message}
-                </p>
+                <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
               )}
             </div>
 
             <div className="col-span-2 flex flex-col gap-2">
-              <Label htmlFor="address">Dirección</Label>
+              <Label htmlFor="address">Direccion</Label>
               <Input id="address" {...register("address")} />
             </div>
 

@@ -284,7 +284,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
         supabase
           .from("payment_methods")
           .select(
-            "id, name, multiplier, payment_installments(id, installments, multiplier, description, payment_method_id)"
+            "id, name, multiplier, is_active, payment_installments(id, installments, multiplier, description, payment_method_id)"
           )
           .order("id"),
         supabase.from("brands").select("id, name").order("name"),
