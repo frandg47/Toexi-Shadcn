@@ -46,6 +46,7 @@ import {
   IconArchiveOff,
   IconDotsVertical,
   IconCash,
+  IconTrash,
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -81,6 +82,16 @@ const formatCurrencyByCode = (amount, currency) => {
   if (currency === "USD") return formatUSD(amount);
   if (currency === "USDT") return formatUSDT(amount);
   return formatARS(amount);
+};
+
+const formatTableAmount = (amount, currency) => {
+  const resolvedCurrency = currency || "ARS";
+  const formattedNumber = new Intl.NumberFormat("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(amount || 0));
+
+  return `${resolvedCurrency} $${formattedNumber}`;
 };
 
 const getLocalDateInputValue = (date = new Date()) => {
@@ -245,6 +256,8 @@ export default function ExpensesPage() {
   const [payAccountId, setPayAccountId] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [expenseToDeactivate, setExpenseToDeactivate] = useState(null);
+  const [variableDeleteDialogOpen, setVariableDeleteDialogOpen] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState(null);
 
   const [incomeForm, setIncomeForm] = useState({
     movement_date: new Date().toISOString().slice(0, 10),
@@ -354,7 +367,10 @@ export default function ExpensesPage() {
           .maybeSingle(),
         supabase
           .from("accounts")
-          .select("id, name, currency, initial_balance, notes, include_in_balance")
+          .select(
+            "id, name, currency, initial_balance, notes, include_in_balance, is_reference_capital"
+          )
+          .eq("is_reference_capital", false)
           .order("name", { ascending: true }),
         supabase
           .from("finance_categories")
@@ -569,7 +585,13 @@ export default function ExpensesPage() {
       return;
     }
 
-    toast.success("Gasto registrado");
+    if (expenseForm.type === "variable") {
+      toast.success("Gasto variable creado correctamente", {
+        description: "No se pago todavia. Debe pagarse desde la tabla de abajo.",
+      });
+    } else {
+      toast.success("Gasto registrado");
+    }
     setExpenseForm((f) => ({
       ...f,
       amount: "",
@@ -822,6 +844,34 @@ export default function ExpensesPage() {
     setDeleteDialogOpen(false);
     setExpenseToDeactivate(null);
     await reloadExpenses();
+  };
+
+  const handleRequestDeleteVariableExpense = (expense) => {
+    if (!expense || expense.type !== "variable") return;
+    setExpenseToDelete(expense);
+    setVariableDeleteDialogOpen(true);
+  };
+
+  const handleDeleteVariableExpense = async () => {
+    if (!expenseToDelete || expenseToDelete.type !== "variable") return;
+
+    const { error } = await supabase
+      .from("expenses")
+      .delete()
+      .eq("id", expenseToDelete.id);
+
+    if (error) {
+      toast.error("No se pudo eliminar el gasto variable", {
+        description: error.message,
+      });
+      return;
+    }
+
+    toast.success("Gasto variable eliminado");
+    setVariableDeleteDialogOpen(false);
+    setExpenseToDelete(null);
+    await reloadExpenses();
+    await reloadBalanceMovements();
   };
 
   const handleCancelFixedExpensePayment = async (expenseParam = editingExpense) => {
@@ -1237,7 +1287,6 @@ export default function ExpensesPage() {
                       <TableHead>Periodo</TableHead>
                       <TableHead>Vence</TableHead>
                       <TableHead>Monto</TableHead>
-                      <TableHead>ARS</TableHead>
                       <TableHead className="text-right">Estado</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
@@ -1274,14 +1323,7 @@ export default function ExpensesPage() {
                               : "-"}
                           </TableCell>
                           <TableCell>{formatDateOnly(getDueDate(exp))}</TableCell>
-                          <TableCell>
-                            {exp.currency === "USD"
-                              ? `USD ${Number(exp.amount).toFixed(2)}`
-                              : exp.currency === "USDT"
-                                ? formatUSDT(exp.amount)
-                                : formatARS(exp.amount)}
-                          </TableCell>
-                          <TableCell>{formatARS(exp.amount_ars)}</TableCell>
+                          <TableCell>{formatTableAmount(exp.amount, exp.currency)}</TableCell>
                           <TableCell className="text-right">
                             <Badge
                               variant="outline"
@@ -1355,7 +1397,7 @@ export default function ExpensesPage() {
                     {filteredFixedExpenses.length === 0 && (
                       <TableRow>
                         <TableCell
-                          colSpan={9}
+                          colSpan={8}
                           className="text-center text-muted-foreground"
                         >
                           No hay gastos registrados.
@@ -1380,7 +1422,6 @@ export default function ExpensesPage() {
                       <TableHead>Cuenta</TableHead>
                       <TableHead>Categoria</TableHead>
                       <TableHead>Monto</TableHead>
-                      <TableHead>ARS</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1393,30 +1434,46 @@ export default function ExpensesPage() {
                         <TableCell>{exp.expense_date}</TableCell>
                         <TableCell>{exp.accounts?.name || "Cuenta"}</TableCell>
                         <TableCell>{renderCategoryBadge(exp.category)}</TableCell>
-                        <TableCell>
-                          {exp.currency === "USD"
-                            ? `USD ${Number(exp.amount).toFixed(2)}`
-                            : exp.currency === "USDT"
-                              ? formatUSDT(exp.amount)
-                              : formatARS(exp.amount)}
-                        </TableCell>
-                        <TableCell>{formatARS(exp.amount_ars)}</TableCell>
+                        <TableCell>{formatTableAmount(exp.amount, exp.currency)}</TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="hover:border-sky-300 hover:bg-sky-50 hover:text-sky-900"
-                            onClick={() => handleOpenEdit(exp)}
-                          >
-                            <IconEdit className="h-4 w-4" />
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 hover:bg-muted"
+                              >
+                                <IconDotsVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-44">
+                              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="hover:border-sky-300 hover:bg-sky-50 hover:text-sky-900"
+                                onClick={() => handleOpenEdit(exp)}
+                              >
+                                <IconEdit className="h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                variant="destructive"
+                                className="hover:border-rose-300 hover:bg-rose-50 hover:text-rose-900"
+                                onClick={() => handleRequestDeleteVariableExpense(exp)}
+                              >
+                                <IconTrash className="h-4 w-4" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
                     {filteredVariableExpenses.length === 0 && (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={5}
                           className="text-center text-muted-foreground"
                         >
                           No hay gastos registrados.
@@ -1800,6 +1857,45 @@ export default function ExpensesPage() {
               Cancelar
             </Button>
             <Button variant="destructive" onClick={handleDeactivateFixedExpense}>
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={variableDeleteDialogOpen}
+        onOpenChange={(open) => {
+          setVariableDeleteDialogOpen(open);
+          if (!open) {
+            setExpenseToDelete(null);
+          }
+        }}
+      >
+        <DialogContent className="w-[90vw] sm:max-w-md rounded-2xl p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Eliminar gasto variable</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              Se eliminara de forma definitiva{" "}
+              <span className="font-medium text-foreground">
+                {expenseToDelete?.category || "Sin categoria"}
+              </span>{" "}
+              y tambien se quitara su movimiento vinculado.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setVariableDeleteDialogOpen(false);
+                setExpenseToDelete(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteVariableExpense}>
               Eliminar
             </Button>
           </DialogFooter>
