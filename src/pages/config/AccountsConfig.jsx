@@ -38,6 +38,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { IconEdit } from "@tabler/icons-react";
 
 const formatARS = (n) =>
   new Intl.NumberFormat("es-AR", {
@@ -70,6 +71,8 @@ export default function AccountsConfig() {
     name: "",
     initial_balance: "",
     currency: "ARS",
+    include_in_balance: true,
+    is_reference_capital: false,
   });
   const [form, setForm] = useState({
     name: "",
@@ -77,6 +80,7 @@ export default function AccountsConfig() {
     currency: "ARS",
     notes: "",
     include_in_balance: true,
+    is_reference_capital: false,
   });
   const [transferOpen, setTransferOpen] = useState(false);
   const [confirmTransferOpen, setConfirmTransferOpen] = useState(false);
@@ -84,6 +88,8 @@ export default function AccountsConfig() {
     from_account_id: "",
     to_account_id: "",
     amount: "",
+    rate_mode: "system",
+    manual_fx_rate: "",
   });
 
   const loadAccounts = async () => {
@@ -91,7 +97,9 @@ export default function AccountsConfig() {
       await Promise.all([
         supabase
           .from("accounts")
-          .select("id, name, currency, initial_balance, notes, include_in_balance")
+          .select(
+            "id, name, currency, initial_balance, notes, include_in_balance, is_reference_capital"
+          )
           .order("name", { ascending: true }),
         supabase
           .from("fx_rates")
@@ -140,6 +148,8 @@ export default function AccountsConfig() {
       name: account.name || "",
       initial_balance: String(account.initial_balance ?? ""),
       currency: account.currency || "ARS",
+      include_in_balance: account.include_in_balance ?? true,
+      is_reference_capital: account.is_reference_capital ?? false,
     });
   };
 
@@ -149,6 +159,8 @@ export default function AccountsConfig() {
       name: "",
       initial_balance: "",
       currency: "ARS",
+      include_in_balance: true,
+      is_reference_capital: false,
     });
   };
 
@@ -167,6 +179,8 @@ export default function AccountsConfig() {
         name,
         initial_balance: initialBalance,
         currency: editForm.currency,
+        include_in_balance: editForm.include_in_balance,
+        is_reference_capital: editForm.is_reference_capital,
       })
       .eq("id", editId);
 
@@ -200,6 +214,7 @@ export default function AccountsConfig() {
         currency: form.currency,
         notes: form.notes || null,
         include_in_balance: form.include_in_balance,
+        is_reference_capital: form.is_reference_capital,
       },
     ]);
 
@@ -216,6 +231,7 @@ export default function AccountsConfig() {
       currency: "ARS",
       notes: "",
       include_in_balance: true,
+      is_reference_capital: false,
     });
     await loadAccounts();
     setLoading(false);
@@ -240,6 +256,18 @@ export default function AccountsConfig() {
     if (currency === "ARS") return 1;
     if (currency === "USD") return fxRate;
     if (currency === "USDT") return usdtRate;
+    return null;
+  };
+
+  const resolveManualRate = (fromCurrency, toCurrency, manualRate) => {
+    const safeManualRate = Number(manualRate || 0);
+    if (!safeManualRate) return null;
+
+    if (fromCurrency === "USD" && toCurrency === "ARS") return safeManualRate;
+    if (fromCurrency === "USDT" && toCurrency === "ARS") return safeManualRate;
+    if (fromCurrency === "ARS" && toCurrency === "USD") return 1 / safeManualRate;
+    if (fromCurrency === "ARS" && toCurrency === "USDT") return 1 / safeManualRate;
+
     return null;
   };
 
@@ -290,12 +318,41 @@ export default function AccountsConfig() {
     fromAccount &&
     toAccount &&
     fromAccount.currency !== toAccount.currency &&
-    getRateForCurrency(fromAccount.currency) &&
-    getRateForCurrency(toAccount.currency);
+    ((transferForm.rate_mode === "system" &&
+      getRateForCurrency(fromAccount.currency) &&
+      getRateForCurrency(toAccount.currency)) ||
+      (transferForm.rate_mode === "manual" &&
+        resolveManualRate(
+          fromAccount.currency,
+          toAccount.currency,
+          transferForm.manual_fx_rate
+        )));
+
+  const manualRateLabel =
+    fromAccount && toAccount
+      ? `1 ${fromAccount.currency} = ? ${toAccount.currency}`
+      : "Cotizacion manual";
+
+  const manualConvertedAmount =
+    fromAccount &&
+    toAccount &&
+    fromAccount.currency !== toAccount.currency &&
+    transferForm.rate_mode === "manual"
+      ? transferAmount *
+        Number(
+          resolveManualRate(
+            fromAccount.currency,
+            toAccount.currency,
+            transferForm.manual_fx_rate
+          ) || 0
+        )
+      : null;
 
   const convertedAmount = canConvert
-    ? (transferAmount * getRateForCurrency(fromAccount.currency)) /
-      getRateForCurrency(toAccount.currency)
+    ? transferForm.rate_mode === "manual"
+      ? manualConvertedAmount
+      : (transferAmount * getRateForCurrency(fromAccount.currency)) /
+        getRateForCurrency(toAccount.currency)
     : null;
 
   const handleCreateTransfer = async () => {
@@ -316,15 +373,50 @@ export default function AccountsConfig() {
       return;
     }
 
-    const fromRate = getRateForCurrency(fromAccount.currency);
-    const toRate = getRateForCurrency(toAccount.currency);
-    if (!fromRate || !toRate) {
-      toast.error("No hay cotizacion activa para la moneda seleccionada");
-      return;
-    }
+    let amountInARS = transferAmount;
+    let amountTo = transferAmount;
+    let fromFxUsed = null;
+    let toFxUsed = null;
 
-    const amountInARS = transferAmount * fromRate;
-    const amountTo = amountInARS / toRate;
+    if (fromAccount.currency !== toAccount.currency) {
+      if (transferForm.rate_mode === "manual") {
+        const manualRate = resolveManualRate(
+          fromAccount.currency,
+          toAccount.currency,
+          transferForm.manual_fx_rate
+        );
+
+        if (!manualRate) {
+          toast.error("Ingresa una cotizacion manual valida");
+          return;
+        }
+
+        amountTo = transferAmount * manualRate;
+
+        if (fromAccount.currency === "ARS") {
+          amountInARS = transferAmount;
+          toFxUsed = amountTo ? amountInARS / amountTo : null;
+        } else if (toAccount.currency === "ARS") {
+          amountInARS = amountTo;
+          fromFxUsed = transferAmount ? amountInARS / transferAmount : null;
+        } else {
+          toast.error("La cotizacion manual solo aplica si una cuenta es ARS");
+          return;
+        }
+      } else {
+        const fromRate = getRateForCurrency(fromAccount.currency);
+        const toRate = getRateForCurrency(toAccount.currency);
+        if (!fromRate || !toRate) {
+          toast.error("No hay cotizacion activa para la moneda seleccionada");
+          return;
+        }
+
+        amountInARS = transferAmount * fromRate;
+        amountTo = amountInARS / toRate;
+        fromFxUsed = fromAccount.currency === "ARS" ? null : fromRate;
+        toFxUsed = toAccount.currency === "ARS" ? null : toRate;
+      }
+    }
 
     setLoading(true);
     const { error } = await supabase.from("account_movements").insert([
@@ -335,7 +427,7 @@ export default function AccountsConfig() {
         amount: transferAmount,
         currency: fromAccount.currency,
         amount_ars: amountInARS,
-        fx_rate_used: fromAccount.currency === "ARS" ? null : fromRate,
+        fx_rate_used: fromFxUsed,
         related_table: "account_transfer",
         notes: `Transferencia a ${toAccount.name}`,
       },
@@ -346,7 +438,7 @@ export default function AccountsConfig() {
         amount: amountTo,
         currency: toAccount.currency,
         amount_ars: amountInARS,
-        fx_rate_used: toAccount.currency === "ARS" ? null : toRate,
+        fx_rate_used: toFxUsed,
         related_table: "account_transfer",
         notes: `Transferencia desde ${fromAccount.name}`,
       },
@@ -364,7 +456,13 @@ export default function AccountsConfig() {
     setLoading(false);
     setConfirmTransferOpen(false);
     setTransferOpen(false);
-    setTransferForm({ from_account_id: "", to_account_id: "", amount: "" });
+    setTransferForm({
+      from_account_id: "",
+      to_account_id: "",
+      amount: "",
+      rate_mode: "system",
+      manual_fx_rate: "",
+    });
     await loadAccounts();
   };
 
@@ -414,6 +512,15 @@ export default function AccountsConfig() {
             />
             <span className="text-sm">Incluir en balance</span>
           </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={form.is_reference_capital}
+              onCheckedChange={(checked) =>
+                setForm((f) => ({ ...f, is_reference_capital: checked }))
+              }
+            />
+            <span className="text-sm">Cuenta de referencia de capital</span>
+          </div>
         </div>
         <Textarea
           placeholder="Notas"
@@ -443,6 +550,7 @@ export default function AccountsConfig() {
                 <TableHead>Saldo actual</TableHead>
                 <TableHead>Saldo disponible</TableHead>
                 <TableHead>Incluir</TableHead>
+                <TableHead>Capital ref.</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -517,7 +625,37 @@ export default function AccountsConfig() {
                         ? formatUSDT(acc.current_balance)
                         : formatARS(acc.current_balance)}
                   </TableCell>
-                  <TableCell>{acc.include_in_balance ? "Si" : "No"}</TableCell>
+                  <TableCell>
+                    {editId === acc.id ? (
+                      <Switch
+                        checked={editForm.include_in_balance}
+                        onCheckedChange={(checked) =>
+                          setEditForm((f) => ({ ...f, include_in_balance: checked }))
+                        }
+                      />
+                    ) : acc.include_in_balance ? (
+                      "Si"
+                    ) : (
+                      "No"
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editId === acc.id ? (
+                      <Switch
+                        checked={editForm.is_reference_capital}
+                        onCheckedChange={(checked) =>
+                          setEditForm((f) => ({
+                            ...f,
+                            is_reference_capital: checked,
+                          }))
+                        }
+                      />
+                    ) : acc.is_reference_capital ? (
+                      "Si"
+                    ) : (
+                      "No"
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
                     {editId === acc.id ? (
                       <div className="flex items-center justify-end gap-2">
@@ -539,7 +677,7 @@ export default function AccountsConfig() {
                       </div>
                     ) : (
                       <Button size="sm" variant="outline" onClick={() => startEdit(acc)}>
-                        Editar
+                        <IconEdit className="h-4 w-4" />
                       </Button>
                     )}
                   </TableCell>
@@ -547,10 +685,10 @@ export default function AccountsConfig() {
               ))}
               {accountBalances.length === 0 && (
                 <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="text-center text-muted-foreground"
-                  >
+                    <TableCell
+                      colSpan={8}
+                      className="text-center text-muted-foreground"
+                    >
                     No hay cuentas creadas.
                   </TableCell>
                 </TableRow>
@@ -617,6 +755,56 @@ export default function AccountsConfig() {
                 }
               />
             </div>
+            {fromAccount &&
+              toAccount &&
+              fromAccount.currency !== toAccount.currency && (
+                <>
+                  <div className="grid gap-1">
+                    <span className="text-xs text-muted-foreground">
+                      Tipo de cotizacion
+                    </span>
+                    <Select
+                      value={transferForm.rate_mode}
+                      onValueChange={(value) =>
+                        setTransferForm((f) => ({
+                          ...f,
+                          rate_mode: value,
+                          manual_fx_rate:
+                            value === "manual" ? f.manual_fx_rate : "",
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Cotizacion" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[9999]">
+                        <SelectItem value="system">Cotizacion del sistema</SelectItem>
+                        <SelectItem value="manual">Cotizacion manual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {transferForm.rate_mode === "manual" && (
+                    <div className="grid gap-1">
+                      <span className="text-xs text-muted-foreground">
+                        {manualRateLabel}
+                      </span>
+                      <Input
+                        type="number"
+                        step="0.0001"
+                        min="0"
+                        placeholder="0.0000"
+                        value={transferForm.manual_fx_rate}
+                        onChange={(e) =>
+                          setTransferForm((f) => ({
+                            ...f,
+                            manual_fx_rate: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  )}
+                </>
+              )}
             {fromAccount && (
               <div className="text-xs text-muted-foreground">
                 Disponible:{" "}
@@ -655,7 +843,9 @@ export default function AccountsConfig() {
                     </div>
                   ) : (
                     <div className="text-muted-foreground">
-                      No hay cotizacion activa para convertir.
+                      {transferForm.rate_mode === "manual"
+                        ? "Ingresa una cotizacion manual valida para convertir."
+                        : "No hay cotizacion activa para convertir."}
                     </div>
                   )}
                 </div>
@@ -704,6 +894,16 @@ export default function AccountsConfig() {
               </strong>{" "}
               desde <strong>{fromAccount?.name || "-"}</strong> hacia{" "}
               <strong>{toAccount?.name || "-"}</strong>.
+              {fromAccount &&
+              toAccount &&
+              fromAccount.currency !== toAccount.currency &&
+              transferForm.rate_mode === "manual" ? (
+                <>
+                  {" "}
+                  Se utilizara una cotizacion manual de{" "}
+                  <strong>{transferForm.manual_fx_rate || "-"}</strong>.
+                </>
+              ) : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

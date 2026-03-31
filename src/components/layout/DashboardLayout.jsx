@@ -15,6 +15,8 @@ import {
   IconCash,
   IconCalculator,
   IconChartBar,
+  IconReceipt,
+  IconBuildingBank,
 } from "@tabler/icons-react";
 
 import SheetNewSale from "@/components/SheetNewSale";
@@ -30,6 +32,8 @@ const navMainBase = [
   { title: "Equipo", url: "/dashboard/team", icon: IconUsersGroup },
   { title: "Top Vendedores", url: "/dashboard/top-sellers", icon: IconMedal },
   { title: "Cotizador", url: "/dashboard/quick-payment-calculator", icon: IconCalculator },
+  { title: "Gastos", url: "/dashboard/expenses", icon: IconReceipt },
+  { title: "Finanzas", url: "/dashboard/finance", icon: IconBuildingBank },
   { title: "Movimientos", url: "/dashboard/movements", icon: IconCash },
 ];
 
@@ -41,7 +45,8 @@ export default function DashboardLayout() {
   const [saleOpen, setSaleOpen] = useState(false);
   const [leadOpen, setLeadOpen] = useState(false);
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isOwner = role?.toLowerCase() === "owner";
 
   const pageTitles = {
     "/dashboard": "Panel principal",
@@ -58,11 +63,16 @@ export default function DashboardLayout() {
     "/dashboard/settings/fx-rates": "Cotizaciones",
     "/dashboard/sales": "Ventas",
     "/dashboard/payment-calculator": "Presupuestos",
+    "/dashboard/expenses": "Gastos",
+    "/dashboard/finance": "Finanzas",
+    "/dashboard/movements": "Movimientos",
     "/dashboard/settings/expenses": "Gastos",
     "/dashboard/settings/movements": "Movimientos",
   };
 
-  const navMain = navMainBase;
+  const navMain = navMainBase.filter(
+    (item) => item.url !== "/dashboard/finance" || isOwner
+  );
   const tituloActual = pageTitles[location.pathname] || "Dashboard";
 
   return (

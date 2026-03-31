@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { IconAlertTriangle, IconChevronRight } from "@tabler/icons-react";
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 import { SectionCards } from "@/components/section-cards";
+import { useAuth } from "@/context/AuthContextProvider";
 import { supabase } from "@/lib/supabaseClient";
 import SalesByChannelChart from "@/components/SalesByChannelChart";
 import SectionCardsProducts from "../components/SectionCardsProducts";
@@ -82,9 +83,16 @@ const getFixedExpenseLabel = (expense, index) =>
   `Gasto fijo ${index + 1}`;
 
 const Dashboard = () => {
+  const { role } = useAuth();
+  const isOwner = role?.toLowerCase() === "owner";
   const [dueSoonExpenses, setDueSoonExpenses] = useState([]);
 
   useEffect(() => {
+    if (!isOwner) {
+      setDueSoonExpenses([]);
+      return;
+    }
+
     const fetchDueSoonFixedExpenses = async () => {
       const { data, error } = await supabase.from("expenses").select("*");
 
@@ -121,7 +129,7 @@ const Dashboard = () => {
     };
 
     fetchDueSoonFixedExpenses();
-  }, []);
+  }, [isOwner]);
 
   const highlightedExpenses = useMemo(
     () => dueSoonExpenses.slice(0, 3),
@@ -132,7 +140,7 @@ const Dashboard = () => {
     <div className="flex flex-1 flex-col">
       <div className="@container/main flex flex-1 flex-col gap-4 ">
         <div className="flex flex-col gap-4 py-4 md:gap-6 md:p-6">
-          {dueSoonExpenses.length > 0 && (
+          {isOwner && dueSoonExpenses.length > 0 && (
             <div className="overflow-hidden rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 via-background to-amber-100 shadow-sm animate-in fade-in-0 slide-in-from-top-2 duration-500">
               <div className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-start md:justify-between md:px-5">
                 <div className="flex items-start gap-3">
@@ -162,7 +170,7 @@ const Dashboard = () => {
                 </div>
 
                 <Link
-                  to="/dashboard/settings/expenses"
+                  to="/dashboard/expenses"
                   className="inline-flex items-center gap-1 self-start rounded-full border border-amber-300 bg-white/80 px-3 py-1.5 text-sm font-medium text-amber-900 transition hover:bg-white"
                 >
                   Ver gastos

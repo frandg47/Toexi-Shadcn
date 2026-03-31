@@ -107,12 +107,39 @@ export default function MovementsConfig() {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
+  const [fxRate, setFxRate] = useState(null);
+  const [usdtRate, setUsdtRate] = useState(null);
+  const [stockCostUsd, setStockCostUsd] = useState(0);
 
   const loadAccounts = useCallback(async () => {
-    const { data: accountsData, error: accountsError } = await supabase
-      .from("accounts")
-      .select("id, name, currency, initial_balance, include_in_balance")
-      .order("name", { ascending: true });
+    const [
+      { data: accountsData, error: accountsError },
+      { data: blueRateData, error: blueRateError },
+      { data: usdtRateData, error: usdtRateError },
+      { data: variantsData, error: variantsError },
+    ] = await Promise.all([
+      supabase
+        .from("accounts")
+        .select(
+          "id, name, currency, initial_balance, include_in_balance, is_reference_capital"
+        )
+        .order("name", { ascending: true }),
+      supabase
+        .from("fx_rates")
+        .select("rate")
+        .eq("source", "blue")
+        .eq("is_active", true)
+        .maybeSingle(),
+      supabase
+        .from("fx_rates")
+        .select("rate")
+        .eq("source", "USDT")
+        .eq("is_active", true)
+        .maybeSingle(),
+      supabase
+        .from("product_variants")
+        .select("stock, cost_price_usd"),
+    ]);
 
     if (accountsError) {
       toast.error("No se pudieron cargar las cuentas", {
@@ -121,7 +148,34 @@ export default function MovementsConfig() {
       return;
     }
 
+    if (blueRateError) {
+      toast.error("No se pudo cargar la cotizacion USD", {
+        description: blueRateError.message,
+      });
+    }
+
+    if (usdtRateError) {
+      toast.error("No se pudo cargar la cotizacion USDT", {
+        description: usdtRateError.message,
+      });
+    }
+
+    if (variantsError) {
+      toast.error("No se pudo cargar el costo del stock", {
+        description: variantsError.message,
+      });
+    }
+
     setAccounts(accountsData || []);
+    setFxRate(Number(blueRateData?.rate || 0) || null);
+    setUsdtRate(Number(usdtRateData?.rate || 0) || null);
+    setStockCostUsd(
+      (variantsData || []).reduce((total, variant) => {
+        const stock = Number(variant.stock || 0);
+        const cost = Number(variant.cost_price_usd || 0);
+        return total + stock * cost;
+      }, 0)
+    );
   }, []);
 
   const loadBalancesAll = useCallback(async () => {
@@ -229,6 +283,7 @@ export default function MovementsConfig() {
     if (movement.related_table === "sale_payment_history") return "Ventas";
     if (movement.related_table === "sale_reversal") return "Anulaciones de venta";
     if (movement.related_table === "purchase_payments") return "Compras";
+    if (movement.related_table === "purchase_reversal") return "Anulaciones de compra";
     if (movement.related_table === "account_transfer") return null;
     if (
       movement.related_table === "expenses" ||
@@ -419,6 +474,45 @@ export default function MovementsConfig() {
     );
   }, [accountBalancesAll]);
 
+  const convertAmountToUsd = useCallback(
+    (amount, currency) => {
+      const safeAmount = Number(amount || 0);
+      if (!safeAmount) return 0;
+      if (currency === "USD") return safeAmount;
+      if (currency === "USDT") {
+        if (usdtRate && fxRate) return (safeAmount * usdtRate) / fxRate;
+        return safeAmount;
+      }
+      if (currency === "ARS") {
+        if (!fxRate) return 0;
+        return safeAmount / fxRate;
+      }
+      return 0;
+    },
+    [fxRate, usdtRate]
+  );
+
+  const businessMetrics = useMemo(() => {
+    const operatingCashUsd = accountBalancesAll.reduce((total, account) => {
+      if (!account.include_in_balance) return total;
+      return total + convertAmountToUsd(account.current_balance, account.currency);
+    }, 0);
+
+    const referenceCapitalUsd = accountBalancesAll.reduce((total, account) => {
+      if (!account.is_reference_capital) return total;
+      return total + convertAmountToUsd(account.current_balance, account.currency);
+    }, 0);
+
+    const realResultUsd = operatingCashUsd + stockCostUsd - referenceCapitalUsd;
+
+    return {
+      operatingCashUsd,
+      referenceCapitalUsd,
+      stockCostUsd,
+      realResultUsd,
+    };
+  }, [accountBalancesAll, convertAmountToUsd, stockCostUsd]);
+
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   const openMovementDetail = useCallback(async (movement) => {
@@ -442,7 +536,10 @@ export default function MovementsConfig() {
         )
         .eq("id", movement.related_id)
         .maybeSingle();
-    } else if (movement.related_table === "purchase_payments") {
+    } else if (
+      movement.related_table === "purchase_payments" ||
+      movement.related_table === "purchase_reversal"
+    ) {
       detailResponse = await supabase
         .from("purchase_payments")
         .select(
@@ -478,85 +575,6 @@ export default function MovementsConfig() {
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-4 py-6">
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="bg-blue-500">
-          <CardHeader>
-            <CardTitle className="text-white">Balance total ARS</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold text-white">
-            {formatCurrency(totalBalances.ars, "ARS")}
-          </CardContent>
-        </Card>
-        <Card className="bg-green-700">
-          <CardHeader>
-            <CardTitle className="text-white">Balance total USD</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl text-white font-semibold">
-            {formatCurrency(totalBalances.usd, "USD")}
-          </CardContent>
-        </Card>
-        <Card className="bg-purple-700">
-          <CardHeader>
-            <CardTitle className="text-white">Balance total USDT</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold text-white">
-            {formatCurrency(totalBalances.usdt, "USDT")}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Balance por cuenta</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cuenta</TableHead>
-                  <TableHead>Moneda</TableHead>
-                  <TableHead>Saldo inicial</TableHead>
-                  <TableHead>Ingresos</TableHead>
-                  <TableHead>Egresos</TableHead>
-                  <TableHead>Balance actual</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {accountBalancesFiltered.map((acc) => (
-                  <TableRow key={acc.id}>
-                    <TableCell>{acc.name}</TableCell>
-                    <TableCell>{acc.currency}</TableCell>
-                    <TableCell>
-                      {formatCurrency(acc.initial_balance, acc.currency)}
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(acc.income, acc.currency)}
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(acc.expense, acc.currency)}
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(acc.current_balance, acc.currency)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {accountBalancesFiltered.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      className="text-center text-muted-foreground"
-                    >
-                      No hay cuentas disponibles.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <CardTitle>Movimientos</CardTitle>
@@ -711,6 +729,8 @@ export default function MovementsConfig() {
                                 ? "Pago gasto"
                             : m.related_table === "purchase_payments"
                               ? "Compra"
+                              : m.related_table === "purchase_reversal"
+                                ? "Anulacion compra"
                               : m.related_table === "commission_payments"
                                 ? "Pago"
                                 : m.related_table
@@ -796,11 +816,13 @@ export default function MovementsConfig() {
                   ? `Venta`
                   : detailMovement.related_table === "sale_payment_history"
                     ? "Historial venta"
-                    : detailMovement.related_table === "sale_reversal"
+                  : detailMovement.related_table === "sale_reversal"
                       ? "Anulacion venta"
                   : `${
                       detailMovement.related_table === "purchase_payments"
                         ? "Compra"
+                        : detailMovement.related_table === "purchase_reversal"
+                          ? "Anulacion compra"
                         : detailMovement.related_table === "expenses"
                           ? "Gasto"
                           : detailMovement.related_table === "expense_reversal"
@@ -865,7 +887,8 @@ export default function MovementsConfig() {
                     )}
                   </>
                 )}
-                {detailMovement?.related_table === "purchase_payments" && (
+                {(detailMovement?.related_table === "purchase_payments" ||
+                  detailMovement?.related_table === "purchase_reversal") && (
                   <>
                     <div>
                       <strong>Compra:</strong> #{detailData.purchase_id}

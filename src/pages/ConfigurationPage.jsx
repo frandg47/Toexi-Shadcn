@@ -82,12 +82,6 @@ const ConfigurationPage = () => {
       path: "/dashboard/settings/sellers-payments",
     },
     {
-      id: "expenses",
-      label: "Ingresos/Gastos",
-      icon: <IconCash className="h-10 w-10 text-lime-600" />,
-      path: "/dashboard/settings/expenses",
-    },
-    {
       id: "brands",
       label: "Marcas",
       icon: <IconBrandApple className="h-10 w-10 text-zinc-700" />,

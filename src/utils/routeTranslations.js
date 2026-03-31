@@ -28,4 +28,5 @@ export const ROUTE_TRANSLATIONS = {
   purchases: "Compras",
   accounts: "Cuentas",
   movements: "Movimientos",
+  finance: "Finanzas",
 };
