@@ -689,9 +689,9 @@ export default function MovementsConfig() {
                     key={m.id}
                     className={`cursor-pointer ${
                       m.type === "income"
-                        ? "bg-green-200"
+                        ? "bg-green-100 hover:bg-green-200/80 dark:bg-green-950/25 dark:hover:bg-green-900/35"
                         : m.type === "expense"
-                          ? "bg-red-200"
+                          ? "bg-red-100 hover:bg-red-200/80 dark:bg-red-950/25 dark:hover:bg-red-900/35"
                           : ""
                     }`}
                     onClick={() => openMovementDetail(m)}

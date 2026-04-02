@@ -184,31 +184,33 @@ const getDueDate = (expense) => {
 
 const getFixedExpenseRowClassName = (isPaidCurrent, isOverdue) => {
   if (isPaidCurrent) {
-    return "bg-sky-50/70 transition-colors hover:bg-sky-100/80";
+    return "bg-sky-50/70 transition-colors hover:bg-sky-100/80 dark:bg-sky-950/25 dark:hover:bg-sky-900/35";
   }
   if (isOverdue) {
-    return "bg-rose-50/80 transition-colors hover:bg-rose-100";
+    return "bg-rose-50/80 transition-colors hover:bg-rose-100 dark:bg-rose-950/25 dark:hover:bg-rose-900/35";
   }
-  return "bg-amber-50/70 transition-colors hover:bg-amber-100/80";
+  return "bg-amber-50/70 transition-colors hover:bg-amber-100/80 dark:bg-amber-950/25 dark:hover:bg-amber-900/35";
 };
 
 const getFixedExpenseBadgeProps = (isPaidCurrent, isOverdue) => {
   if (isPaidCurrent) {
     return {
       label: "Pagado",
-      className: "border-sky-200 bg-sky-100 text-sky-800 hover:bg-sky-100",
+      className:
+        "border-sky-200 bg-sky-100 text-sky-800 hover:bg-sky-100 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-950/60",
     };
   }
   if (isOverdue) {
     return {
       label: "En deuda",
-      className: "border-rose-200 bg-rose-100 text-rose-800 hover:bg-rose-100",
+      className:
+        "border-rose-200 bg-rose-100 text-rose-800 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-200 dark:hover:bg-rose-950/60",
     };
   }
   return {
     label: "Pendiente",
     className:
-      "border-amber-200 bg-amber-100 text-amber-900 hover:bg-amber-100",
+      "border-amber-200 bg-amber-100 text-amber-900 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200 dark:hover:bg-amber-950/60",
   };
 };
 
@@ -1332,7 +1334,7 @@ export default function ExpensesPage() {
                                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  className="hover:border-sky-300 hover:bg-sky-50 hover:text-sky-900"
+                                  className="hover:border-sky-300 hover:bg-sky-50 hover:text-sky-900 dark:hover:border-sky-800 dark:hover:bg-sky-950/50 dark:hover:text-sky-100"
                                   onClick={() => handleOpenEdit(exp)}
                                 >
                                   <IconEdit className="h-4 w-4" />
@@ -1341,8 +1343,8 @@ export default function ExpensesPage() {
                                 <DropdownMenuItem
                                   className={
                                     isPaidCurrent
-                                      ? "hover:bg-sky-50 hover:text-sky-900"
-                                      : "hover:border-amber-300 hover:bg-amber-50 hover:text-amber-900"
+                                      ? "hover:bg-sky-50 hover:text-sky-900 dark:hover:bg-sky-950/50 dark:hover:text-sky-100"
+                                      : "hover:border-amber-300 hover:bg-amber-50 hover:text-amber-900 dark:hover:border-amber-800 dark:hover:bg-amber-950/50 dark:hover:text-amber-100"
                                   }
                                   onClick={() =>
                                     isPaidCurrent
@@ -1537,7 +1539,7 @@ export default function ExpensesPage() {
                               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                className="hover:border-sky-300 hover:bg-sky-50 hover:text-sky-900"
+                                className="hover:border-sky-300 hover:bg-sky-50 hover:text-sky-900 dark:hover:border-sky-800 dark:hover:bg-sky-950/50 dark:hover:text-sky-100"
                                 onClick={() => handleOpenEdit(exp)}
                               >
                                 <IconEdit className="h-4 w-4" />
@@ -1546,7 +1548,7 @@ export default function ExpensesPage() {
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 variant="destructive"
-                                className="hover:border-rose-300 hover:bg-rose-50 hover:text-rose-900"
+                                className="hover:border-rose-300 hover:bg-rose-50 hover:text-rose-900 dark:hover:border-rose-800 dark:hover:bg-rose-950/50 dark:hover:text-rose-100"
                                 onClick={() =>
                                   handleRequestDeleteVariableExpense(exp)
                                 }
@@ -1929,7 +1931,7 @@ export default function ExpensesPage() {
                 </SelectContent>
               </Select>
               {payAccountOptions.length === 0 && (
-                <p className="text-xs text-amber-600">
+                <p className="text-xs text-amber-600 dark:text-amber-300">
                   No hay cuentas disponibles con la misma moneda.
                 </p>
               )}
@@ -1943,7 +1945,9 @@ export default function ExpensesPage() {
                 </p>
               )}
               {isPayInsufficient && (
-                <p className="text-xs text-red-600">Saldo insuficiente</p>
+                <p className="text-xs text-red-600 dark:text-red-300">
+                  Saldo insuficiente
+                </p>
               )}
             </div>
           </div>

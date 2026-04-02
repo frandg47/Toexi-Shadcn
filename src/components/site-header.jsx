@@ -2,6 +2,7 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useLocation } from "react-router-dom";
 import BreadcrumbHeader from "@/components/BreadCrumbHeader.jsx";
+import ThemeToggle from "@/components/theme-toggle";
 
 
 const TITULOS = {
@@ -43,12 +44,12 @@ export function SiteHeader({ actions }) {
         sticky top-0 z-40 
         flex h-16
         shrink-0 items-center gap-2 border-b 
-        bg-green-600/80 md:bg-white/90 backdrop-blur-sm
+        bg-green-600/80 md:bg-background/90 dark:bg-background/95 backdrop-blur-sm
         transition-[width,height] ease-linear
       "
     >
       <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6 mb-1">
-        <SidebarTrigger className="-ml-1 text-white md:text-black/90" />
+        <SidebarTrigger className="-ml-1 text-white md:text-foreground" />
 
         <Separator
           orientation="vertical"
@@ -60,6 +61,7 @@ export function SiteHeader({ actions }) {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          <ThemeToggle />
           {actions}
         </div>
       </div>
