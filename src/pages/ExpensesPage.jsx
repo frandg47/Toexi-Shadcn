@@ -99,10 +99,26 @@ const getLocalDateInputValue = (date = new Date()) => {
   return localDate.toISOString().slice(0, 10);
 };
 
+const parseDateValue = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : new Date(value);
+  }
+  if (typeof value === "string") {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      const [, year, month, day] = match;
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 const addInterval = (dateValue, amount, unit) => {
   if (!dateValue || !amount) return null;
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return null;
+  const date = parseDateValue(dateValue);
+  if (!date) return null;
   const value = Number(amount);
   if (!value) return null;
 
@@ -120,16 +136,16 @@ const addInterval = (dateValue, amount, unit) => {
 
 const normalizeDate = (value) => {
   if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
+  const date = parseDateValue(value);
+  if (!date) return null;
   date.setHours(0, 0, 0, 0);
   return date;
 };
 
 const formatDateOnly = (value) => {
   if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
+  const date = parseDateValue(value);
+  if (!date) return "-";
   return date.toLocaleDateString("es-AR");
 };
 
@@ -154,7 +170,7 @@ const getDueDate = (expense) => {
     const nextDueDate = addInterval(
       dueDate,
       expense.frequency_value,
-      expense.frequency_unit
+      expense.frequency_unit,
     );
 
     if (!nextDueDate) break;
@@ -180,15 +196,13 @@ const getFixedExpenseBadgeProps = (isPaidCurrent, isOverdue) => {
   if (isPaidCurrent) {
     return {
       label: "Pagado",
-      className:
-        "border-sky-200 bg-sky-100 text-sky-800 hover:bg-sky-100",
+      className: "border-sky-200 bg-sky-100 text-sky-800 hover:bg-sky-100",
     };
   }
   if (isOverdue) {
     return {
       label: "En deuda",
-      className:
-        "border-rose-200 bg-rose-100 text-rose-800 hover:bg-rose-100",
+      className: "border-rose-200 bg-rose-100 text-rose-800 hover:bg-rose-100",
     };
   }
   return {
@@ -256,7 +270,8 @@ export default function ExpensesPage() {
   const [payAccountId, setPayAccountId] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [expenseToDeactivate, setExpenseToDeactivate] = useState(null);
-  const [variableDeleteDialogOpen, setVariableDeleteDialogOpen] = useState(false);
+  const [variableDeleteDialogOpen, setVariableDeleteDialogOpen] =
+    useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState(null);
 
   const [incomeForm, setIncomeForm] = useState({
@@ -289,7 +304,7 @@ export default function ExpensesPage() {
       supabase
         .from("expenses")
         .select(
-          "id, expense_date, amount, currency, amount_ars, category, type, notes, created_at, last_paid_at, frequency_value, frequency_unit, account_id, is_active, accounts(name, currency)"
+          "id, expense_date, amount, currency, amount_ars, category, type, notes, created_at, last_paid_at, frequency_value, frequency_unit, account_id, is_active, accounts(name, currency)",
         )
         .eq("type", "fixed")
         .eq("is_active", true)
@@ -297,7 +312,7 @@ export default function ExpensesPage() {
       supabase
         .from("expenses")
         .select(
-          "id, expense_date, amount, currency, amount_ars, category, type, notes, created_at, last_paid_at, frequency_value, frequency_unit, account_id, is_active, accounts(name, currency)"
+          "id, expense_date, amount, currency, amount_ars, category, type, notes, created_at, last_paid_at, frequency_value, frequency_unit, account_id, is_active, accounts(name, currency)",
         )
         .eq("type", "variable")
         .order("expense_date", { ascending: false })
@@ -368,7 +383,7 @@ export default function ExpensesPage() {
         supabase
           .from("accounts")
           .select(
-            "id, name, currency, initial_balance, notes, include_in_balance, is_reference_capital"
+            "id, name, currency, initial_balance, notes, include_in_balance, is_reference_capital",
           )
           .eq("is_reference_capital", false)
           .order("name", { ascending: true }),
@@ -376,9 +391,7 @@ export default function ExpensesPage() {
           .from("finance_categories")
           .select("id, name, type, is_active, created_at")
           .order("name", { ascending: true }),
-        supabase
-          .from("account_movements")
-          .select("account_id, type, amount"),
+        supabase.from("account_movements").select("account_id, type, amount"),
       ]);
 
       setFxRate(rate?.rate ? Number(rate.rate) : null);
@@ -402,11 +415,11 @@ export default function ExpensesPage() {
 
   const selectedAccount = useMemo(
     () => accounts.find((a) => String(a.id) === String(expenseForm.account_id)),
-    [accounts, expenseForm.account_id]
+    [accounts, expenseForm.account_id],
   );
   const selectedIncomeAccount = useMemo(
     () => accounts.find((a) => String(a.id) === String(incomeForm.account_id)),
-    [accounts, incomeForm.account_id]
+    [accounts, incomeForm.account_id],
   );
   const accountBalances = useMemo(() => {
     const totals = new Map();
@@ -444,11 +457,11 @@ export default function ExpensesPage() {
   }, [accountBalances]);
   const expenseCategories = useMemo(
     () => categories.filter((c) => c.type === "expense" && c.is_active),
-    [categories]
+    [categories],
   );
   const incomeCategories = useMemo(
     () => categories.filter((c) => c.type === "income" && c.is_active),
-    [categories]
+    [categories],
   );
   const payAccountOptions = useMemo(() => {
     if (!payExpense) return accounts;
@@ -458,7 +471,7 @@ export default function ExpensesPage() {
 
   const selectedPayAccount = useMemo(() => {
     return accountBalances.find(
-      (acc) => String(acc.id) === String(payAccountId)
+      (acc) => String(acc.id) === String(payAccountId),
     );
   }, [accountBalances, payAccountId]);
   const payRequiredAmount = payExpense ? Number(payExpense.amount || 0) : 0;
@@ -471,12 +484,12 @@ export default function ExpensesPage() {
 
   const fixedExpenses = useMemo(
     () => expenses.filter((exp) => exp.type === "fixed"),
-    [expenses]
+    [expenses],
   );
 
   const variableExpenses = useMemo(
     () => expenses.filter((exp) => exp.type === "variable"),
-    [expenses]
+    [expenses],
   );
 
   const applyFilters = useCallback(
@@ -510,17 +523,14 @@ export default function ExpensesPage() {
         return true;
       });
     },
-    [dateRange, filters]
+    [dateRange, filters],
   );
 
-  const filteredFixedExpenses = useMemo(
-    () => applyFilters(fixedExpenses, true),
-    [applyFilters, fixedExpenses]
-  );
+  const filteredFixedExpenses = useMemo(() => fixedExpenses, [fixedExpenses]);
 
   const filteredVariableExpenses = useMemo(
     () => applyFilters(variableExpenses, false),
-    [applyFilters, variableExpenses]
+    [applyFilters, variableExpenses],
   );
 
   const handleWeekFilter = () => {
@@ -544,7 +554,8 @@ export default function ExpensesPage() {
     if (expenseForm.type !== "fixed") {
       if (!selectedAccount) return toast.error("Selecciona una cuenta");
       currency = selectedAccount.currency || "ARS";
-      rate = currency === "USD" ? fxRate : currency === "USDT" ? usdtRate : null;
+      rate =
+        currency === "USD" ? fxRate : currency === "USDT" ? usdtRate : null;
       if (currency !== "ARS" && !rate) {
         return toast.error(`No hay cotizacion activa para ${currency}`);
       }
@@ -554,7 +565,7 @@ export default function ExpensesPage() {
     const amountARS = currency === "ARS" ? amount : amount * rate;
     const normalizedCategory = normalizeExpenseCategory(
       expenseForm.category,
-      expenseForm.type
+      expenseForm.type,
     );
 
     const { error } = await supabase.from("expenses").insert([
@@ -587,7 +598,8 @@ export default function ExpensesPage() {
 
     if (expenseForm.type === "variable") {
       toast.success("Gasto variable creado correctamente", {
-        description: "No se pago todavia. Debe pagarse desde la tabla de abajo.",
+        description:
+          "No se pago todavia. Debe pagarse desde la tabla de abajo.",
       });
     } else {
       toast.success("Gasto registrado");
@@ -680,7 +692,7 @@ export default function ExpensesPage() {
     if (!amount || Number.isNaN(amount)) return toast.error("Monto invalido");
 
     const selectedEditAccount = accounts.find(
-      (acc) => String(acc.id) === String(editForm.account_id)
+      (acc) => String(acc.id) === String(editForm.account_id),
     );
     if (!selectedEditAccount) {
       return toast.error("Selecciona una cuenta");
@@ -695,7 +707,7 @@ export default function ExpensesPage() {
     const amountARS = currency === "ARS" ? amount : amount * rate;
     const normalizedCategory = normalizeExpenseCategory(
       editForm.category,
-      editingExpense.type
+      editingExpense.type,
     );
 
     const payload = {
@@ -749,7 +761,7 @@ export default function ExpensesPage() {
     }
 
     const selected = accountBalances.find(
-      (acc) => String(acc.id) === String(payAccountId)
+      (acc) => String(acc.id) === String(payAccountId),
     );
     if (!selected) {
       toast.error("Selecciona una cuenta valida");
@@ -874,7 +886,9 @@ export default function ExpensesPage() {
     await reloadBalanceMovements();
   };
 
-  const handleCancelFixedExpensePayment = async (expenseParam = editingExpense) => {
+  const handleCancelFixedExpensePayment = async (
+    expenseParam = editingExpense,
+  ) => {
     const expense = expenseParam;
     if (!expense || expense.type !== "fixed") return;
     if (!expense.last_paid_at) return;
@@ -888,7 +902,7 @@ export default function ExpensesPage() {
       await supabase
         .from("account_movements")
         .select(
-          "movement_date, account_id, amount, currency, amount_ars, fx_rate_used, notes"
+          "movement_date, account_id, amount, currency, amount_ars, fx_rate_used, notes",
         )
         .eq("related_table", "expenses")
         .eq("related_id", expense.id)
@@ -909,10 +923,12 @@ export default function ExpensesPage() {
             movement_date: originalExpenseMovement.movement_date || localToday,
             account_id: originalExpenseMovement.account_id,
             type: "expense",
-            amount: Number(originalExpenseMovement.amount || expense.amount || 0),
+            amount: Number(
+              originalExpenseMovement.amount || expense.amount || 0,
+            ),
             currency: originalExpenseMovement.currency || expense.currency,
             amount_ars: Number(
-              originalExpenseMovement.amount_ars || expense.amount_ars || 0
+              originalExpenseMovement.amount_ars || expense.amount_ars || 0,
             ),
             fx_rate_used: originalExpenseMovement.fx_rate_used || null,
             related_table: "expense_payment_history",
@@ -960,9 +976,12 @@ export default function ExpensesPage() {
       .eq("id", expense.id);
 
     if (expenseError) {
-      toast.error("Se genero el movimiento inverso pero no se pudo anular el pago", {
-        description: expenseError.message,
-      });
+      toast.error(
+        "Se genero el movimiento inverso pero no se pudo anular el pago",
+        {
+          description: expenseError.message,
+        },
+      );
       return;
     }
 
@@ -975,7 +994,6 @@ export default function ExpensesPage() {
     await reloadExpenses();
     await reloadBalanceMovements();
   };
-
 
   if (!isOwner) {
     return <Navigate to="/unauthorized" replace />;
@@ -1014,49 +1032,86 @@ export default function ExpensesPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 md:grid-cols-3">
-                <Input
-                  type="date"
-                  value={expenseForm.expense_date}
-                  onChange={(e) =>
-                    setExpenseForm((f) => ({
-                      ...f,
-                      expense_date: e.target.value,
-                    }))
-                  }
-                />
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="Monto"
-                  value={expenseForm.amount}
-                  onChange={(e) =>
-                    setExpenseForm((f) => ({ ...f, amount: e.target.value }))
-                  }
-                />
-                <Select
-                  value={expenseForm.account_id}
-                  onValueChange={(value) =>
-                    setExpenseForm((f) => ({ ...f, account_id: value }))
-                  }
-                  disabled={expenseForm.type === "fixed"}
-                >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        expenseForm.type === "fixed"
-                          ? "Cuenta (al pagar)"
-                          : "Cuenta"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent className="z-[9999]">
-                    {accounts.map((acc) => (
-                      <SelectItem key={acc.id} value={String(acc.id)}>
-                        {acc.name} ({acc.currency})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">
+                    {expenseForm.type === "fixed"
+                      ? "Fecha de vencimiento"
+                      : "Fecha"}
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-between gap-2 font-normal"
+                      >
+                        <span>
+                          {expenseForm.expense_date
+                            ? formatDateOnly(expenseForm.expense_date)
+                            : "Seleccionar fecha"}
+                        </span>
+                        <IconCalendar className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={parseDateValue(expenseForm.expense_date) ?? undefined}
+                        onSelect={(date) =>
+                          setExpenseForm((f) => ({
+                            ...f,
+                            expense_date: date
+                              ? getLocalDateInputValue(date)
+                              : "",
+                          }))
+                        }
+                        locale={es}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">Monto</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Monto"
+                    value={expenseForm.amount}
+                    onChange={(e) =>
+                      setExpenseForm((f) => ({ ...f, amount: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">
+                    {expenseForm.type === "fixed" ? "Cuenta al pagar" : "Cuenta"}
+                  </Label>
+                  <Select
+                    value={expenseForm.account_id}
+                    onValueChange={(value) =>
+                      setExpenseForm((f) => ({ ...f, account_id: value }))
+                    }
+                    disabled={expenseForm.type === "fixed"}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          expenseForm.type === "fixed"
+                            ? "Cuenta (al pagar)"
+                            : "Cuenta"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent className="z-[9999]">
+                      {accounts.map((acc) => (
+                        <SelectItem key={acc.id} value={String(acc.id)}>
+                          {acc.name} ({acc.currency})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="grid gap-3 md:grid-cols-3">
@@ -1109,47 +1164,61 @@ export default function ExpensesPage() {
               </div>
               {expenseForm.type === "fixed" && (
                 <div className="grid gap-3 md:grid-cols-3">
-                  <Input
-                    type="number"
-                    min="1"
-                    placeholder="Cada cuanto"
-                    value={expenseForm.frequency_value}
-                    onChange={(e) =>
-                      setExpenseForm((f) => ({
-                        ...f,
-                        frequency_value: e.target.value,
-                      }))
-                    }
-                  />
-                  <Select
-                    value={expenseForm.frequency_unit}
-                    onValueChange={(value) =>
-                      setExpenseForm((f) => ({
-                        ...f,
-                        frequency_unit: value,
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Periodo" />
-                    </SelectTrigger>
-                    <SelectContent className="z-[9999]">
-                      <SelectItem value="days">Dias</SelectItem>
-                      <SelectItem value="weeks">Semanas</SelectItem>
-                      <SelectItem value="months">Meses</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    placeholder="Proximo vencimiento"
-                    value={formatDateOnly(
-                      addInterval(
-                        expenseForm.expense_date,
-                        expenseForm.frequency_value || 1,
-                        expenseForm.frequency_unit
-                      ) || expenseForm.expense_date
-                    )}
-                    readOnly
-                  />
+                  <div className="grid gap-1">
+                    <Label className="text-xs text-muted-foreground">
+                      Renovacion cada
+                    </Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="Cada cuanto"
+                      value={expenseForm.frequency_value}
+                      onChange={(e) =>
+                        setExpenseForm((f) => ({
+                          ...f,
+                          frequency_value: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-xs text-muted-foreground">
+                      Periodo
+                    </Label>
+                    <Select
+                      value={expenseForm.frequency_unit}
+                      onValueChange={(value) =>
+                        setExpenseForm((f) => ({
+                          ...f,
+                          frequency_unit: value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Periodo" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[9999]">
+                        <SelectItem value="days">Dias</SelectItem>
+                        <SelectItem value="weeks">Semanas</SelectItem>
+                        <SelectItem value="months">Meses</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-xs text-muted-foreground">
+                      Siguiente vencimiento
+                    </Label>
+                    <Input
+                      value={formatDateOnly(
+                        addInterval(
+                          expenseForm.expense_date,
+                          expenseForm.frequency_value || 1,
+                          expenseForm.frequency_unit,
+                        ) || expenseForm.expense_date,
+                      )}
+                      readOnly
+                    />
+                  </div>
                 </div>
               )}
 
@@ -1165,6 +1234,157 @@ export default function ExpensesPage() {
               </Button>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Gastos fijos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha ultimo pago</TableHead>
+                      <TableHead>Cuenta</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Periodo</TableHead>
+                      <TableHead>Vence</TableHead>
+                      <TableHead>Monto</TableHead>
+                      <TableHead className="text-right">Estado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredFixedExpenses.map((exp) => {
+                      const dueDate = getDueDate(exp);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const isPaidCurrent =
+                        exp.last_paid_at &&
+                        dueDate &&
+                        new Date(dueDate) > today;
+                      const isOverdue = dueDate && new Date(dueDate) <= today;
+
+                      return (
+                        <TableRow
+                          key={exp.id}
+                          className={getFixedExpenseRowClassName(
+                            isPaidCurrent,
+                            isOverdue,
+                          )}
+                        >
+                          <TableCell>
+                            {formatDateOnly(exp.last_paid_at)}
+                          </TableCell>
+                          <TableCell>
+                            {exp.accounts?.name || "Sin cuenta"}
+                          </TableCell>
+                          <TableCell>
+                            {renderCategoryBadge(exp.category)}
+                          </TableCell>
+                          <TableCell>
+                            {exp.frequency_value
+                              ? `${exp.frequency_value} ${
+                                  exp.frequency_unit === "weeks"
+                                    ? "semanas"
+                                    : exp.frequency_unit === "months"
+                                      ? "meses"
+                                      : "dias"
+                                }`
+                              : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {formatDateOnly(getDueDate(exp))}
+                          </TableCell>
+                          <TableCell>
+                            {formatTableAmount(exp.amount, exp.currency)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge
+                              variant="outline"
+                              className={
+                                getFixedExpenseBadgeProps(
+                                  isPaidCurrent,
+                                  isOverdue,
+                                ).className
+                              }
+                            >
+                              {
+                                getFixedExpenseBadgeProps(
+                                  isPaidCurrent,
+                                  isOverdue,
+                                ).label
+                              }
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 hover:bg-muted"
+                                >
+                                  <IconDotsVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-44">
+                                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="hover:border-sky-300 hover:bg-sky-50 hover:text-sky-900"
+                                  onClick={() => handleOpenEdit(exp)}
+                                >
+                                  <IconEdit className="h-4 w-4" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className={
+                                    isPaidCurrent
+                                      ? "hover:bg-sky-50 hover:text-sky-900"
+                                      : "hover:border-amber-300 hover:bg-amber-50 hover:text-amber-900"
+                                  }
+                                  onClick={() =>
+                                    isPaidCurrent
+                                      ? handleCancelFixedExpensePayment(exp)
+                                      : handleOpenPayDialog(exp)
+                                  }
+                                >
+                                  <IconCash className="h-4 w-4" />
+                                  {isPaidCurrent ? "Anular pago" : "Pagar"}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onClick={() =>
+                                    handleRequestDeactivateFixedExpense(exp)
+                                  }
+                                >
+                                  <IconArchiveOff className="h-4 w-4" />
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {filteredFixedExpenses.length === 0 && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={8}
+                          className="text-center text-muted-foreground"
+                        >
+                          No hay gastos registrados.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Filtros</CardTitle>
@@ -1182,7 +1402,7 @@ export default function ExpensesPage() {
                         <IconCalendar className="h-4 w-4" />
                         {dateRange?.from && dateRange?.to
                           ? `${dateRange.from.toLocaleDateString(
-                              "es-AR"
+                              "es-AR",
                             )} - ${dateRange.to.toLocaleDateString("es-AR")}`
                           : "Filtrar por fecha"}
                       </Button>
@@ -1274,143 +1494,6 @@ export default function ExpensesPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Gastos fijos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha ultimo pago</TableHead>
-                      <TableHead>Cuenta</TableHead>
-                      <TableHead>Categoria</TableHead>
-                      <TableHead>Periodo</TableHead>
-                      <TableHead>Vence</TableHead>
-                      <TableHead>Monto</TableHead>
-                      <TableHead className="text-right">Estado</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredFixedExpenses.map((exp) => {
-                      const dueDate = getDueDate(exp);
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      const isPaidCurrent =
-                        exp.last_paid_at && dueDate && new Date(dueDate) > today;
-                      const isOverdue = dueDate && new Date(dueDate) <= today;
-
-                      return (
-                        <TableRow
-                          key={exp.id}
-                          className={getFixedExpenseRowClassName(
-                            isPaidCurrent,
-                            isOverdue
-                          )}
-                        >
-                          <TableCell>{formatDateOnly(exp.last_paid_at)}</TableCell>
-                          <TableCell>{exp.accounts?.name || "Sin cuenta"}</TableCell>
-                          <TableCell>{renderCategoryBadge(exp.category)}</TableCell>
-                          <TableCell>
-                            {exp.frequency_value
-                              ? `${exp.frequency_value} ${
-                                  exp.frequency_unit === "weeks"
-                                    ? "semanas"
-                                    : exp.frequency_unit === "months"
-                                    ? "meses"
-                                    : "dias"
-                                }`
-                              : "-"}
-                          </TableCell>
-                          <TableCell>{formatDateOnly(getDueDate(exp))}</TableCell>
-                          <TableCell>{formatTableAmount(exp.amount, exp.currency)}</TableCell>
-                          <TableCell className="text-right">
-                            <Badge
-                              variant="outline"
-                              className={
-                                getFixedExpenseBadgeProps(
-                                  isPaidCurrent,
-                                  isOverdue
-                                ).className
-                              }
-                            >
-                              {
-                                getFixedExpenseBadgeProps(
-                                  isPaidCurrent,
-                                  isOverdue
-                                ).label
-                              }
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 hover:bg-muted"
-                                >
-                                  <IconDotsVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-44">
-                                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="hover:border-sky-300 hover:bg-sky-50 hover:text-sky-900"
-                                  onClick={() => handleOpenEdit(exp)}
-                                >
-                                  <IconEdit className="h-4 w-4" />
-                                  Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className={
-                                    isPaidCurrent
-                                      ? "hover:bg-sky-50 hover:text-sky-900"
-                                      : "hover:border-amber-300 hover:bg-amber-50 hover:text-amber-900"
-                                  }
-                                  onClick={() =>
-                                    isPaidCurrent
-                                      ? handleCancelFixedExpensePayment(exp)
-                                      : handleOpenPayDialog(exp)
-                                  }
-                                >
-                                  <IconCash className="h-4 w-4" />
-                                  {isPaidCurrent ? "Anular pago" : "Pagar"}
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onClick={() =>
-                                    handleRequestDeactivateFixedExpense(exp)
-                                  }
-                                >
-                                  <IconArchiveOff className="h-4 w-4" />
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                    {filteredFixedExpenses.length === 0 && (
-                      <TableRow>
-                        <TableCell
-                          colSpan={8}
-                          className="text-center text-muted-foreground"
-                        >
-                          No hay gastos registrados.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
               <CardTitle>Gastos variables</CardTitle>
             </CardHeader>
             <CardContent>
@@ -1433,8 +1516,12 @@ export default function ExpensesPage() {
                       >
                         <TableCell>{exp.expense_date}</TableCell>
                         <TableCell>{exp.accounts?.name || "Cuenta"}</TableCell>
-                        <TableCell>{renderCategoryBadge(exp.category)}</TableCell>
-                        <TableCell>{formatTableAmount(exp.amount, exp.currency)}</TableCell>
+                        <TableCell>
+                          {renderCategoryBadge(exp.category)}
+                        </TableCell>
+                        <TableCell>
+                          {formatTableAmount(exp.amount, exp.currency)}
+                        </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -1460,7 +1547,9 @@ export default function ExpensesPage() {
                               <DropdownMenuItem
                                 variant="destructive"
                                 className="hover:border-rose-300 hover:bg-rose-50 hover:text-rose-900"
-                                onClick={() => handleRequestDeleteVariableExpense(exp)}
+                                onClick={() =>
+                                  handleRequestDeleteVariableExpense(exp)
+                                }
                               >
                                 <IconTrash className="h-4 w-4" />
                                 Eliminar
@@ -1625,88 +1714,152 @@ export default function ExpensesPage() {
             <DialogTitle>Editar gasto</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3 md:grid-cols-2">
-            <Input
-              type="date"
-              value={editForm.expense_date}
-              onChange={(e) =>
-                setEditForm((f) => ({ ...f, expense_date: e.target.value }))
-              }
-            />
-            <Input
-              type="number"
-              step="0.01"
-              placeholder="Monto"
-              value={editForm.amount}
-              onChange={(e) =>
-                setEditForm((f) => ({ ...f, amount: e.target.value }))
-              }
-            />
-            <Select
-              value={editForm.account_id}
-              onValueChange={(value) =>
-                setEditForm((f) => ({ ...f, account_id: value }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Cuenta" />
-              </SelectTrigger>
-              <SelectContent className="z-[9999]">
-                {accounts.map((acc) => (
-                  <SelectItem key={acc.id} value={String(acc.id)}>
-                    {acc.name} ({acc.currency})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={editForm.category}
-              onValueChange={(value) =>
-                setEditForm((f) => ({ ...f, category: value }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Categoria" />
-              </SelectTrigger>
-              <SelectContent className="z-[9999]">
-                {expenseCategories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.name}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="grid gap-1">
+              <Label className="text-xs text-muted-foreground">
+                {editingExpense?.type === "fixed"
+                  ? "Fecha de vencimiento"
+                  : "Fecha"}
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="justify-between gap-2 font-normal"
+                  >
+                    <span>
+                      {editForm.expense_date
+                        ? formatDateOnly(editForm.expense_date)
+                        : "Seleccionar fecha"}
+                    </span>
+                    <IconCalendar className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={parseDateValue(editForm.expense_date) ?? undefined}
+                    onSelect={(date) =>
+                      setEditForm((f) => ({
+                        ...f,
+                        expense_date: date ? getLocalDateInputValue(date) : "",
+                      }))
+                    }
+                    locale={es}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="grid gap-1">
+              <Label className="text-xs text-muted-foreground">Monto</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="Monto"
+                value={editForm.amount}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, amount: e.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label className="text-xs text-muted-foreground">Cuenta</Label>
+              <Select
+                value={editForm.account_id}
+                onValueChange={(value) =>
+                  setEditForm((f) => ({ ...f, account_id: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Cuenta" />
+                </SelectTrigger>
+                <SelectContent className="z-[9999]">
+                  {accounts.map((acc) => (
+                    <SelectItem key={acc.id} value={String(acc.id)}>
+                      {acc.name} ({acc.currency})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1">
+              <Label className="text-xs text-muted-foreground">Categoria</Label>
+              <Select
+                value={editForm.category}
+                onValueChange={(value) =>
+                  setEditForm((f) => ({ ...f, category: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Categoria" />
+                </SelectTrigger>
+                <SelectContent className="z-[9999]">
+                  {expenseCategories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {editingExpense?.type === "fixed" && (
               <>
-                <Input
-                  type="number"
-                  min="1"
-                  placeholder="Cada cuanto"
-                  value={editForm.frequency_value}
-                  onChange={(e) =>
-                    setEditForm((f) => ({
-                      ...f,
-                      frequency_value: e.target.value,
-                    }))
-                  }
-                />
-                <Select
-                  value={editForm.frequency_unit}
-                  onValueChange={(value) =>
-                    setEditForm((f) => ({
-                      ...f,
-                      frequency_unit: value,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Periodo" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[9999]">
-                    <SelectItem value="days">Dias</SelectItem>
-                    <SelectItem value="weeks">Semanas</SelectItem>
-                    <SelectItem value="months">Meses</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Renovacion cada
+                  </Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="Cada cuanto"
+                    value={editForm.frequency_value}
+                    onChange={(e) =>
+                      setEditForm((f) => ({
+                        ...f,
+                        frequency_value: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Periodo
+                  </Label>
+                  <Select
+                    value={editForm.frequency_unit}
+                    onValueChange={(value) =>
+                      setEditForm((f) => ({
+                        ...f,
+                        frequency_unit: value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Periodo" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[9999]">
+                      <SelectItem value="days">Dias</SelectItem>
+                      <SelectItem value="weeks">Semanas</SelectItem>
+                      <SelectItem value="months">Meses</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1 md:col-span-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Siguiente vencimiento
+                  </Label>
+                  <Input
+                    value={formatDateOnly(
+                      addInterval(
+                        editForm.expense_date,
+                        editForm.frequency_value || 1,
+                        editForm.frequency_unit,
+                      ) || editForm.expense_date,
+                    )}
+                    readOnly
+                  />
+                </div>
               </>
             )}
           </div>
@@ -1718,14 +1871,15 @@ export default function ExpensesPage() {
             }
           />
           <DialogFooter>
-            {editingExpense?.type === "fixed" && editingExpense?.last_paid_at && (
-              <Button
-                variant="outline"
-                onClick={handleCancelFixedExpensePayment}
-              >
-                Anular pago
-              </Button>
-            )}
+            {editingExpense?.type === "fixed" &&
+              editingExpense?.last_paid_at && (
+                <Button
+                  variant="outline"
+                  onClick={handleCancelFixedExpensePayment}
+                >
+                  Anular pago
+                </Button>
+              )}
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
               Cancelar
             </Button>
@@ -1756,10 +1910,7 @@ export default function ExpensesPage() {
                 </div>
                 <div>
                   <strong>Monto:</strong>{" "}
-                  {formatCurrencyByCode(
-                    payRequiredAmount,
-                    payExpense.currency
-                  )}
+                  {formatCurrencyByCode(payRequiredAmount, payExpense.currency)}
                 </div>
               </div>
             )}
@@ -1787,7 +1938,7 @@ export default function ExpensesPage() {
                   Saldo disponible:{" "}
                   {formatCurrencyByCode(
                     selectedPayBalance,
-                    selectedPayAccount.currency
+                    selectedPayAccount.currency,
                   )}
                 </p>
               )}
@@ -1835,9 +1986,7 @@ export default function ExpensesPage() {
             <DialogTitle>Eliminar gasto fijo</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              Seguro desea eliminar este gasto fijo?
-            </p>
+            <p>Seguro desea eliminar este gasto fijo?</p>
             <p>
               Se desactivara{" "}
               <span className="font-medium text-foreground">
@@ -1856,7 +2005,10 @@ export default function ExpensesPage() {
             >
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleDeactivateFixedExpense}>
+            <Button
+              variant="destructive"
+              onClick={handleDeactivateFixedExpense}
+            >
               Eliminar
             </Button>
           </DialogFooter>
