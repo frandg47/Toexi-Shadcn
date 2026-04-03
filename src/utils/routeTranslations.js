@@ -15,6 +15,7 @@ export const ROUTE_TRANSLATIONS = {
   "my-sales": "Mis Ventas",
   "quick-payment-calculator": "Cotizador",
   expenses: "Gastos",
+  "after-sales": "Postventa",
 
   // ⚙️ Configuración
   settings: "Configuraciones",

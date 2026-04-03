@@ -17,6 +17,7 @@ import {
   IconChartBar,
   IconReceipt,
   IconBuildingBank,
+  IconTool,
 } from "@tabler/icons-react";
 
 import SheetNewSale from "@/components/SheetNewSale";
@@ -33,6 +34,7 @@ const navMainBase = [
   { title: "Top Vendedores", url: "/dashboard/top-sellers", icon: IconMedal },
   { title: "Cotizador", url: "/dashboard/quick-payment-calculator", icon: IconCalculator },
   { title: "Gastos", url: "/dashboard/expenses", icon: IconReceipt },
+  { title: "Postventa", url: "/dashboard/after-sales", icon: IconTool },
   { title: "Finanzas", url: "/dashboard/finance", icon: IconBuildingBank },
   { title: "Movimientos", url: "/dashboard/movements", icon: IconCash },
 ];
@@ -64,6 +66,7 @@ export default function DashboardLayout() {
     "/dashboard/sales": "Ventas",
     "/dashboard/payment-calculator": "Presupuestos",
     "/dashboard/expenses": "Gastos",
+    "/dashboard/after-sales": "Postventa",
     "/dashboard/finance": "Finanzas",
     "/dashboard/movements": "Movimientos",
     "/dashboard/settings/expenses": "Gastos",

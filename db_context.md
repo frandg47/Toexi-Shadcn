@@ -25,7 +25,26 @@ CREATE TABLE public.accounts (
   notes text,
   include_in_balance boolean NOT NULL DEFAULT true,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
+  is_reference_capital boolean NOT NULL DEFAULT false,
   CONSTRAINT accounts_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.aftersales_devices (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  variant_id integer NOT NULL,
+  sale_id bigint,
+  warranty_exchange_id bigint,
+  source_type text NOT NULL CHECK (source_type = ANY (ARRAY['factory'::text, 'warranty'::text])),
+  imei text,
+  quantity integer NOT NULL DEFAULT 1,
+  status text NOT NULL DEFAULT 'defective_in_store'::text CHECK (status = ANY (ARRAY['defective_in_store'::text, 'in_repair'::text, 'repaired'::text])),
+  notes text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  created_by uuid DEFAULT auth.uid(),
+  CONSTRAINT aftersales_devices_pkey PRIMARY KEY (id),
+  CONSTRAINT aftersales_devices_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id),
+  CONSTRAINT aftersales_devices_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id),
+  CONSTRAINT aftersales_devices_warranty_exchange_id_fkey FOREIGN KEY (warranty_exchange_id) REFERENCES public.warranty_exchanges(id)
 );
 CREATE TABLE public.brands (
   id integer NOT NULL DEFAULT nextval('brands_id_seq'::regclass),
@@ -90,6 +109,7 @@ CREATE TABLE public.expenses (
   frequency_value integer,
   frequency_unit text,
   last_paid_at timestamp with time zone,
+  is_active boolean NOT NULL DEFAULT true,
   CONSTRAINT expenses_pkey PRIMARY KEY (id),
   CONSTRAINT expenses_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id),
   CONSTRAINT expenses_fixed_expense_id_fkey FOREIGN KEY (fixed_expense_id) REFERENCES public.fixed_expenses(id)
@@ -193,6 +213,7 @@ CREATE TABLE public.product_variants (
   camera_front text,
   wholesale_price numeric,
   stock_defective integer NOT NULL DEFAULT 0,
+  cost_price_usd numeric,
   CONSTRAINT product_variants_pkey PRIMARY KEY (id),
   CONSTRAINT product_variants_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
 );
@@ -264,6 +285,9 @@ CREATE TABLE public.purchases (
   fx_rate_used numeric,
   notes text,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
+  status text NOT NULL DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'cancelled'::text])),
+  void_reason text,
+  voided_at timestamp with time zone,
   CONSTRAINT purchases_pkey PRIMARY KEY (id),
   CONSTRAINT purchases_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id)
 );
@@ -373,4 +397,25 @@ CREATE TABLE public.users (
   avatar_url text,
   CONSTRAINT users_pkey PRIMARY KEY (id),
   CONSTRAINT users_id_auth_fkey FOREIGN KEY (id_auth) REFERENCES auth.users(id)
+);
+CREATE TABLE public.warranty_exchanges (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  sale_id bigint NOT NULL,
+  sale_item_id bigint NOT NULL,
+  original_variant_id integer,
+  original_imei text,
+  quantity integer NOT NULL DEFAULT 1,
+  returned_stock_bucket text NOT NULL CHECK (returned_stock_bucket = ANY (ARRAY['available'::text, 'defective'::text])),
+  replacement_variant_id integer NOT NULL,
+  replacement_imei text,
+  reason text NOT NULL,
+  notes text,
+  status text NOT NULL DEFAULT 'completed'::text CHECK (status = ANY (ARRAY['pending'::text, 'completed'::text, 'cancelled'::text])),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  created_by uuid DEFAULT auth.uid(),
+  CONSTRAINT warranty_exchanges_pkey PRIMARY KEY (id),
+  CONSTRAINT warranty_exchanges_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id),
+  CONSTRAINT warranty_exchanges_sale_item_id_fkey FOREIGN KEY (sale_item_id) REFERENCES public.sale_items(id),
+  CONSTRAINT warranty_exchanges_original_variant_id_fkey FOREIGN KEY (original_variant_id) REFERENCES public.product_variants(id),
+  CONSTRAINT warranty_exchanges_replacement_variant_id_fkey FOREIGN KEY (replacement_variant_id) REFERENCES public.product_variants(id)
 );
