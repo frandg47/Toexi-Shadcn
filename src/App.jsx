@@ -166,7 +166,14 @@ export default function App() {
             <Route path="settings/providers" element={<ProvidersConfig />} />
             <Route path="settings/purchases" element={<PurchasesConfig />} />
             <Route path="settings/accounts" element={<AccountsConfig />} />
-            <Route path="movements" element={<MovementsConfig />} />
+            <Route
+              path="movements"
+              element={
+                <ProtectedRoute allowedRoles={["owner"]}>
+                  <MovementsConfig />
+                </ProtectedRoute>
+              }
+            />
           </Route>
 
           {/* 🛍️ VISTA DE VENDEDORES */}

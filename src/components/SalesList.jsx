@@ -173,24 +173,52 @@ const buildWarrantyPdfLines = (warranties = []) =>
             lines.push(`Notas de garantia: ${warranty.notes}`);
         }
 
+        if (Number(warranty.store_credit_usd || 0) > 0.009) {
+            lines.push(
+                `Credito a favor proxima compra: USD ${Number(
+                    warranty.store_credit_usd || 0,
+                ).toLocaleString("es-AR", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                })}`,
+            );
+        }
+
         return lines;
     });
 
 const buildWarrantyPdfRows = (warranties = []) =>
-    warranties.map((warranty) => [
-        formatWarrantyVariantForNote(warranty.original_variant),
-        warranty.original_imei || "-",
-        formatWarrantyVariantForNote(warranty.replacement_variant),
-        warranty.replacement_imei || "-",
-        String(warranty.quantity || 1),
-        warranty.settlement_method?.name
-            ? `${warranty.settlement_method.name}${
-                  warranty.settlement_installments
-                      ? ` (${warranty.settlement_installments} cuotas)`
-                      : ""
-              }`
-            : "-",
-    ]);
+    warranties.flatMap((warranty) => {
+        const replacementItems =
+            warranty.replacement_items?.length > 0
+                ? warranty.replacement_items
+                : [
+                      {
+                          variant: warranty.replacement_variant,
+                          imei: warranty.replacement_imei,
+                          quantity: warranty.quantity,
+                      },
+                  ];
+
+        return replacementItems.map((replacement, index) => [
+            index === 0 ? formatWarrantyVariantForNote(warranty.original_variant) : "",
+            index === 0 ? warranty.original_imei || "-" : "",
+            formatWarrantyVariantForNote(replacement.variant),
+            replacement.imei || "-",
+            String(replacement.quantity || 1),
+            index === 0
+                ? warranty.settlement_method?.name
+                    ? `${warranty.settlement_method.name}${
+                          warranty.settlement_installments
+                              ? ` (${warranty.settlement_installments} cuotas)`
+                              : ""
+                      }`
+                    : Number(warranty.store_credit_usd || 0) > 0.009
+                      ? "Credito proxima compra"
+                      : "-"
+                : "",
+        ]);
+    });
 
 const getPaymentDisplayCurrency = (methodName) => {
     const upper = methodName?.toUpperCase();
@@ -206,7 +234,8 @@ export function SalesList() {
     const { role, id_auth } = useAuth();
     const normalizedRole = `${role || ""}`.trim().toLowerCase();
     const isOwner = normalizedRole === "owner";
-    console.log("[SalesList] role:", role, "normalized:", normalizedRole, "isOwner:", isOwner);
+    const canManageSaleActions =
+        normalizedRole === "owner" || normalizedRole === "superadmin";
     const [auditUsers, setAuditUsers] = useState({});
     const [sellerOptions, setSellerOptions] = useState([]);
     const [editOpen, setEditOpen] = useState(false);
@@ -310,10 +339,10 @@ export function SalesList() {
     const [usdtRate, setUsdtRate] = useState(null);
     const [selectedWarrantyItemId, setSelectedWarrantyItemId] = useState("");
     const [warrantyReturnBucket, setWarrantyReturnBucket] = useState("defective");
-    const [warrantyReplacementVariantId, setWarrantyReplacementVariantId] = useState("");
+    const [warrantyReplacementRows, setWarrantyReplacementRows] = useState([]);
+    const [warrantyProductSearch, setWarrantyProductSearch] = useState("");
     const [warrantyReason, setWarrantyReason] = useState("");
     const [warrantyNotes, setWarrantyNotes] = useState("");
-    const [warrantyReplacementImei, setWarrantyReplacementImei] = useState("");
     const [warrantySettlementAccountId, setWarrantySettlementAccountId] = useState("");
     const [warrantySettlementMethodId, setWarrantySettlementMethodId] = useState("");
     const [warrantySettlementInstallments, setWarrantySettlementInstallments] = useState("");
@@ -324,12 +353,38 @@ export function SalesList() {
             null,
         [warrantyItems, selectedWarrantyItemId],
     );
-    const selectedReplacementVariant = useMemo(
+    const filteredReplacementOptions = useMemo(() => {
+        const search = warrantyProductSearch.trim().toLowerCase();
+        if (!search) return replacementOptions;
+        return replacementOptions.filter((variant) =>
+            formatVariantLabel({
+                product_name: variant.products?.name,
+                variant_name: variant.variant_name,
+                color: variant.color,
+            })
+                .toLowerCase()
+                .includes(search),
+        );
+    }, [replacementOptions, warrantyProductSearch]);
+    const replacementRowsDetailed = useMemo(
         () =>
-            replacementOptions.find(
-                (variant) => String(variant.id) === String(warrantyReplacementVariantId),
-            ) || null,
-        [replacementOptions, warrantyReplacementVariantId],
+            warrantyReplacementRows.map((row, index) => {
+                const variant =
+                    replacementOptions.find(
+                        (item) => String(item.id) === String(row.variant_id),
+                    ) || null;
+                const quantity = Number(row.quantity || 0);
+                const unitPriceUsd = Number(variant?.usd_price || 0);
+                return {
+                    ...row,
+                    index,
+                    variant,
+                    quantity,
+                    unitPriceUsd,
+                    subtotalUsd: Number((unitPriceUsd * quantity).toFixed(2)),
+                };
+            }),
+        [replacementOptions, warrantyReplacementRows],
     );
     const selectedSettlementMethod = useMemo(
         () =>
@@ -347,29 +402,34 @@ export function SalesList() {
         [paymentInstallments, warrantySettlementMethodId],
     );
     const warrantyPriceDiff = useMemo(() => {
-        if (!selectedWarrantyItem || !selectedReplacementVariant) {
+        if (!selectedWarrantyItem || replacementRowsDetailed.length === 0) {
             return {
                 originalTotalUsd: 0,
                 replacementTotalUsd: 0,
                 differenceUsd: 0,
+                storeCreditUsd: 0,
             };
         }
 
-        const quantity = Number(selectedWarrantyItem.quantity || 1);
         const originalTotalUsd = Number(
             selectedWarrantyItem.subtotal_usd ||
-                Number(selectedWarrantyItem.usd_price || 0) * quantity ||
+                Number(selectedWarrantyItem.usd_price || 0) *
+                    Number(selectedWarrantyItem.quantity || 1) ||
                 0,
         );
-        const replacementTotalUsd =
-            Number(selectedReplacementVariant.usd_price || 0) * quantity;
+        const replacementTotalUsd = replacementRowsDetailed.reduce(
+            (acc, row) => acc + Number(row.subtotalUsd || 0),
+            0,
+        );
+        const differenceUsd = Number((replacementTotalUsd - originalTotalUsd).toFixed(2));
 
         return {
             originalTotalUsd,
             replacementTotalUsd,
-            differenceUsd: Number((replacementTotalUsd - originalTotalUsd).toFixed(2)),
+            differenceUsd,
+            storeCreditUsd: differenceUsd < 0 ? Math.abs(differenceUsd) : 0,
         };
-    }, [selectedReplacementVariant, selectedWarrantyItem]);
+    }, [replacementRowsDetailed, selectedWarrantyItem]);
     const selectedSettlementAccount = useMemo(
         () =>
             accounts.find(
@@ -491,7 +551,7 @@ export function SalesList() {
     }, [dateRange]);
 
     useEffect(() => {
-        if (!isOwner) return;
+        if (!canManageSaleActions) return;
 
         const fetchSellers = async () => {
             const { data, error } = await supabase
@@ -583,7 +643,7 @@ export function SalesList() {
         fetchSellers();
         fetchChannels();
         fetchWarrantyHelpers();
-    }, [isOwner]);
+    }, [canManageSaleActions]);
 
     const load = useCallback(async () => {
         try {
@@ -598,16 +658,47 @@ export function SalesList() {
                 const { data: warrantiesData, error: warrantiesError } = await supabase
                     .from("warranty_exchanges")
                     .select(
-                        "id, sale_id, sale_item_id, original_imei, replacement_imei, quantity, returned_stock_bucket, reason, notes, created_at, price_difference_usd, settlement_type, settlement_currency, settlement_amount, settlement_installments, settlement_multiplier, settlement_method:payment_methods!warranty_exchanges_settlement_payment_method_id_fkey(id, name), original_variant:product_variants!warranty_exchanges_original_variant_id_fkey(id, variant_name, color, products(name)), replacement_variant:product_variants!warranty_exchanges_replacement_variant_id_fkey(id, variant_name, color, products(name))",
+                        "id, sale_id, sale_item_id, original_imei, replacement_imei, quantity, returned_stock_bucket, reason, notes, created_at, price_difference_usd, settlement_type, settlement_currency, settlement_amount, settlement_installments, settlement_multiplier, store_credit_usd, store_credit_amount_ars, settlement_method:payment_methods!warranty_exchanges_settlement_payment_method_id_fkey(id, name), original_variant:product_variants!warranty_exchanges_original_variant_id_fkey(id, variant_name, color, products(name)), replacement_variant:product_variants!warranty_exchanges_replacement_variant_id_fkey(id, variant_name, color, products(name))",
                     )
                     .in("sale_id", saleIds)
                     .order("created_at", { ascending: false });
 
                 if (!warrantiesError) {
+                    const warrantyIds = (warrantiesData || []).map((warranty) => warranty.id);
+                    let warrantyItemsMap = {};
+
+                    if (warrantyIds.length > 0) {
+                        const { data: replacementItemsData, error: replacementItemsError } =
+                            await supabase
+                                .from("warranty_exchange_items")
+                                .select(
+                                    "id, warranty_exchange_id, imei, quantity, unit_price_usd, subtotal_usd, variant:product_variants(id, variant_name, color, products(name))",
+                                )
+                                .in("warranty_exchange_id", warrantyIds)
+                                .order("id", { ascending: true });
+
+                        if (!replacementItemsError) {
+                            warrantyItemsMap = (replacementItemsData || []).reduce(
+                                (acc, item) => {
+                                    if (!acc[item.warranty_exchange_id]) {
+                                        acc[item.warranty_exchange_id] = [];
+                                    }
+                                    acc[item.warranty_exchange_id].push(item);
+                                    return acc;
+                                },
+                                {},
+                            );
+                        }
+                    }
+
                     const grouped = {};
                     (warrantiesData || []).forEach((warranty) => {
+                        const mergedWarranty = {
+                            ...warranty,
+                            replacement_items: warrantyItemsMap[warranty.id] || [],
+                        };
                         if (!grouped[warranty.sale_id]) grouped[warranty.sale_id] = [];
-                        grouped[warranty.sale_id].push(warranty);
+                        grouped[warranty.sale_id].push(mergedWarranty);
                     });
                     setWarrantiesBySale(grouped);
                 } else {
@@ -652,6 +743,10 @@ export function SalesList() {
 
     const totalPages = Math.ceil(count / 10);
     const openEditSale = (sale) => {
+        if (!isOwner) {
+            toast.error("Solo el owner puede editar ventas");
+            return;
+        }
         const saleDate = sale?.sale_date ? new Date(sale.sale_date) : new Date();
         const hh = String(saleDate.getHours()).padStart(2, "0");
         const mm = String(saleDate.getMinutes()).padStart(2, "0");
@@ -743,8 +838,8 @@ export function SalesList() {
     };
 
     const startCancelSale = (sale) => {
-        if (!isOwner) {
-            toast.error("Solo el owner puede anular ventas");
+        if (!canManageSaleActions) {
+            toast.error("Solo owner o superadmin puede anular ventas");
             return;
         }
         setCancelingS(sale);
@@ -874,18 +969,44 @@ export function SalesList() {
         setReplacementOptions([]);
         setSelectedWarrantyItemId("");
         setWarrantyReturnBucket("defective");
-        setWarrantyReplacementVariantId("");
+        setWarrantyReplacementRows([]);
+        setWarrantyProductSearch("");
         setWarrantyReason("");
         setWarrantyNotes("");
-        setWarrantyReplacementImei("");
         setWarrantySettlementAccountId("");
         setWarrantySettlementMethodId("");
         setWarrantySettlementInstallments("");
     };
 
+    const createWarrantyReplacementRow = (variantId = "", quantity = 1) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        variant_id: variantId ? String(variantId) : "",
+        quantity: String(quantity),
+        imei: "",
+    });
+
+    const updateWarrantyReplacementRow = (rowId, patch) => {
+        setWarrantyReplacementRows((prev) =>
+            prev.map((row) => (row.id === rowId ? { ...row, ...patch } : row)),
+        );
+    };
+
+    const addWarrantyReplacementRow = (variantId = "", quantity = 1) => {
+        setWarrantyReplacementRows((prev) => [
+            ...prev,
+            createWarrantyReplacementRow(variantId, quantity),
+        ]);
+    };
+
+    const removeWarrantyReplacementRow = (rowId) => {
+        setWarrantyReplacementRows((prev) =>
+            prev.length > 1 ? prev.filter((row) => row.id !== rowId) : prev,
+        );
+    };
+
     const openWarrantyDialog = async (sale) => {
-        if (!isOwner) {
-            toast.error("Solo el owner puede gestionar garantias");
+        if (!canManageSaleActions) {
+            toast.error("Solo owner o superadmin puede gestionar garantias");
             return;
         }
         if (sale.status === "anulado") {
@@ -930,19 +1051,17 @@ export function SalesList() {
             }
 
             const defaultItem = validItems[0];
-            const defaultReplacement =
-                validVariants.find(
-                    (variant) => variant.id === defaultItem.variant_id,
-                ) || validVariants[0];
             setWarrantySale(sale);
             setWarrantyItems(validItems);
             setReplacementOptions(validVariants);
             setSelectedWarrantyItemId(String(defaultItem.id));
-            setWarrantyReplacementVariantId(String(defaultReplacement?.id || ""));
+            setWarrantyReplacementRows([
+                createWarrantyReplacementRow(defaultItem.variant_id || validVariants[0]?.id || "", 1),
+            ]);
+            setWarrantyProductSearch("");
             setWarrantyReturnBucket("defective");
             setWarrantyReason("");
             setWarrantyNotes("");
-            setWarrantyReplacementImei("");
             setWarrantySettlementAccountId("");
             setWarrantySettlementMethodId("");
             setWarrantySettlementInstallments("");
@@ -960,10 +1079,6 @@ export function SalesList() {
             toast.error("Selecciona el item original");
             return;
         }
-        if (!warrantyReplacementVariantId) {
-            toast.error("Selecciona la variante de reemplazo");
-            return;
-        }
         if (!warrantyReason.trim()) {
             toast.error("Debes ingresar el motivo de la garantia");
             return;
@@ -972,13 +1087,16 @@ export function SalesList() {
         const selectedItem = warrantyItems.find(
             (item) => String(item.id) === String(selectedWarrantyItemId),
         );
+        const validReplacementRows = warrantyReplacementRows.filter(
+            (row) => row.variant_id && Number(row.quantity || 0) > 0,
+        );
 
-        if (selectedItem?.imei && !warrantyReplacementImei.trim()) {
-            toast.error("Debes ingresar el IMEI del equipo de reemplazo");
+        if (validReplacementRows.length === 0) {
+            toast.error("Debes agregar al menos un producto de reemplazo");
             return;
         }
 
-        if (Math.abs(warrantyPriceDiff.differenceUsd) > 0.009) {
+        if (warrantyPriceDiff.differenceUsd > 0.009) {
             if (!warrantySettlementMethodId) {
                 toast.error("Selecciona el metodo para liquidar la diferencia");
                 return;
@@ -1009,10 +1127,13 @@ export function SalesList() {
                 p_sale_id: warrantySale.sale_id,
                 p_sale_item_id: Number(selectedWarrantyItemId),
                 p_return_bucket: warrantyReturnBucket,
-                p_replacement_variant_id: Number(warrantyReplacementVariantId),
+                p_replacements: validReplacementRows.map((row) => ({
+                    variant_id: Number(row.variant_id),
+                    quantity: Number(row.quantity || 0),
+                    imei: row.imei?.trim() || null,
+                })),
                 p_reason: warrantyReason.trim(),
                 p_notes: warrantyNotes.trim() || null,
-                p_replacement_imei: warrantyReplacementImei.trim() || null,
                 p_settlement_account_id: warrantySettlementAccountId
                     ? Number(warrantySettlementAccountId)
                     : null,
@@ -1603,16 +1724,35 @@ export function SalesList() {
                                             </p>
                                             <p>
                                                 <strong>Reemplazo:</strong>{" "}
-                                                {formatVariantLabel({
-                                                    product_name:
-                                                        warranty.replacement_variant?.products?.name,
-                                                    variant_name:
-                                                        warranty.replacement_variant?.variant_name,
-                                                    color: warranty.replacement_variant?.color,
-                                                })}
-                                                {warranty.replacement_imei
-                                                    ? ` | IMEI: ${warranty.replacement_imei}`
-                                                    : ""}
+                                                {(warranty.replacement_items?.length
+                                                    ? warranty.replacement_items
+                                                    : [
+                                                          {
+                                                              variant: warranty.replacement_variant,
+                                                              imei: warranty.replacement_imei,
+                                                              quantity: warranty.quantity,
+                                                          },
+                                                      ]
+                                                )
+                                                    .map((replacement) => {
+                                                        const label = formatVariantLabel({
+                                                            product_name:
+                                                                replacement.variant?.products?.name,
+                                                            variant_name:
+                                                                replacement.variant?.variant_name,
+                                                            color: replacement.variant?.color,
+                                                        });
+                                                        return `${label}${
+                                                            replacement.imei
+                                                                ? ` | IMEI: ${replacement.imei}`
+                                                                : ""
+                                                        }${
+                                                            Number(replacement.quantity || 1) > 1
+                                                                ? ` | Cant: ${replacement.quantity}`
+                                                                : ""
+                                                        }`;
+                                                    })
+                                                    .join(" / ")}
                                             </p>
                                             <p>
                                                 <strong>Ingreso del devuelto a:</strong>{" "}
@@ -1653,6 +1793,18 @@ export function SalesList() {
                                                     <strong>Notas:</strong> {warranty.notes}
                                                 </p>
                                             )}
+                                            {Number(warranty.store_credit_usd || 0) > 0.009 && (
+                                                <p>
+                                                    <strong>Credito proxima compra:</strong> USD{" "}
+                                                    {Number(warranty.store_credit_usd || 0).toLocaleString(
+                                                        "es-AR",
+                                                        {
+                                                            minimumFractionDigits: 2,
+                                                            maximumFractionDigits: 2,
+                                                        },
+                                                    )}
+                                                </p>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -1681,8 +1833,9 @@ export function SalesList() {
 
                         {/* Botón descargar PDF */}
                         <div className="mt-4 flex flex-wrap justify-end gap-2">
-                            {isOwner && (
-                                <>
+                            {(isOwner || canManageSaleActions) && (
+                                <> 
+                                    {isOwner && (
                                     <Button
                                         variant="outline"
                                         size="sm"
@@ -1691,6 +1844,8 @@ export function SalesList() {
                                     >
                                         Editar venta
                                     </Button>
+                                    )}
+                                    {canManageSaleActions && (
                                     <Button
                                         variant="secondary"
                                         size="sm"
@@ -1700,6 +1855,8 @@ export function SalesList() {
                                         <IconShieldCheck className="mr-2 h-4 w-4" />
                                         Garantia
                                     </Button>
+                                    )}
+                                    {canManageSaleActions && (
                                     <Button
                                         variant="destructive"
                                         size="sm"
@@ -1708,6 +1865,7 @@ export function SalesList() {
                                     >
                                         Anular venta
                                     </Button>
+                                    )}
                                 </>
                             )}
                             <Button
@@ -1910,9 +2068,12 @@ export function SalesList() {
                                         replacementOptions.find(
                                             (variant) => variant.id === nextItem?.variant_id,
                                         ) || replacementOptions[0];
-                                    setWarrantyReplacementVariantId(
-                                        String(nextReplacement?.id || ""),
-                                    );
+                                    setWarrantyReplacementRows([
+                                        createWarrantyReplacementRow(
+                                            nextReplacement?.id || "",
+                                            1,
+                                        ),
+                                    ]);
                                 }}
                             >
                                 <SelectTrigger>
@@ -1945,28 +2106,113 @@ export function SalesList() {
                             </Select>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label>Equipo de reemplazo</Label>
-                            <Select
-                                value={warrantyReplacementVariantId}
-                                onValueChange={setWarrantyReplacementVariantId}
+                        <div className="space-y-3">
+                            <div className="space-y-2">
+                                <Label>Buscar producto de reemplazo</Label>
+                                <Input
+                                    placeholder="Buscar por producto, variante o color"
+                                    value={warrantyProductSearch}
+                                    onChange={(e) => setWarrantyProductSearch(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="space-y-3">
+                                {replacementRowsDetailed.map((row, index) => (
+                                    <div
+                                        key={row.id}
+                                        className="rounded-md border p-3 space-y-3"
+                                    >
+                                        <div className="flex items-center justify-between gap-2">
+                                            <Label>Producto #{index + 1}</Label>
+                                            {replacementRowsDetailed.length > 1 && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => removeWarrantyReplacementRow(row.id)}
+                                                >
+                                                    Quitar
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Producto de reemplazo</Label>
+                                            <Select
+                                                value={row.variant_id}
+                                                onValueChange={(value) =>
+                                                    updateWarrantyReplacementRow(row.id, {
+                                                        variant_id: value,
+                                                    })
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Seleccionar reemplazo" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {filteredReplacementOptions.map((variant) => (
+                                                        <SelectItem
+                                                            key={variant.id}
+                                                            value={String(variant.id)}
+                                                        >
+                                                            {formatVariantLabel({
+                                                                product_name: variant.products?.name,
+                                                                variant_name: variant.variant_name,
+                                                                color: variant.color,
+                                                            })}{" "}
+                                                            | Stock: {variant.stock}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="grid gap-3 md:grid-cols-2">
+                                            <div className="space-y-2">
+                                                <Label>Cantidad</Label>
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    value={row.quantity}
+                                                    onChange={(e) =>
+                                                        updateWarrantyReplacementRow(row.id, {
+                                                            quantity: e.target.value,
+                                                        })
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>IMEI nuevo</Label>
+                                                <Input
+                                                    placeholder="Opcional"
+                                                    value={row.imei}
+                                                    onChange={(e) =>
+                                                        updateWarrantyReplacementRow(row.id, {
+                                                            imei: e.target.value,
+                                                        })
+                                                    }
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <p className="text-xs text-muted-foreground">
+                                            Subtotal: USD{" "}
+                                            {Number(row.subtotalUsd || 0).toLocaleString("es-AR", {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            })}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => addWarrantyReplacementRow("", 1)}
                             >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Seleccionar reemplazo" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {replacementOptions.map((variant) => (
-                                        <SelectItem key={variant.id} value={String(variant.id)}>
-                                            {formatVariantLabel({
-                                                product_name: variant.products?.name,
-                                                variant_name: variant.variant_name,
-                                                color: variant.color,
-                                            })}{" "}
-                                            | Stock: {variant.stock}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                                Agregar producto
+                            </Button>
                         </div>
 
                         <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
@@ -2003,7 +2249,7 @@ export function SalesList() {
                                     {warrantyPriceDiff.differenceUsd > 0
                                         ? "Cliente paga diferencia:"
                                         : warrantyPriceDiff.differenceUsd < 0
-                                            ? "Corresponde reintegro:"
+                                            ? "Credito a favor proxima compra:"
                                             : "Sin diferencia de precio:"}
                                 </strong>{" "}
                                 USD{" "}
@@ -2016,7 +2262,7 @@ export function SalesList() {
                             </p>
                         </div>
 
-                        {Math.abs(warrantyPriceDiff.differenceUsd) > 0.009 && (
+                        {warrantyPriceDiff.differenceUsd > 0.009 && (
                             <div className="space-y-4 rounded-md border border-dashed p-4">
                                 <div className="space-y-2">
                                     <Label>Metodo para la diferencia</Label>
@@ -2086,9 +2332,7 @@ export function SalesList() {
 
                                 <div className="space-y-2">
                                     <Label>
-                                        {warrantyPriceDiff.differenceUsd > 0
-                                            ? "Cuenta donde ingresa la diferencia"
-                                            : "Cuenta desde la que se reintegra"}
+                                        Cuenta donde ingresa la diferencia
                                     </Label>
                                     <Select
                                         value={warrantySettlementAccountId}
@@ -2116,9 +2360,7 @@ export function SalesList() {
                                             <>
                                                 <p>
                                                     <strong>
-                                                        {warrantyPriceDiff.differenceUsd > 0
-                                                            ? "Cobro estimado:"
-                                                            : "Reintegro estimado:"}
+                                                        Cobro estimado:
                                                     </strong>{" "}
                                                     {warrantySettlementPreview.currency}{" "}
                                                     {Number(
@@ -2161,14 +2403,31 @@ export function SalesList() {
                             </div>
                         )}
 
-                        <div className="space-y-2">
-                            <Label>IMEI del equipo de reemplazo</Label>
-                            <Input
-                                placeholder="IMEI del nuevo equipo"
-                                value={warrantyReplacementImei}
-                                onChange={(e) => setWarrantyReplacementImei(e.target.value)}
-                            />
-                        </div>
+                        {warrantyPriceDiff.storeCreditUsd > 0.009 && (
+                            <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100">
+                                <p>
+                                    <strong>Credito a favor para proxima compra:</strong> USD{" "}
+                                    {Number(warrantyPriceDiff.storeCreditUsd || 0).toLocaleString(
+                                        "es-AR",
+                                        {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                        },
+                                    )}
+                                </p>
+                                {fxRate && (
+                                    <p className="text-xs text-sky-800/80 dark:text-sky-200/80">
+                                        Equivalente estimado ARS: ${" "}
+                                        {Number(
+                                            warrantyPriceDiff.storeCreditUsd * Number(fxRate),
+                                        ).toLocaleString("es-AR", {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                        })}
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <Label>Motivo de garantia</Label>

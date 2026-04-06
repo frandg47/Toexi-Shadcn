@@ -67,6 +67,7 @@ export default function FinancePage() {
   const [fxRate, setFxRate] = useState(null);
   const [usdtRate, setUsdtRate] = useState(null);
   const [stockCostUsd, setStockCostUsd] = useState(0);
+  const [aftersalesStockCostUsd, setAftersalesStockCostUsd] = useState(0);
   const [filters, setFilters] = useState({
     accountId: "all",
     type: "all",
@@ -83,6 +84,7 @@ export default function FinancePage() {
       { data: blueRateData, error: blueRateError },
       { data: usdtRateData, error: usdtRateError },
       { data: variantsData, error: variantsError },
+      { data: aftersalesData, error: aftersalesError },
       { data: movementsData, error: movementsError },
     ] = await Promise.all([
       supabase
@@ -104,6 +106,11 @@ export default function FinancePage() {
         .eq("is_active", true)
         .maybeSingle(),
       supabase.from("product_variants").select("stock, cost_price_usd"),
+      supabase
+        .from("aftersales_devices")
+        .select(
+          "quantity, status, sold_sale_id, include_in_stock_cost_balance, variant:product_variants!aftersales_devices_variant_id_fkey(cost_price_usd)"
+        ),
       supabase.from("account_movements").select("account_id, type, amount"),
     ]);
 
@@ -141,6 +148,23 @@ export default function FinancePage() {
           const stock = Number(variant.stock || 0);
           const cost = Number(variant.cost_price_usd || 0);
           return total + stock * cost;
+        }, 0)
+      );
+    }
+
+    if (aftersalesError) {
+      toast.error("No se pudo cargar el stock de postventa", {
+        description: aftersalesError.message,
+      });
+    } else {
+      setAftersalesStockCostUsd(
+        (aftersalesData || []).reduce((total, device) => {
+          if (!device.include_in_stock_cost_balance) return total;
+          if (device.sold_sale_id != null) return total;
+          if (device.status === "repaired") return total;
+          const quantity = Number(device.quantity || 0);
+          const cost = Number(device.variant?.cost_price_usd || 0);
+          return total + quantity * cost;
         }, 0)
       );
     }
@@ -288,10 +312,11 @@ export default function FinancePage() {
     return {
       operatingCashUsd,
       referenceCapitalUsd,
-      stockCostUsd,
-      realResultUsd: operatingCashUsd + stockCostUsd - referenceCapitalUsd,
+      stockCostUsd: stockCostUsd + aftersalesStockCostUsd,
+      realResultUsd:
+        operatingCashUsd + stockCostUsd + aftersalesStockCostUsd - referenceCapitalUsd,
     };
-  }, [accountBalancesAll, convertAmountToUsd, stockCostUsd]);
+  }, [accountBalancesAll, aftersalesStockCostUsd, convertAmountToUsd, stockCostUsd]);
 
   if (!isOwner) {
     return <Navigate to="/unauthorized" replace />;

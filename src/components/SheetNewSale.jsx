@@ -39,6 +39,7 @@ import {
 // import { useSaleStore } from "../store/useSaleStore";
 
 export default function SheetNewSale({ open, onOpenChange, lead }) {
+  const ARS_TOLERANCE = 10;
   // --- Wizard ---
   const [step, setStep] = useState(1);
 
@@ -714,7 +715,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     }
 
     const remainingDiff = Math.abs(paidARS - totalDue);
-    if (Math.round(remainingDiff) > 10) {
+    if (Math.round(remainingDiff) > ARS_TOLERANCE) {
       return toast.error(
         "El total pagado no coincide con el total de la venta"
       );

@@ -73,9 +73,11 @@ export default function DashboardLayout() {
     "/dashboard/settings/movements": "Movimientos",
   };
 
-  const navMain = navMainBase.filter(
-    (item) => item.url !== "/dashboard/finance" || isOwner
-  );
+  const navMain = navMainBase.filter((item) => {
+    if (item.url === "/dashboard/finance") return isOwner;
+    if (item.url === "/dashboard/movements") return isOwner;
+    return true;
+  });
   const tituloActual = pageTitles[location.pathname] || "Dashboard";
 
   return (

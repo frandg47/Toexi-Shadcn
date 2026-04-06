@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/context/AuthContextProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,6 +71,8 @@ const formatCurrency = (value, currency) => {
 };
 
 export default function MovementsConfig() {
+  const { role } = useAuth();
+  const isOwner = role?.toLowerCase() === "owner";
   const CHART_COLORS = [
     "#16A34A",
     "#059669",
@@ -110,6 +114,10 @@ export default function MovementsConfig() {
   const [fxRate, setFxRate] = useState(null);
   const [usdtRate, setUsdtRate] = useState(null);
   const [stockCostUsd, setStockCostUsd] = useState(0);
+
+  if (!isOwner) {
+    return <Navigate to="/unauthorized" replace />;
+  }
 
   const loadAccounts = useCallback(async () => {
     const [
