@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/context/AuthContextProvider";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,8 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function DialogVariants({ open, onClose, productId, onSave }) {
+  const { role } = useAuth();
+  const isOwner = role?.toLowerCase() === "owner";
   const [variants, setVariants] = useState([]);
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState(null);
@@ -105,11 +108,14 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
   // Determinar qué campos mostrar
   const visibleFields = useMemo(() => {
     if (!product?.categories?.name) return VARIANT_FIELDS_BY_CATEGORY.default;
-    return (
+    const baseFields =
       VARIANT_FIELDS_BY_CATEGORY[product.categories.name] ||
-      VARIANT_FIELDS_BY_CATEGORY.default
-    );
-  }, [product]);
+      VARIANT_FIELDS_BY_CATEGORY.default;
+
+    return isOwner
+      ? baseFields
+      : baseFields.filter((field) => field !== "cost_price_usd");
+  }, [isOwner, product]);
 
   // Cargar producto y variantes
   useEffect(() => {
@@ -216,12 +222,15 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
   const saveVariants = async () => {
     const invalidVariantIndex = variants.findIndex(
       (variant) =>
-        variant.cost_price_usd === "" ||
-        variant.cost_price_usd === null ||
-        Number.isNaN(Number(variant.cost_price_usd))
+        variant.active !== false &&
+        (
+          variant.cost_price_usd === "" ||
+          variant.cost_price_usd === null ||
+          Number.isNaN(Number(variant.cost_price_usd))
+        )
     );
 
-    if (invalidVariantIndex !== -1) {
+    if (isOwner && invalidVariantIndex !== -1) {
       toast.error(`La variante ${invalidVariantIndex + 1} debe tener costo en USD`);
       return;
     }
@@ -525,7 +534,7 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
                         </div>
                       )}
 
-                      {visibleFields.includes("usd_price") && (
+                      {visibleFields.includes("cost_price_usd") && (
                         <div className="grid gap-2">
                           <Label>Costo USD</Label>
                           <Input

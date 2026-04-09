@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,8 @@ export default function ProductDetailDialog({
   // 🔹 Variantes reales
   const realVariants = useMemo(() => {
     return (product.variants || []).filter((v) => {
+      if (v?.active === false) return false;
+
       // incluir si tiene nombre de variante
       if (v.variant_name?.trim()) return true;
 
@@ -80,6 +82,16 @@ export default function ProductDetailDialog({
 
 
   const [activeTab, setActiveTab] = useState(grouped[0]?.key || "");
+  useEffect(() => {
+    if (!grouped.length) {
+      setActiveTab("");
+      return;
+    }
+
+    if (!grouped.some((group) => group.key === activeTab)) {
+      setActiveTab(grouped[0]?.key || "");
+    }
+  }, [activeTab, grouped]);
   const selectedGroup = grouped.find((g) => g.key === activeTab);
   const firstVariant = selectedGroup?.variants[0] || realVariants[0];
 
