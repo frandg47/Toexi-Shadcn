@@ -86,34 +86,50 @@ const toTimestampAR = (date) => {
 
 const buildSaleMovementHistory = (payment, movement) => {
     const isUsdPayment = payment.amount_usd != null && Number(payment.amount_usd) !== 0;
+    const movementAmount = movement?.amount;
+    const movementCurrency = movement?.currency;
 
     return {
         movement_date: movement?.movement_date || toDateKeyAR(new Date()),
         account_id: payment.account_id,
         type: "transfer",
-        amount: isUsdPayment ? Number(payment.amount_usd || 0) : Number(payment.amount_ars || 0),
-        currency: isUsdPayment ? "USD" : "ARS",
-        amount_ars: isUsdPayment ? null : Number(payment.amount_ars || 0),
+        amount: movementAmount != null
+            ? Number(movementAmount || 0)
+            : isUsdPayment ? Number(payment.amount_usd || 0) : Number(payment.amount_ars || 0),
+        currency: movementCurrency || (isUsdPayment ? "USD" : "ARS"),
+        amount_ars: movementCurrency === "ARS" || (!movementCurrency && !isUsdPayment)
+            ? Number(movement?.amount_ars ?? payment.amount_ars ?? 0)
+            : null,
         fx_rate_used: null,
         related_table: "sale_payment_history",
         related_id: payment.id,
+        accreditation_status: movement?.accreditation_status || "credited",
+        available_on: movement?.available_on || movement?.movement_date || toDateKeyAR(new Date()),
         notes: `Historial de cobro de venta #${payment.sale_id}`,
     };
 };
 
-const buildSaleReversalMovement = (payment, saleId, reason) => {
+const buildSaleReversalMovement = (payment, saleId, reason, movement) => {
     const isUsdPayment = payment.amount_usd != null && Number(payment.amount_usd) !== 0;
+    const movementAmount = movement?.amount;
+    const movementCurrency = movement?.currency;
 
     return {
         movement_date: toDateKeyAR(new Date()),
         account_id: payment.account_id,
         type: "expense",
-        amount: isUsdPayment ? Number(payment.amount_usd || 0) : Number(payment.amount_ars || 0),
-        currency: isUsdPayment ? "USD" : "ARS",
-        amount_ars: isUsdPayment ? null : Number(payment.amount_ars || 0),
+        amount: movementAmount != null
+            ? Number(movementAmount || 0)
+            : isUsdPayment ? Number(payment.amount_usd || 0) : Number(payment.amount_ars || 0),
+        currency: movementCurrency || (isUsdPayment ? "USD" : "ARS"),
+        amount_ars: movementCurrency === "ARS" || (!movementCurrency && !isUsdPayment)
+            ? Number(movement?.amount_ars ?? payment.amount_ars ?? 0)
+            : null,
         fx_rate_used: null,
         related_table: "sale_reversal",
         related_id: payment.id,
+        accreditation_status: "credited",
+        available_on: toDateKeyAR(new Date()),
         notes: `Anulacion de venta #${saleId}${reason ? ` | Motivo: ${reason}` : ""}`,
     };
 };
@@ -885,7 +901,7 @@ export function SalesList() {
             if (salePaymentIds.length > 0) {
                 const { data: paymentMovements, error: paymentMovementsError } = await supabase
                     .from("account_movements")
-                    .select("related_id, movement_date")
+                    .select("related_id, movement_date, amount, currency, amount_ars, accreditation_status, available_on")
                     .eq("related_table", "sale_payments")
                     .in("related_id", salePaymentIds);
 
@@ -931,7 +947,8 @@ export function SalesList() {
                     buildSaleReversalMovement(
                         payment,
                         cancelingSale.sale_id,
-                        cancelReason
+                        cancelReason,
+                        paymentMovementsMap.get(payment.id)
                     )
                 );
 

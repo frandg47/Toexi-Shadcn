@@ -70,6 +70,19 @@ const formatCurrency = (value, currency) => {
   }).format(safe);
 };
 
+const todayDateKey = () =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+const isMovementPendingAccreditation = (movement) =>
+  movement?.accreditation_status === "pending" &&
+  movement?.available_on &&
+  movement.available_on > todayDateKey();
+
 export default function MovementsConfig() {
   const { role } = useAuth();
   const isOwner = role?.toLowerCase() === "owner";
@@ -189,7 +202,7 @@ export default function MovementsConfig() {
   const loadBalancesAll = useCallback(async () => {
     const { data, error } = await supabase
       .from("account_movements")
-      .select("account_id, type, amount");
+      .select("account_id, type, amount, accreditation_status, available_on");
 
     if (error) {
       toast.error("No se pudo cargar el balance", {
@@ -204,7 +217,7 @@ export default function MovementsConfig() {
   const loadBalancesFiltered = useCallback(async () => {
     let query = supabase
       .from("account_movements")
-      .select("account_id, type, amount");
+      .select("account_id, type, amount, accreditation_status, available_on");
 
     if (filters.accountId !== "all") {
       query = query.eq("account_id", filters.accountId);
@@ -245,7 +258,7 @@ export default function MovementsConfig() {
     let query = supabase
       .from("account_movements")
       .select(
-        "id, created_at, movement_date, account_id, type, amount, currency, amount_ars, related_table, related_id, notes, accounts(name, currency)",
+        "id, created_at, movement_date, account_id, type, amount, currency, amount_ars, related_table, related_id, notes, accreditation_status, available_on, accounts(name, currency)",
         { count: "exact" },
       )
       .order("movement_date", { ascending: false })
@@ -424,6 +437,7 @@ export default function MovementsConfig() {
   const accountBalancesAll = useMemo(() => {
     const totals = new Map();
     balanceMovementsAll.forEach((m) => {
+      if (isMovementPendingAccreditation(m)) return;
       const entry = totals.get(m.account_id) || { income: 0, expense: 0 };
       if (m.type === "income") entry.income += Number(m.amount || 0);
       if (m.type === "expense") entry.expense += Number(m.amount || 0);
@@ -448,6 +462,7 @@ export default function MovementsConfig() {
   const accountBalancesFiltered = useMemo(() => {
     const totals = new Map();
     balanceMovementsFiltered.forEach((m) => {
+      if (isMovementPendingAccreditation(m)) return;
       const entry = totals.get(m.account_id) || { income: 0, expense: 0 };
       if (m.type === "income") entry.income += Number(m.amount || 0);
       if (m.type === "expense") entry.expense += Number(m.amount || 0);
@@ -540,7 +555,7 @@ export default function MovementsConfig() {
       detailResponse = await supabase
         .from("sale_payments")
         .select(
-          "id, sale_id, amount_ars, amount_usd, payment_method_id, installments, reference, created_at, payment_methods(name), sales(id, total_ars, customer_id, customers:customers!sales_customer_id_fkey(name, last_name))",
+          "id, sale_id, amount_ars, amount_usd, payment_method_id, installments, reference, created_at, payment_methods(name, accreditation_delay_business_days), sales(id, total_ars, customer_id, customers:customers!sales_customer_id_fkey(name, last_name))",
         )
         .eq("id", movement.related_id)
         .maybeSingle();
@@ -687,71 +702,85 @@ export default function MovementsConfig() {
                   <TableHead>Cuenta</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Monto</TableHead>
+                  <TableHead>Acreditacion</TableHead>
                   <TableHead>Origen</TableHead>
                   <TableHead>Notas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {movements.map((m) => (
-                  <TableRow
-                    key={m.id}
-                    className={`cursor-pointer ${
-                      m.type === "income"
-                        ? "bg-green-100 hover:bg-green-200/80 dark:bg-green-950/25 dark:hover:bg-green-900/35"
-                        : m.type === "expense"
-                          ? "bg-red-100 hover:bg-red-200/80 dark:bg-red-950/25 dark:hover:bg-red-900/35"
-                          : ""
-                    }`}
-                    onClick={() => openMovementDetail(m)}
-                  >
-                    <TableCell>{m.movement_date}</TableCell>
-                    <TableCell>
-                      {m.accounts?.name || `Cuenta ${m.account_id}`}
-                    </TableCell>
-                    <TableCell>
-                      {m.related_table === "sale_payment_history"
-                        ? "Historial"
-                        : m.type === "income"
-                        ? "Ingreso"
-                        : m.type === "expense"
-                          ? "Egreso"
-                          : "Transferencia"}
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(m.amount, m.currency)}
-                    </TableCell>
-                    <TableCell>
-                      {m.related_table === "account_transfer"
-                        ? "Transferencia"
-                        : m.related_table === "sale_payments"
-                          ? "Venta"
-                          : m.related_table === "sale_payment_history"
-                            ? "Historial venta"
-                            : m.related_table === "sale_reversal"
-                              ? "Anulacion venta"
-                          : m.related_table === "expenses"
-                            ? "Gasto"
-                            : m.related_table === "expense_reversal"
-                              ? "Anulacion gasto"
-                              : m.related_table === "expense_payment_history"
-                                ? "Pago gasto"
-                            : m.related_table === "purchase_payments"
-                              ? "Compra"
-                              : m.related_table === "purchase_reversal"
-                                ? "Anulacion compra"
-                              : m.related_table === "commission_payments"
-                                ? "Pago"
-                                : m.related_table
-                                  ? `${m.related_table} ${m.related_id ? `#${m.related_id}` : ""}`
-                                  : "-"}
-                    </TableCell>
-                    <TableCell>{m.notes || "-"}</TableCell>
-                  </TableRow>
-                ))}
+                {movements.map((m) => {
+                  const pendingAccreditation = isMovementPendingAccreditation(m);
+
+                  return (
+                    <TableRow
+                      key={m.id}
+                      className={`cursor-pointer ${
+                        pendingAccreditation
+                          ? "bg-yellow-100 hover:bg-yellow-200/80 dark:bg-yellow-950/25 dark:hover:bg-yellow-900/35"
+                          : m.type === "income"
+                            ? "bg-green-100 hover:bg-green-200/80 dark:bg-green-950/25 dark:hover:bg-green-900/35"
+                            : m.type === "expense"
+                              ? "bg-red-100 hover:bg-red-200/80 dark:bg-red-950/25 dark:hover:bg-red-900/35"
+                              : ""
+                      }`}
+                      onClick={() => openMovementDetail(m)}
+                    >
+                      <TableCell>{m.movement_date}</TableCell>
+                      <TableCell>
+                        {m.accounts?.name || `Cuenta ${m.account_id}`}
+                      </TableCell>
+                      <TableCell>
+                        {m.related_table === "sale_payment_history"
+                          ? "Historial"
+                          : m.type === "income"
+                          ? "Ingreso"
+                          : m.type === "expense"
+                            ? "Egreso"
+                            : "Transferencia"}
+                      </TableCell>
+                      <TableCell>
+                        {formatCurrency(m.amount, m.currency)}
+                      </TableCell>
+                      <TableCell>
+                        {pendingAccreditation
+                          ? `Pendiente hasta ${m.available_on}`
+                          : m.available_on
+                            ? `Acreditado ${m.available_on}`
+                            : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {m.related_table === "account_transfer"
+                          ? "Transferencia"
+                          : m.related_table === "sale_payments"
+                            ? "Venta"
+                            : m.related_table === "sale_payment_history"
+                              ? "Historial venta"
+                              : m.related_table === "sale_reversal"
+                                ? "Anulacion venta"
+                            : m.related_table === "expenses"
+                              ? "Gasto"
+                              : m.related_table === "expense_reversal"
+                                ? "Anulacion gasto"
+                                : m.related_table === "expense_payment_history"
+                                  ? "Pago gasto"
+                              : m.related_table === "purchase_payments"
+                                ? "Compra"
+                                : m.related_table === "purchase_reversal"
+                                  ? "Anulacion compra"
+                                : m.related_table === "commission_payments"
+                                  ? "Pago"
+                                  : m.related_table
+                                    ? `${m.related_table} ${m.related_id ? `#${m.related_id}` : ""}`
+                                    : "-"}
+                      </TableCell>
+                      <TableCell>{m.notes || "-"}</TableCell>
+                    </TableRow>
+                  );
+                })}
                 {movements.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="text-center text-muted-foreground"
                     >
                       No hay movimientos para mostrar.
@@ -816,6 +845,14 @@ export default function MovementsConfig() {
                 : detailMovement?.type === "expense"
                   ? "Egreso"
                   : "Transferencia"}
+            </div>
+            <div>
+              <strong>Acreditacion:</strong>{" "}
+              {isMovementPendingAccreditation(detailMovement)
+                ? `Pendiente hasta ${detailMovement.available_on}`
+                : detailMovement?.available_on
+                  ? `Acreditado ${detailMovement.available_on}`
+                  : "-"}
             </div>
             <div>
               <strong>Origen:</strong>{" "}
@@ -884,6 +921,15 @@ export default function MovementsConfig() {
                     <div>
                       <strong>Metodo:</strong>{" "}
                       {detailData.payment_methods?.name || "-"}
+                    </div>
+                    <div>
+                      <strong>Demora configurada:</strong>{" "}
+                      {Number(
+                        detailData.payment_methods
+                          ?.accreditation_delay_business_days || 0
+                      ) === 0
+                        ? "Inmediata"
+                        : `${detailData.payment_methods.accreditation_delay_business_days} dias habiles`}
                     </div>
                     <div>
                       <strong>Cuotas:</strong> {detailData.installments || "-"}

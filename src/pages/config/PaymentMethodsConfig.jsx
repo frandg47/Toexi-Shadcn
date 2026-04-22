@@ -51,6 +51,7 @@ export default function PaymentMethodsConfig() {
     editId: null,
     name: "",
     percent: 0,
+    accreditationDelayBusinessDays: 0,
   });
   const [installmentModal, setInstallmentModal] = useState({
     open: false,
@@ -72,7 +73,7 @@ export default function PaymentMethodsConfig() {
     let query = supabase
       .from("payment_methods")
       .select(
-        "id, name, multiplier, is_active, payment_installments(id, installments, multiplier, description)"
+        "id, name, multiplier, is_active, accreditation_delay_business_days, payment_installments(id, installments, multiplier, description)"
       )
       .order("id");
 
@@ -101,7 +102,8 @@ export default function PaymentMethodsConfig() {
 
   // ?? Guardar o actualizar método
   const handleSaveMethod = async () => {
-    const { name, percent, editId } = methodModal;
+    const { name, percent, editId, accreditationDelayBusinessDays } =
+      methodModal;
     if (!name) {
       // ?? REEMPLAZO 2: Usar toast para campos requeridos
       toast.warning("Campos requeridos", {
@@ -111,7 +113,14 @@ export default function PaymentMethodsConfig() {
     }
 
     const multiplier = 1 + parseFloat(percent || 0) / 100;
-    const payload = { name, multiplier: parseFloat(multiplier.toFixed(4)) };
+    const payload = {
+      name,
+      multiplier: parseFloat(multiplier.toFixed(4)),
+      accreditation_delay_business_days: Math.max(
+        Number(accreditationDelayBusinessDays || 0),
+        0
+      ),
+    };
 
     let error;
     if (editId) {
@@ -139,7 +148,13 @@ export default function PaymentMethodsConfig() {
           editId ? "actualizado" : "creado"
         } correctamente.`,
       });
-      setMethodModal({ open: false, editId: null, name: "", percent: 0 });
+      setMethodModal({
+        open: false,
+        editId: null,
+        name: "",
+        percent: 0,
+        accreditationDelayBusinessDays: 0,
+      });
       fetchMethods();
     }
   };
@@ -274,7 +289,13 @@ export default function PaymentMethodsConfig() {
         </Button>
         <Button
           onClick={() =>
-            setMethodModal({ open: true, editId: null, name: "", percent: 0 })
+            setMethodModal({
+              open: true,
+              editId: null,
+              name: "",
+              percent: 0,
+              accreditationDelayBusinessDays: 0,
+            })
           }
         >
           <IconPlus className="h-4 w-4" /> Agregar
@@ -302,6 +323,8 @@ export default function PaymentMethodsConfig() {
                       editId: method.id,
                       name: method.name,
                       percent: ((method.multiplier - 1) * 100).toFixed(2),
+                      accreditationDelayBusinessDays:
+                        method.accreditation_delay_business_days ?? 0,
                     })
                   }
                 >
@@ -337,6 +360,17 @@ export default function PaymentMethodsConfig() {
                   </b>
                 )}
               </p>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Acreditacion:{" "}
+                  <b>
+                    {Number(method.accreditation_delay_business_days || 0) === 0
+                      ? "Inmediata"
+                      : `${method.accreditation_delay_business_days} dias habiles`}
+                  </b>
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <p className="font-medium">Cuotas:</p>
                 {method.payment_installments?.length > 0 ? (
@@ -443,7 +477,13 @@ export default function PaymentMethodsConfig() {
       <Dialog
         open={methodModal.open}
         onOpenChange={() =>
-          setMethodModal({ open: false, editId: null, name: "", percent: 0 })
+          setMethodModal({
+            open: false,
+            editId: null,
+            name: "",
+            percent: 0,
+            accreditationDelayBusinessDays: 0,
+          })
         }
       >
         <DialogContent
@@ -481,6 +521,24 @@ export default function PaymentMethodsConfig() {
                 }
               />
             </div>
+            <div className="grid gap-2">
+              <Label>Acreditacion (dias habiles)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={methodModal.accreditationDelayBusinessDays}
+                onChange={(e) =>
+                  setMethodModal((p) => ({
+                    ...p,
+                    accreditationDelayBusinessDays: e.target.value,
+                  }))
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Usar 0 para acreditacion inmediata y 2 para postnet con demora.
+              </p>
+            </div>
           </div>
 
           <DialogFooter className="flex flex-col sm:flex-row sm:justify-end gap-2">
@@ -492,6 +550,7 @@ export default function PaymentMethodsConfig() {
                   editId: null,
                   name: "",
                   percent: 0,
+                  accreditationDelayBusinessDays: 0,
                 })
               }
             >

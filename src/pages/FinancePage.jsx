@@ -57,10 +57,24 @@ const getCurrencyBadgeClass = (currency) => {
   return "border-sky-200 bg-sky-50 text-sky-700";
 };
 
+const todayDateKey = () =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+const isMovementPendingAccreditation = (movement) =>
+  movement?.accreditation_status === "pending" &&
+  movement?.available_on &&
+  movement.available_on > todayDateKey();
+
 export default function FinancePage() {
   const { role } = useAuth();
   const isOwner = role?.toLowerCase() === "owner";
   const [loading, setLoading] = useState(false);
+  const [monthlyNetIncomeLoading, setMonthlyNetIncomeLoading] = useState(false);
   const [accounts, setAccounts] = useState([]);
   const [balanceMovementsAll, setBalanceMovementsAll] = useState([]);
   const [balanceMovementsFiltered, setBalanceMovementsFiltered] = useState([]);
@@ -76,6 +90,11 @@ export default function FinancePage() {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
+  const [monthlyNetIncome, setMonthlyNetIncome] = useState([]);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [salesYears, setSalesYears] = useState([]);
+  const [salesChannels, setSalesChannels] = useState([]);
+  const [selectedSalesChannels, setSelectedSalesChannels] = useState([]);
 
   const loadStaticData = useCallback(async () => {
     setLoading(true);
@@ -86,6 +105,8 @@ export default function FinancePage() {
       { data: variantsData, error: variantsError },
       { data: aftersalesData, error: aftersalesError },
       { data: movementsData, error: movementsError },
+      { data: salesChannelsData, error: salesChannelsError },
+      { data: salesYearsData, error: salesYearsError },
     ] = await Promise.all([
       supabase
         .from("accounts")
@@ -111,7 +132,19 @@ export default function FinancePage() {
         .select(
           "quantity, status, sold_sale_id, include_in_stock_cost_balance, variant:product_variants!aftersales_devices_variant_id_fkey(cost_price_usd)"
         ),
-      supabase.from("account_movements").select("account_id, type, amount"),
+      supabase
+        .from("account_movements")
+        .select("account_id, type, amount, currency, accreditation_status, available_on"),
+      supabase
+        .from("sales_channels")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name", { ascending: true }),
+      supabase
+        .from("sales")
+        .select("sale_date")
+        .eq("status", "vendido")
+        .is("voided_at", null),
     ]);
 
     if (accountsError) {
@@ -177,13 +210,197 @@ export default function FinancePage() {
       setBalanceMovementsAll(movementsData || []);
     }
 
+    if (salesChannelsError) {
+      toast.error("No se pudieron cargar los canales de venta", {
+        description: salesChannelsError.message,
+      });
+    } else {
+      setSalesChannels(salesChannelsData || []);
+    }
+
+    if (salesYearsError) {
+      toast.error("No se pudieron cargar los años de ventas", {
+        description: salesYearsError.message,
+      });
+    } else {
+      const years = Array.from(
+        new Set(
+          (salesYearsData || [])
+            .map((sale) => new Date(sale.sale_date).getFullYear())
+            .filter((year) => Number.isFinite(year))
+        )
+      ).sort((a, b) => b - a);
+
+      setSalesYears(years);
+      setSelectedYear((currentYear) =>
+        years.length > 0 && !years.includes(currentYear)
+          ? years[0]
+          : currentYear
+      );
+    }
+
     setLoading(false);
   }, []);
+
+  const loadMonthlyNetIncome = useCallback(async () => {
+    setMonthlyNetIncomeLoading(true);
+    // Obtener todas las ventas con sus items del año seleccionado
+    const yearStart = new Date(`${selectedYear}-01-01`).toISOString().split("T")[0];
+    const yearEnd = new Date(`${selectedYear}-12-31`).toISOString().split("T")[0];
+
+    let salesQuery = supabase
+      .from("sales")
+      .select(
+        `
+        id,
+        sale_date,
+        status,
+        total_usd,
+        sales_channel_id,
+        sale_items(
+          id,
+          quantity,
+          usd_price,
+          variant_id
+        )
+      `
+      )
+      .eq("status", "vendido")
+      .is("voided_at", null)
+      .gte("sale_date", yearStart)
+      .lte("sale_date", yearEnd);
+
+    if (selectedSalesChannels.length === 1 && selectedSalesChannels[0] === "none") {
+      salesQuery = salesQuery.is("sales_channel_id", null);
+    } else if (selectedSalesChannels.length > 0) {
+      const channelIds = selectedSalesChannels
+        .filter((channelId) => channelId !== "none")
+        .map(Number);
+
+      if (channelIds.length > 0 && selectedSalesChannels.includes("none")) {
+        salesQuery = salesQuery.or(
+          `sales_channel_id.in.(${channelIds.join(",")}),sales_channel_id.is.null`
+        );
+      } else if (channelIds.length > 0) {
+        salesQuery = salesQuery.in("sales_channel_id", channelIds);
+      }
+    }
+
+    const { data: salesData, error: salesError } = await salesQuery;
+
+    if (salesError) {
+      console.error("Error loading net income:", salesError);
+      toast.error("No se pudieron cargar los ingresos netos", {
+        description: salesError.message,
+      });
+      setMonthlyNetIncomeLoading(false);
+      return;
+    }
+
+    // Obtener todos los variant_ids únicos
+    const variantIds = new Set();
+    (salesData || []).forEach((sale) => {
+      sale.sale_items?.forEach((item) => {
+        if (item.variant_id) variantIds.add(item.variant_id);
+      });
+    });
+
+    // Obtener los costos de los productos
+    let variantCosts = {};
+    if (variantIds.size > 0) {
+      const { data: variantsData, error: variantsError } = await supabase
+        .from("product_variants")
+        .select("id, cost_price_usd")
+        .in("id", Array.from(variantIds));
+
+      if (variantsError) {
+        console.error("Error loading variant costs:", variantsError);
+        toast.error("No se pudieron cargar los costos de productos", {
+          description: variantsError.message,
+        });
+        setMonthlyNetIncomeLoading(false);
+        return;
+      }
+
+      if (variantsData) {
+        variantsData.forEach((variant) => {
+          variantCosts[variant.id] = variant.cost_price_usd || 0;
+        });
+      }
+    }
+
+    // Calcular ingresos netos por mes
+    const monthlyData = {};
+
+    (salesData || []).forEach((sale) => {
+      const saleDate = new Date(sale.sale_date);
+      const monthKey = saleDate.toLocaleString("es-AR", {
+        year: "numeric",
+        month: "2-digit",
+      }); // Formato: "2026-04"
+
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = {
+          month: monthKey,
+          totalSales: 0,
+          totalCost: 0,
+          netIncome: 0,
+          salesCount: 0,
+        };
+      }
+
+      sale.sale_items?.forEach((item) => {
+        const quantity = Number(item.quantity || 0);
+        const salePrice = Number(item.usd_price || 0);
+        const costPrice = Number(variantCosts[item.variant_id] || 0);
+
+        const itemSaleValue = quantity * salePrice;
+        const itemCost = quantity * costPrice;
+
+        monthlyData[monthKey].totalSales += itemSaleValue;
+        monthlyData[monthKey].totalCost += itemCost;
+      });
+
+      monthlyData[monthKey].salesCount += 1;
+    });
+
+    // Calcular el ingreso neto para cada mes
+    Object.keys(monthlyData).forEach((key) => {
+      monthlyData[key].netIncome =
+        monthlyData[key].totalSales - monthlyData[key].totalCost;
+    });
+
+    // Convertir a array y ordenar por mes descendente
+    const sortedData = Object.values(monthlyData).sort((a, b) => {
+      return b.month.localeCompare(a.month);
+    });
+
+    setMonthlyNetIncome(sortedData);
+    setMonthlyNetIncomeLoading(false);
+  }, [selectedSalesChannels, selectedYear]);
+
+  const toggleSalesChannelFilter = (channelId) => {
+    setSelectedSalesChannels((current) =>
+      current.includes(channelId)
+        ? current.filter((id) => id !== channelId)
+        : [...current, channelId]
+    );
+  };
+
+  const selectedSalesChannelLabels = useMemo(() => {
+    return selectedSalesChannels.map((channelId) => {
+      if (channelId === "none") return "Sin canal";
+      return (
+        salesChannels.find((channel) => String(channel.id) === channelId)?.name ||
+        `Canal ${channelId}`
+      );
+    });
+  }, [selectedSalesChannels, salesChannels]);
 
   const loadFilteredBalances = useCallback(async () => {
     let query = supabase
       .from("account_movements")
-      .select("account_id, type, amount");
+      .select("account_id, type, amount, currency, accreditation_status, available_on");
 
     if (filters.accountId !== "all") {
       query = query.eq("account_id", filters.accountId);
@@ -218,7 +435,8 @@ export default function FinancePage() {
 
   useEffect(() => {
     loadStaticData();
-  }, [loadStaticData]);
+    loadMonthlyNetIncome();
+  }, [loadStaticData, loadMonthlyNetIncome]);
 
   useEffect(() => {
     loadFilteredBalances();
@@ -235,6 +453,7 @@ export default function FinancePage() {
     const totals = new Map();
 
     movementsSource.forEach((movement) => {
+      if (isMovementPendingAccreditation(movement)) return;
       const entry = totals.get(movement.account_id) || { income: 0, expense: 0 };
       if (movement.type === "income") entry.income += Number(movement.amount || 0);
       if (movement.type === "expense") entry.expense += Number(movement.amount || 0);
@@ -280,6 +499,23 @@ export default function FinancePage() {
     );
   }, [accountBalancesAll]);
 
+  const pendingAccreditations = useMemo(() => {
+    return balanceMovementsAll.reduce(
+      (totals, movement) => {
+        if (!isMovementPendingAccreditation(movement)) return totals;
+        if (movement.type !== "income") return totals;
+
+        const currency = movement.currency || "ARS";
+        const amount = Number(movement.amount || 0);
+        if (currency === "USD") totals.usd += amount;
+        else if (currency === "USDT") totals.usdt += amount;
+        else totals.ars += amount;
+        return totals;
+      },
+      { ars: 0, usd: 0, usdt: 0 }
+    );
+  }, [balanceMovementsAll]);
+
   const convertAmountToUsd = useCallback(
     (amount, currency) => {
       const safeAmount = Number(amount || 0);
@@ -324,7 +560,7 @@ export default function FinancePage() {
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-4 py-6">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card className="bg-blue-500">
           <CardHeader>
             <CardTitle className="text-white">Balance total ARS</CardTitle>
@@ -347,6 +583,14 @@ export default function FinancePage() {
           </CardHeader>
           <CardContent className="text-2xl font-semibold text-white">
             {formatCurrency(totalBalances.usdt, "USDT")}
+          </CardContent>
+        </Card>
+        <Card className="bg-amber-500">
+          <CardHeader>
+            <CardTitle className="text-white">Pendiente acreditacion ARS</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold text-white">
+            {formatCurrency(pendingAccreditations.ars, "ARS")}
           </CardContent>
         </Card>
       </div>
@@ -389,6 +633,146 @@ export default function FinancePage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-2">
+            <CardTitle>Ingresos netos por mes - Ventas concretadas</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Ingresos por venta menos costo del producto
+            </p>
+          </div>
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:gap-3">
+            <div className="grid gap-1 min-w-[150px]">
+              <span className="text-xs text-muted-foreground">Año</span>
+              <Select
+                value={String(selectedYear)}
+                onValueChange={(value) => setSelectedYear(Number(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar año" />
+                </SelectTrigger>
+                <SelectContent>
+                  {salesYears.map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1 min-w-[260px]">
+              <span className="text-xs text-muted-foreground">Canal de venta</span>
+              <div className="flex max-w-[360px] flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant={selectedSalesChannels.length === 0 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedSalesChannels([])}
+                >
+                  Todos
+                </Button>
+                <Button
+                  type="button"
+                  variant={
+                    selectedSalesChannels.includes("none") ? "default" : "outline"
+                  }
+                  size="sm"
+                  onClick={() => toggleSalesChannelFilter("none")}
+                >
+                  Sin canal
+                </Button>
+                {salesChannels.map((channel) => {
+                  const channelId = String(channel.id);
+                  const isSelected = selectedSalesChannels.includes(channelId);
+
+                  return (
+                    <Button
+                      key={channel.id}
+                      type="button"
+                      variant={isSelected ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => toggleSalesChannelFilter(channelId)}
+                    >
+                      {channel.name}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+            <Button
+              onClick={loadMonthlyNetIncome}
+              disabled={monthlyNetIncomeLoading}
+            >
+              <IconRefresh className="h-4 w-4" />
+              {monthlyNetIncomeLoading ? "Actualizando..." : "Actualizar"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {selectedSalesChannelLabels.length > 1 && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-green-200 bg-gray-800 px-3 py-2 text-sm text-green-800">
+              <span className="font-medium text-white">Canales filtrados:</span>
+              {selectedSalesChannelLabels.map((label) => (
+                <span
+                  key={label}
+                  className="rounded-full bg-green-100 px-2 py-0.5 font-medium text-green-800"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Mes</TableHead>
+                  <TableHead className="text-right">Total de ventas (USD)</TableHead>
+                  <TableHead className="text-right">Costo total (USD)</TableHead>
+                  <TableHead className="text-right bg-emerald-50/70 text-emerald-800">
+                    Ingreso neto (USD)
+                  </TableHead>
+                  <TableHead className="text-right">Cantidad de ventas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {monthlyNetIncome.length > 0 ? (
+                  monthlyNetIncome.map((monthData) => (
+                    <TableRow key={monthData.month}>
+                      <TableCell className="font-medium">{monthData.month}</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(monthData.totalSales, "USD")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(monthData.totalCost, "USD")}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-semibold bg-emerald-50/50 ${
+                          monthData.netIncome >= 0
+                            ? "text-emerald-900"
+                            : "text-rose-900"
+                        }`}
+                      >
+                        {formatCurrency(monthData.netIncome, "USD")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {monthData.salesCount}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      No hay datos de ingresos netos disponibles.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
