@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -34,6 +34,7 @@ import {
   IconTrash,
   IconCirclePlus,
   IconUserPlus,
+  IconScan,
 } from "@tabler/icons-react";
 // import { useNavigate } from "react-router-dom";
 // import { useSaleStore } from "../store/useSaleStore";
@@ -61,10 +62,13 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   const [searchSeller, setSearchSeller] = useState("");
   const [searchProduct, setSearchProduct] = useState("");
   const [searchVariant, setSearchVariant] = useState("");
+  const [barcodeSearch, setBarcodeSearch] = useState("");
+  const [barcodeLoading, setBarcodeLoading] = useState(false);
   const [focusCustomer, setFocusCustomer] = useState(false);
   const [focusSeller, setFocusSeller] = useState(false);
   const [focusProduct, setFocusProduct] = useState(false);
   const [focusVariant, setFocusVariant] = useState(false);
+  const barcodeInputRef = useRef(null);
 
   // --- Selected entities / cart ---
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -488,6 +492,8 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     // Producto y variantes
     setSelectedProduct(null);
     setSearchProduct("");
+    setBarcodeSearch("");
+    setBarcodeLoading(false);
     setVariants([]);
     setSelectedVariants([]);
 
@@ -609,6 +615,12 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     fetchVariants();
   }, [selectedProduct, focusVariant, searchVariant]);
 
+  useEffect(() => {
+    if (!open || step !== 2) return;
+    const timer = setTimeout(() => barcodeInputRef.current?.focus(), 120);
+    return () => clearTimeout(timer);
+  }, [open, step]);
+
   const getInstallmentsForMethod = (methodId) => {
     if (!methodId) return [];
     return paymentInstallments.filter(
@@ -632,6 +644,66 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       // Si es nuevo, agregamos un item con un IMEI vacío
       return [...prev, { ...variant, imeis: [""] }];
     });
+  };
+
+  const normalizeBarcode = (value) => value.trim();
+
+  const variantMatchesBarcode = (variant, barcode) => {
+    const normalized = barcode.toLowerCase();
+    return ["barcode", "bar_code", "sku", "code", "codigo"].some((field) => {
+      const value = variant?.[field];
+      return value && String(value).trim().toLowerCase() === normalized;
+    });
+  };
+
+  const handleBarcodeSubmit = async () => {
+    const barcode = normalizeBarcode(barcodeSearch);
+    if (!barcode || barcodeLoading) return;
+
+    const loadedVariant = variants.find((variant) =>
+      variantMatchesBarcode(variant, barcode)
+    );
+
+    if (loadedVariant) {
+      handleAddVariant(loadedVariant);
+      setBarcodeSearch("");
+      toast.success("Producto agregado por codigo de barras");
+      barcodeInputRef.current?.focus();
+      return;
+    }
+
+    setBarcodeLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("product_variants")
+        .select(
+          "id, variant_name, color, storage, ram, usd_price, wholesale_price, stock, barcode, products(name)"
+        )
+        .eq("barcode", barcode)
+        .eq("active", true)
+        .gt("stock", 0)
+        .limit(1);
+
+      if (error) throw error;
+
+      const foundVariant = data?.[0];
+      if (!foundVariant) {
+        toast.error("No se encontro una variante con ese codigo de barras");
+        barcodeInputRef.current?.focus();
+        return;
+      }
+
+      handleAddVariant(foundVariant);
+      setBarcodeSearch("");
+      toast.success("Producto agregado por codigo de barras");
+      barcodeInputRef.current?.focus();
+    } catch (error) {
+      console.error("Error buscando codigo de barras:", error);
+      toast.error("No se pudo buscar el codigo de barras");
+    } finally {
+      setBarcodeLoading(false);
+    }
   };
 
   const handleIMEIChange = (variantId, index, value) => {
@@ -1044,6 +1116,32 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
           {step === 2 && (
             <div className="space-y-4">
               <h3 className="font-medium ">Seleccionar productos</h3>
+
+              {/* Codigo de barras */}
+              <div className="space-y-1">
+                <div className="relative">
+                  <IconScan className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    ref={barcodeInputRef}
+                    className="pl-9"
+                    placeholder="Escanear o escribir codigo de barras..."
+                    value={barcodeSearch}
+                    onChange={(e) => setBarcodeSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleBarcodeSubmit();
+                      }
+                    }}
+                    disabled={barcodeLoading}
+                  />
+                </div>
+                {barcodeLoading && (
+                  <p className="text-xs text-muted-foreground">
+                    Buscando codigo de barras...
+                  </p>
+                )}
+              </div>
 
               {/* Producto */}
               <div className="relative">
