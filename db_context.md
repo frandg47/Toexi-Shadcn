@@ -41,10 +41,14 @@ CREATE TABLE public.aftersales_devices (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   created_by uuid DEFAULT auth.uid(),
+  include_in_stock_cost_balance boolean NOT NULL DEFAULT false,
+  sold_sale_id bigint,
+  sold_at timestamp with time zone,
   CONSTRAINT aftersales_devices_pkey PRIMARY KEY (id),
   CONSTRAINT aftersales_devices_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id),
   CONSTRAINT aftersales_devices_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id),
-  CONSTRAINT aftersales_devices_warranty_exchange_id_fkey FOREIGN KEY (warranty_exchange_id) REFERENCES public.warranty_exchanges(id)
+  CONSTRAINT aftersales_devices_warranty_exchange_id_fkey FOREIGN KEY (warranty_exchange_id) REFERENCES public.warranty_exchanges(id),
+  CONSTRAINT aftersales_devices_sold_sale_id_fkey FOREIGN KEY (sold_sale_id) REFERENCES public.sales(id)
 );
 CREATE TABLE public.brands (
   id integer NOT NULL DEFAULT nextval('brands_id_seq'::regclass),
@@ -98,7 +102,7 @@ CREATE TABLE public.expenses (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   expense_date date NOT NULL,
   amount numeric NOT NULL,
-  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text])),
+  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text, 'USDT'::text])),
   amount_ars numeric NOT NULL,
   fx_rate_used numeric,
   account_id bigint,
@@ -126,7 +130,7 @@ CREATE TABLE public.fixed_expenses (
   id bigint NOT NULL DEFAULT nextval('fixed_expenses_id_seq'::regclass),
   name text NOT NULL,
   amount numeric NOT NULL,
-  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text])),
+  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text, 'USDT'::text])),
   account_id bigint,
   category text,
   due_day integer,
@@ -265,7 +269,7 @@ CREATE TABLE public.purchase_payments (
   account_id bigint NOT NULL,
   payment_method_id integer,
   amount numeric NOT NULL,
-  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text])),
+  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text, 'USDT'::text])),
   amount_ars numeric,
   fx_rate_used numeric,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -279,7 +283,7 @@ CREATE TABLE public.purchases (
   id bigint NOT NULL DEFAULT nextval('purchases_id_seq'::regclass),
   provider_id bigint,
   purchase_date date NOT NULL,
-  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text])),
+  currency text NOT NULL CHECK (currency = ANY (ARRAY['ARS'::text, 'USD'::text, 'USDT'::text])),
   total_amount numeric NOT NULL,
   total_amount_ars numeric,
   fx_rate_used numeric,
@@ -398,6 +402,19 @@ CREATE TABLE public.users (
   CONSTRAINT users_pkey PRIMARY KEY (id),
   CONSTRAINT users_id_auth_fkey FOREIGN KEY (id_auth) REFERENCES auth.users(id)
 );
+CREATE TABLE public.warranty_exchange_items (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  warranty_exchange_id bigint NOT NULL,
+  variant_id integer NOT NULL,
+  imei text,
+  quantity integer NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  unit_price_usd numeric NOT NULL DEFAULT 0,
+  subtotal_usd numeric NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT warranty_exchange_items_pkey PRIMARY KEY (id),
+  CONSTRAINT warranty_exchange_items_warranty_exchange_id_fkey FOREIGN KEY (warranty_exchange_id) REFERENCES public.warranty_exchanges(id),
+  CONSTRAINT warranty_exchange_items_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id)
+);
 CREATE TABLE public.warranty_exchanges (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   sale_id bigint NOT NULL,
@@ -413,9 +430,23 @@ CREATE TABLE public.warranty_exchanges (
   status text NOT NULL DEFAULT 'completed'::text CHECK (status = ANY (ARRAY['pending'::text, 'completed'::text, 'cancelled'::text])),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   created_by uuid DEFAULT auth.uid(),
+  price_difference_usd numeric NOT NULL DEFAULT 0,
+  settlement_type text NOT NULL DEFAULT 'none'::text CHECK (settlement_type = ANY (ARRAY['none'::text, 'customer_payment'::text, 'customer_refund'::text])),
+  settlement_account_id bigint,
+  settlement_payment_method_id integer,
+  settlement_currency text CHECK (settlement_currency IS NULL OR (settlement_currency = ANY (ARRAY['ARS'::text, 'USD'::text, 'USDT'::text]))),
+  settlement_amount numeric,
+  settlement_amount_ars numeric,
+  settlement_fx_rate_used numeric,
+  settlement_installments integer,
+  settlement_multiplier numeric,
+  store_credit_usd numeric NOT NULL DEFAULT 0,
+  store_credit_amount_ars numeric,
   CONSTRAINT warranty_exchanges_pkey PRIMARY KEY (id),
   CONSTRAINT warranty_exchanges_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id),
   CONSTRAINT warranty_exchanges_sale_item_id_fkey FOREIGN KEY (sale_item_id) REFERENCES public.sale_items(id),
   CONSTRAINT warranty_exchanges_original_variant_id_fkey FOREIGN KEY (original_variant_id) REFERENCES public.product_variants(id),
-  CONSTRAINT warranty_exchanges_replacement_variant_id_fkey FOREIGN KEY (replacement_variant_id) REFERENCES public.product_variants(id)
+  CONSTRAINT warranty_exchanges_replacement_variant_id_fkey FOREIGN KEY (replacement_variant_id) REFERENCES public.product_variants(id),
+  CONSTRAINT warranty_exchanges_settlement_account_id_fkey FOREIGN KEY (settlement_account_id) REFERENCES public.accounts(id),
+  CONSTRAINT warranty_exchanges_settlement_payment_method_id_fkey FOREIGN KEY (settlement_payment_method_id) REFERENCES public.payment_methods(id)
 );

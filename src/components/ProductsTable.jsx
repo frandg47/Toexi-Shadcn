@@ -813,7 +813,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                       >
                         <IconVersions className="h-4 w-4" />
                       </Button>
-                      <Button
+                      {/* <Button
                         size="icon"
                         variant="destructive"
                         className="p-2"
@@ -823,7 +823,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                         }}
                       >
                         <IconTrash className="h-4 w-4" />
-                      </Button>
+                      </Button> */}
                     </div>
                   )}
                 </div>
@@ -990,7 +990,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                           >
                             <IconVersions className="h-4 w-4" />
                           </Button>
-                          <Button
+                          {/* <Button
                             size="sm"
                             variant="destructive"
                             className="p-2"
@@ -1000,7 +1000,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                             }}
                           >
                             <IconTrash className="h-4 w-4" />
-                          </Button>
+                          </Button> */}
                         </div>
                       </TableCell>
                     )}
