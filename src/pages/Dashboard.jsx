@@ -6,6 +6,7 @@ import { SectionCards } from "@/components/section-cards";
 import { useAuth } from "@/context/AuthContextProvider";
 import { supabase } from "@/lib/supabaseClient";
 import SalesByChannelChart from "@/components/SalesByChannelChart";
+import TopProductsSoldChart from "@/components/TopProductsSoldChart";
 import SectionCardsProducts from "../components/SectionCardsProducts";
 
 const ALERT_WINDOW_DAYS = 5;
@@ -187,8 +188,9 @@ const Dashboard = () => {
           <div className="">
             <ChartAreaInteractive />
           </div>
-          <div className="">
+          <div className="grid gap-4 lg:grid-cols-2">
             <SalesByChannelChart />
+            <TopProductsSoldChart />
           </div>
         </div>
       </div>
