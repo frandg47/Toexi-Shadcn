@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+﻿import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthContextProvider, useAuth } from "./context/AuthContextProvider";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import CatalogPage from "./pages/CatalogPage";
 import CustomersPage from "./pages/CustomersPage";
 import TeamPage from "./pages/TeamPage";
 import LoginPage from "./pages/LoginPage";
+import MaintenancePage from "./pages/MaintenancePage";
 import OrdersPage from "./pages/OrdersPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import ConcentricLoader from "./components/ui/loading";
@@ -26,7 +27,7 @@ import ExpensesPage from "./pages/ExpensesPage";
 import FinancePage from "./pages/FinancePage";
 import AftersalesPage from "./pages/AftersalesPage";
 
-// ⚙️ Configuración
+// âš™ï¸ ConfiguraciÃ³n
 import ComissionConfig from "./pages/config/ComissionConfig";
 import FxRatesConfig from "./pages/config/FxRatesConfig";
 import PaymentMethodsConfig from "./pages/config/PaymentMethodsConfig";
@@ -41,12 +42,14 @@ import MovementsConfig from "./pages/config/MovementsConfig";
 import InstallPromptBanner from "./components/InstallPromptBanner";
 import IOSInstallBanner from "@/components/IOSInstallBanner";
 
-// 🔒 COMPONENTE DE RUTA PROTEGIDA
+const MAINTENANCE_MODE = true;
+
+// ðŸ”’ COMPONENTE DE RUTA PROTEGIDA
 function ProtectedRoute({ children, allowedRoles }) {
   const location = useLocation();
   const { user, role, isActive, status, error, refreshProfile } = useAuth();
 
-  // 🔍 Mostrar loader solo mientras se verifica sesión por primera vez
+  // ðŸ” Mostrar loader solo mientras se verifica sesiÃ³n por primera vez
   if (status === "loading") {
     return (
       <div className="flex min-h-[100svh] w-full items-center justify-center">
@@ -70,40 +73,49 @@ function ProtectedRoute({ children, allowedRoles }) {
     );
   }
 
-  // 🔐 Si no hay usuario autenticado (una vez que terminó de cargar)
+  // ðŸ” Si no hay usuario autenticado (una vez que terminÃ³ de cargar)
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  // 🚫 Si el usuario está deshabilitado
+  // ðŸš« Si el usuario estÃ¡ deshabilitado
   if (!isActive) {
     return <Navigate to="/login?disabled=1" replace />;
   }
 
-  // 🎭 Normalizar rol
+  // ðŸŽ­ Normalizar rol
   const normalizedRole = role?.toLowerCase();
 
-  // 🚷 Si el rol no tiene permiso
+  // ðŸš· Si el rol no tiene permiso
   if (
     Array.isArray(allowedRoles) &&
     allowedRoles.length > 0 &&
     !allowedRoles.includes(normalizedRole)
   ) {
-    // Si es vendedor e intenta entrar al dashboard → redirigir a su panel
+    // Si es vendedor e intenta entrar al dashboard â†’ redirigir a su panel
     if (normalizedRole === "seller") {
       return <Navigate to="/seller/products" replace />;
     }
 
-    // Caso contrario → página de no autorizado
+    // Caso contrario â†’ pÃ¡gina de no autorizado
     return <Navigate to="/unauthorized" replace />;
   }
 
-  // ✅ Si todo está bien, renderizar el contenido
+  // âœ… Si todo estÃ¡ bien, renderizar el contenido
   return children;
 }
 
-// 🧭 APP PRINCIPAL
+// ðŸ§­ APP PRINCIPAL
 export default function App() {
+  if (MAINTENANCE_MODE) {
+    return (
+      <>
+        <Toaster position="top-center" />
+        <MaintenancePage />
+      </>
+    );
+  }
+
   return (
     <>
       <InstallPromptBanner />
@@ -111,12 +123,12 @@ export default function App() {
       <Toaster position="top-center" />
       <AuthContextProvider>
         <Routes>
-          {/* 🔓 PÁGINAS PÚBLICAS */}
+          {/* ðŸ”“ PÃGINAS PÃšBLICAS */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
 
-          {/* 🧭 DASHBOARD (solo superadmin/owner) */}
+          {/* ðŸ§­ DASHBOARD (solo superadmin/owner) */}
           <Route
             path="/dashboard/*"
             element={
@@ -125,7 +137,7 @@ export default function App() {
               </ProtectedRoute>
             }
           >
-            {/* 🧩 RUTAS INTERNAS DEL DASHBOARD */}
+            {/* ðŸ§© RUTAS INTERNAS DEL DASHBOARD */}
             <Route index element={<Dashboard />} />
             <Route path="products" element={<Products />} />
             <Route path="catalog" element={<CatalogPage />} />
@@ -146,7 +158,7 @@ export default function App() {
             <Route path="finance" element={<FinancePage />} />
             <Route path="settings/expenses" element={<ExpensesPage />} />
 
-            {/* ⚙️ CONFIGURACIONES */}
+            {/* âš™ï¸ CONFIGURACIONES */}
             <Route
               path="settings"
               element={<ConfigurationPage titulo="Configuraciones" />}
@@ -176,7 +188,7 @@ export default function App() {
             />
           </Route>
 
-          {/* 🛍️ VISTA DE VENDEDORES */}
+          {/* ðŸ›ï¸ VISTA DE VENDEDORES */}
           <Route
             path="/seller/*"
             element={
@@ -197,13 +209,14 @@ export default function App() {
               path="quick-payment-calculator"
               element={<QuickPaymentCalculator />}
             />
-            {/* Agregá más rutas específicas del vendedor aquí */}
+            {/* AgregÃ¡ mÃ¡s rutas especÃ­ficas del vendedor aquÃ­ */}
           </Route>
 
-          {/* 🚪 RUTA POR DEFECTO */}
+          {/* ðŸšª RUTA POR DEFECTO */}
           <Route path="*" element={<FallbackRedirect />} />
         </Routes>
       </AuthContextProvider>
     </>
   );
 }
+
