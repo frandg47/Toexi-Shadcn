@@ -37,6 +37,7 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
   const [variants, setVariants] = useState([]);
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState(null);
+  const isSerialTracked = product?.inventory_tracking_mode === "serial";
 
   // Configuración de campos visibles según categoría
   const VARIANT_FIELDS_BY_CATEGORY = {
@@ -608,6 +609,7 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
                             min="0"
                             placeholder="0"
                             value={v.stock || 0}
+                            disabled={isSerialTracked}
                             onChange={(e) =>
                               handleChange(
                                 index,
@@ -618,6 +620,12 @@ export default function DialogVariants({ open, onClose, productId, onSave }) {
                               )
                             }
                           />
+                          {isSerialTracked && (
+                            <p className="text-xs text-muted-foreground">
+                              El stock de productos serializados se gestionara por
+                              unidades trazables en inventario.
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>

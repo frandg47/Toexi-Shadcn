@@ -209,6 +209,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
              commission_pct,
              commission_fixed,
              cover_image_url,
+             inventory_tracking_mode,
              allow_backorder,
              lead_time_label,
              deposit_amount,
@@ -400,6 +401,7 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
           priority: commission.priority,
           coverImageUrl:
             p.cover_image_url || variants[0]?.image_url || PLACEHOLDER_IMAGE,
+          inventoryTrackingMode: p.inventory_tracking_mode || "quantity",
           allowBackorder: p.allow_backorder,
           leadTimeLabel: p.lead_time_label,
           depositAmount: p.deposit_amount,
@@ -743,6 +745,20 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                       <p className="text-xs text-muted-foreground">
                         {p.brandName} • {p.categoryName}
                       </p>
+                      <div className="mt-1">
+                        <Badge
+                          variant="secondary"
+                          className={
+                            p.inventoryTrackingMode === "serial"
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200"
+                              : ""
+                          }
+                        >
+                          {p.inventoryTrackingMode === "serial"
+                            ? "Serializado"
+                            : "Por cantidad"}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
 
@@ -909,6 +925,20 @@ const ProductsTable = ({ refreshToken = 0, isSellerView = false }) => {
                       <p className="text-xs text-muted-foreground">
                         {p.categoryName}
                       </p>
+                      <div className="mt-1">
+                        <Badge
+                          variant="secondary"
+                          className={
+                            p.inventoryTrackingMode === "serial"
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200"
+                              : ""
+                          }
+                        >
+                          {p.inventoryTrackingMode === "serial"
+                            ? "Serializado"
+                            : "Por cantidad"}
+                        </Badge>
+                      </div>
                     </TableCell>
 
                     <TableCell>

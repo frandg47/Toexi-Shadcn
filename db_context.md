@@ -233,6 +233,7 @@ CREATE TABLE public.products (
   lead_time_label text,
   active boolean NOT NULL DEFAULT true,
   cover_image_url text,
+  inventory_tracking_mode text NOT NULL DEFAULT 'quantity'::text CHECK (inventory_tracking_mode = ANY (ARRAY['quantity'::text, 'serial'::text])),
   created_at timestamp without time zone DEFAULT now(),
   deposit_amount real,
   CONSTRAINT products_pkey PRIMARY KEY (id),
@@ -295,13 +296,57 @@ CREATE TABLE public.purchases (
   CONSTRAINT purchases_pkey PRIMARY KEY (id),
   CONSTRAINT purchases_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id)
 );
+CREATE TABLE public.inventory_units (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  variant_id integer NOT NULL,
+  purchase_id bigint,
+  purchase_item_id bigint,
+  sale_id bigint,
+  sale_item_id bigint,
+  warranty_exchange_id bigint,
+  identifier_value text NOT NULL,
+  identifier_normalized text GENERATED ALWAYS AS (nullif(lower(regexp_replace(btrim(COALESCE(identifier_value, ''::text)), '[^[:alnum:]]'::text, ''::text, 'g'::text)), ''::text)) STORED,
+  status text NOT NULL DEFAULT 'available'::text CHECK (status = ANY (ARRAY['available'::text, 'reserved'::text, 'sold'::text, 'defective'::text, 'in_repair'::text, 'returned_available'::text, 'returned_defective'::text, 'warranty_hold'::text, 'voided'::text])),
+  received_at timestamp with time zone NOT NULL DEFAULT now(),
+  sold_at timestamp with time zone,
+  returned_at timestamp with time zone,
+  notes text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  created_by uuid DEFAULT auth.uid(),
+  updated_by uuid,
+  CONSTRAINT inventory_units_pkey PRIMARY KEY (id),
+  CONSTRAINT inventory_units_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id),
+  CONSTRAINT inventory_units_purchase_id_fkey FOREIGN KEY (purchase_id) REFERENCES public.purchases(id),
+  CONSTRAINT inventory_units_purchase_item_id_fkey FOREIGN KEY (purchase_item_id) REFERENCES public.purchase_items(id),
+  CONSTRAINT inventory_units_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id),
+  CONSTRAINT inventory_units_sale_item_id_fkey FOREIGN KEY (sale_item_id) REFERENCES public.sale_items(id),
+  CONSTRAINT inventory_units_warranty_exchange_id_fkey FOREIGN KEY (warranty_exchange_id) REFERENCES public.warranty_exchanges(id)
+);
+CREATE TABLE public.inventory_unit_events (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  inventory_unit_id bigint NOT NULL,
+  event_type text NOT NULL,
+  from_status text,
+  to_status text,
+  related_table text,
+  related_id bigint,
+  notes text,
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  created_by uuid DEFAULT auth.uid(),
+  CONSTRAINT inventory_unit_events_pkey PRIMARY KEY (id),
+  CONSTRAINT inventory_unit_events_inventory_unit_id_fkey FOREIGN KEY (inventory_unit_id) REFERENCES public.inventory_units(id)
+);
 CREATE TABLE public.sale_item_imeis (
   id integer NOT NULL DEFAULT nextval('sale_item_imeis_id_seq'::regclass),
   sale_item_id integer NOT NULL,
   imei text NOT NULL,
+  inventory_unit_id bigint,
   created_at timestamp without time zone DEFAULT now(),
   CONSTRAINT sale_item_imeis_pkey PRIMARY KEY (id),
-  CONSTRAINT sale_item_imeis_sale_item_id_fkey FOREIGN KEY (sale_item_id) REFERENCES public.sale_items(id)
+  CONSTRAINT sale_item_imeis_sale_item_id_fkey FOREIGN KEY (sale_item_id) REFERENCES public.sale_items(id),
+  CONSTRAINT sale_item_imeis_inventory_unit_id_fkey FOREIGN KEY (inventory_unit_id) REFERENCES public.inventory_units(id)
 );
 CREATE TABLE public.sale_items (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,

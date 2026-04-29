@@ -34,6 +34,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
     commission_pct: "",
     commission_fixed: "",
     cover_image_url: "",
+    inventory_tracking_mode: "quantity",
     allow_backorder: false,
     lead_time_label: "",
     active: true,
@@ -75,6 +76,10 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
             ? product.commission_fixed || product.commissionFixed || ""
             : "",
         cover_image_url: product.cover_image_url || product.coverImageUrl || "",
+        inventory_tracking_mode:
+          product.inventory_tracking_mode ||
+          product.inventoryTrackingMode ||
+          "quantity",
         allow_backorder:
           product.allow_backorder ?? product.allowBackorder ?? false,
         lead_time_label: product.lead_time_label || product.leadTimeLabel || "",
@@ -89,6 +94,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
         commission_pct: "",
         commission_fixed: "",
         cover_image_url: "",
+        inventory_tracking_mode: "quantity",
         allow_backorder: false,
         lead_time_label: "",
         active: true,
@@ -191,6 +197,7 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
         ? parseFloat(form.commission_fixed)
         : null,
       cover_image_url: imageUrl || null,
+      inventory_tracking_mode: form.inventory_tracking_mode || "quantity",
       allow_backorder: form.allow_backorder,
       lead_time_label: form.allow_backorder
         ? form.lead_time_label || null
@@ -361,6 +368,32 @@ export default function DialogProduct({ open, onClose, product, onSave }) {
                 onChange={handleChange}
               />
             </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label>Trazabilidad de inventario</Label>
+            <Select
+              value={form.inventory_tracking_mode || "quantity"}
+              onValueChange={(value) =>
+                setForm((prev) => ({
+                  ...prev,
+                  inventory_tracking_mode: value,
+                }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar modo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="quantity">Por cantidad</SelectItem>
+                <SelectItem value="serial">Por unidad serializada</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {form.inventory_tracking_mode === "serial"
+                ? "Los productos serializados usaran IMEI/SN por unidad. El stock manual de variantes quedara bloqueado."
+                : "Los productos no serializados seguiran usando stock agregado por cantidad."}
+            </p>
           </div>
 
           {/* Imagen */}

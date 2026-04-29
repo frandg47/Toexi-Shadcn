@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContextProvider";
 import { supabase } from "@/lib/supabaseClient";
@@ -122,6 +122,21 @@ const convertAmountToARS = (amount, currency, fxRate, usdtRate) => {
   return numericAmount * rate;
 };
 
+const normalizeIdentifier = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+const parseIdentifiers = (value) =>
+  String(value || "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const isSerialTrackedVariant = (variant) =>
+  variant?.products?.inventory_tracking_mode === "serial";
+
 const PurchasesConfig = () => {
   const { role } = useAuth();
   const isOwner = role?.toLowerCase() === "owner";
@@ -227,7 +242,9 @@ const PurchasesConfig = () => {
         supabase.from("providers").select("id, name").order("name"),
         supabase
           .from("product_variants")
-          .select("id, variant_name, color, storage, ram, products(name, active)")
+          .select(
+            "id, variant_name, color, storage, ram, products(name, active, inventory_tracking_mode)"
+          )
           .eq("active", true)
           .order("id", { ascending: true }),
         supabase
@@ -362,7 +379,13 @@ const PurchasesConfig = () => {
     if (items.some((i) => i.variant_id === variant.id)) return;
     setItems((prev) => [
       ...prev,
-      { variant_id: variant.id, variant, quantity: 1, unit_cost: "" },
+      {
+        variant_id: variant.id,
+        variant,
+        quantity: 1,
+        unit_cost: "",
+        identifiersText: "",
+      },
     ]);
     setSearchVariant("");
   };
@@ -426,10 +449,22 @@ const PurchasesConfig = () => {
   };
 
   const handleAddEditItem = (variant) => {
+    if (isSerialTrackedVariant(variant)) {
+      toast.error(
+        "Los productos serializados todavia no se pueden agregar desde la edicion de compras"
+      );
+      return;
+    }
     if (editItems.some((item) => item.variant_id === variant.id)) return;
     setEditItems((prev) => [
       ...prev,
-      { variant_id: variant.id, variant, quantity: 1, unit_cost: "" },
+      {
+        variant_id: variant.id,
+        variant,
+        quantity: 1,
+        unit_cost: "",
+        identifiersText: "",
+      },
     ]);
     setEditSearchVariant("");
   };
@@ -495,7 +530,19 @@ const PurchasesConfig = () => {
   const handleSave = async () => {
     if (!form.provider_id) return toast.error("Selecciona un proveedor");
     if (!items.length) return toast.error("Agrega al menos un producto");
-    if (payments.some((payment) => !payment.account_id || Number(payment.amount || 0) <= 0)) {
+    if (
+      items.some(
+        (item) =>
+          Number(item.quantity || 0) <= 0 || Number(item.unit_cost || 0) < 0
+      )
+    ) {
+      return toast.error("Completa cantidades y costos validos para todos los items");
+    }
+    if (
+      payments.some(
+        (payment) => !payment.account_id || Number(payment.amount || 0) <= 0
+      )
+    ) {
       return toast.error("Completa todas las cuentas y montos del pago");
     }
     if (
@@ -519,10 +566,14 @@ const PurchasesConfig = () => {
         return false;
       })
     ) {
-      return toast.error("Falta cotizacion activa para alguna de las cuentas elegidas");
+      return toast.error(
+        "Falta cotizacion activa para alguna de las cuentas elegidas"
+      );
     }
     if (Math.abs(totalPaid - totalAmountArs) > 0.01) {
-      return toast.error("La suma de los pagos debe coincidir con el total de la compra");
+      return toast.error(
+        "La suma de los pagos debe coincidir con el total de la compra"
+      );
     }
 
     const currency = form.currency;
@@ -537,26 +588,28 @@ const PurchasesConfig = () => {
       return toast.error(`No hay cotizacion activa para ${currency}`);
     }
 
-    const { data: purchase, error } = await supabase
-      .from("purchases")
-      .insert([
-        {
-          provider_id: Number(form.provider_id),
-          purchase_date: form.purchase_date,
-          currency,
-          total_amount: totalAmount,
-          total_amount_ars: totalAmountArs,
-          fx_rate_used: currency === "ARS" ? null : rate,
-          notes: form.notes || null,
-          status: "active",
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      toast.error("No se pudo registrar la compra", { description: error.message });
-      return;
+    const duplicateIdentifiers = new Set();
+    for (const item of items) {
+      if (!isSerialTrackedVariant(item.variant)) continue;
+      const identifiers = parseIdentifiers(item.identifiersText);
+      const expected = Number(item.quantity || 0);
+      if (identifiers.length !== expected) {
+        return toast.error(
+          `${item.variant?.products?.name || "La variante"} requiere ${expected} IMEI/SN y cargaste ${identifiers.length}`
+        );
+      }
+      for (const identifier of identifiers) {
+        const normalized = normalizeIdentifier(identifier);
+        if (!normalized) {
+          return toast.error("Todos los IMEI/SN deben estar completos");
+        }
+        if (duplicateIdentifiers.has(normalized)) {
+          return toast.error(
+            `El IMEI/SN ${identifier} esta repetido en la compra`
+          );
+        }
+        duplicateIdentifiers.add(normalized);
+      }
     }
 
     const paymentRows = payments.map((payment) => {
@@ -573,48 +626,45 @@ const PurchasesConfig = () => {
         usdtRate
       );
       return {
-        purchase_id: purchase.id,
         account_id: Number(payment.account_id),
+        payment_method_id: null,
         amount: paymentAmount,
         currency: paymentCurrency,
         amount_ars:
           paymentCurrency === "ARS" ? paymentAmount : paymentAmount * paymentRate,
         fx_rate_used: paymentCurrency === "ARS" ? null : paymentRate,
-        notes: form.notes || null,
       };
     });
 
-    const { error: paymentError } = await supabase
-      .from("purchase_payments")
-      .insert(paymentRows);
-
-    if (paymentError) {
-      toast.error("Compra creada, pero falló el pago", {
-        description: paymentError.message,
-      });
-      return;
-    }
-
-    const payloadItems = items.map((i) => ({
-      purchase_id: purchase.id,
-      variant_id: i.variant_id,
-      quantity: Number(i.quantity || 0),
-      unit_cost: Number(i.unit_cost || 0),
-      subtotal: Number(i.quantity || 0) * Number(i.unit_cost || 0),
+    const payloadItems = items.map((item) => ({
+      variant_id: item.variant_id,
+      quantity: Number(item.quantity || 0),
+      unit_cost: Number(item.unit_cost || 0),
+      identifiers: isSerialTrackedVariant(item.variant)
+        ? parseIdentifiers(item.identifiersText)
+        : [],
     }));
 
-    const { error: itemsError } = await supabase
-      .from("purchase_items")
-      .insert(payloadItems);
+    const { error } = await supabase.rpc("create_purchase_with_inventory_units", {
+      p_provider_id: Number(form.provider_id),
+      p_purchase_date: form.purchase_date,
+      p_currency: currency,
+      p_total_amount: totalAmount,
+      p_total_amount_ars: totalAmountArs,
+      p_fx_rate_used: currency === "ARS" ? null : rate,
+      p_notes: form.notes || null,
+      p_items: payloadItems,
+      p_payments: paymentRows,
+    });
 
-    if (itemsError) {
-      toast.error("Compra creada, pero fallaron los items", {
-        description: itemsError.message,
+    if (error) {
+      toast.error("No se pudo registrar la compra", {
+        description: error.message,
       });
       return;
     }
 
-      toast.success("Compra registrada");
+    toast.success("Compra registrada");
     setForm((f) => ({
       ...f,
       notes: "",
@@ -637,7 +687,7 @@ const PurchasesConfig = () => {
     const { data, error } = await supabase
       .from("purchase_items")
       .select(
-        "id, quantity, unit_cost, subtotal, product_variants(variant_name, color, storage, ram, products(name))"
+        "id, quantity, unit_cost, subtotal, product_variants(variant_name, color, storage, ram, products(name, inventory_tracking_mode))"
       )
       .eq("purchase_id", purchase.id)
       .order("id", { ascending: true });
@@ -680,7 +730,7 @@ const PurchasesConfig = () => {
         supabase
           .from("purchase_items")
           .select(
-            "id, variant_id, quantity, unit_cost, subtotal, product_variants(id, variant_name, color, storage, ram, products(name))"
+            "id, variant_id, quantity, unit_cost, subtotal, product_variants(id, variant_name, color, storage, ram, products(name, inventory_tracking_mode))"
           )
           .eq("purchase_id", purchase.id)
           .order("id", { ascending: true }),
@@ -700,6 +750,13 @@ const PurchasesConfig = () => {
       return;
     }
 
+    if ((itemsData || []).some((item) => isSerialTrackedVariant(item.product_variants))) {
+      toast.error(
+        "Las compras con productos serializados todavia no se pueden editar desde este formulario"
+      );
+      return;
+    }
+
     setEditingPurchase(purchaseData);
     setEditForm({
       provider_id: String(purchaseData.provider_id || ""),
@@ -715,6 +772,7 @@ const PurchasesConfig = () => {
         variant: item.product_variants,
         quantity: item.quantity,
         unit_cost: item.unit_cost,
+        identifiersText: "",
       }))
     );
     setEditPayments(
@@ -732,6 +790,11 @@ const PurchasesConfig = () => {
     if (!editingPurchase?.id) return;
     if (editingPurchase.status === "cancelled") {
       return toast.error("No se puede editar una compra anulada");
+    }
+    if (editItems.some((item) => isSerialTrackedVariant(item.variant))) {
+      return toast.error(
+        "Las compras con productos serializados todavia no se pueden editar"
+      );
     }
     if (!editForm.provider_id) return toast.error("Selecciona un proveedor");
     if (!editItems.length) return toast.error("Agrega al menos un producto");
@@ -1057,7 +1120,14 @@ const PurchasesConfig = () => {
                         onClick={() => handleAddItem(v)}
                         className="w-full text-left px-3 py-2 hover:bg-muted"
                       >
-                        {v.products?.name} {v.variant_name} {v.color}
+                        <div className="font-medium">
+                          {v.products?.name} {v.variant_name} {v.color}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {isSerialTrackedVariant(v)
+                            ? "Serializado: requiere IMEI/SN por unidad"
+                            : "Por cantidad"}
+                        </div>
                       </button>
                     ))
                   ) : (
@@ -1087,6 +1157,11 @@ const PurchasesConfig = () => {
                     <TableCell>
                       {item.variant?.products?.name} {item.variant?.variant_name}{" "}
                       {item.variant?.color}
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {isSerialTrackedVariant(item.variant)
+                          ? "Serializado"
+                          : "Por cantidad"}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Input
@@ -1128,6 +1203,32 @@ const PurchasesConfig = () => {
                     </TableCell>
                   </TableRow>
                 ))}
+                {items
+                  .filter((item) => isSerialTrackedVariant(item.variant))
+                  .map((item) => (
+                    <TableRow key={`serials-${item.variant_id}`}>
+                      <TableCell colSpan={5} className="bg-muted/20">
+                        <div className="grid gap-2">
+                          <Label>IMEI/SN</Label>
+                          <Textarea
+                            placeholder={`Carga ${item.quantity || 0} IMEI/SN, uno por linea`}
+                            value={item.identifiersText || ""}
+                            onChange={(e) =>
+                              handleUpdateItem(
+                                item.variant_id,
+                                "identifiersText",
+                                e.target.value
+                              )
+                            }
+                          />
+                          <div className="text-xs text-muted-foreground">
+                            Cargados: {parseIdentifiers(item.identifiersText).length} /{" "}
+                            {Number(item.quantity || 0)}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 {items.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground">
@@ -1977,3 +2078,5 @@ const PurchasesConfig = () => {
 };
 
 export default PurchasesConfig;
+
+
