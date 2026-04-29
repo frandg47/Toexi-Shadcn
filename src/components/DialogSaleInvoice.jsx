@@ -15,6 +15,12 @@ import { toast } from "sonner";
 export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSurcharge }) {
   if (!sale) return null;
 
+  const getVariantQuantity = (variant) =>
+    Number(variant?.quantity || variant?.imeis?.length || 0);
+
+  const getVariantIdentifiers = (variant) =>
+    Array.isArray(variant?.imeis) ? variant.imeis.filter(Boolean) : [];
+
   // Helper para detectar método USD
   const getPaymentDisplayCurrency = (methodName) => {
     const upper = methodName?.toUpperCase();
@@ -81,8 +87,9 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
 
         p_items: safeSale.variants.map(v => ({
           variant_id: v.variant_id ?? v.id,
-          quantity: v.quantity,
+          quantity: getVariantQuantity(v),
           imeis: v.imeis,
+          inventory_unit_ids: v.inventory_unit_ids || [],
           usd_price: v.usd_price,
         })),
 
@@ -223,10 +230,10 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
         v.product_name,
         v.variant_name ? v.variant_name : "Modelo Base",
         v.color || "-",
-        v.imeis.length,                      // 📌 cantidad = largo del array
-        (v.imeis || []).join("\n"),          // 📌 IMEIs separados por saltos de línea
+        getVariantQuantity(v),
+        getVariantIdentifiers(v).join("\n"),
         `USD ${v.usd_price.toFixed(2)}`,
-        `$ ${(v.usd_price * v.imeis.length * safeSale.fx_rate_used)
+        `$ ${(v.usd_price * getVariantQuantity(v) * safeSale.fx_rate_used)
           .toLocaleString("es-AR")}`,
       ]),
 
@@ -416,12 +423,12 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
             {safeSale.variants.map((v, i) => (
               <div key={i} className="text-xs border-b py-1">
                 <div className="font-medium">
-                  {v.product_name} {v.variant_name} — {v.imeis.length}u · USD {v.usd_price}
+                  {v.product_name} {v.variant_name} — {getVariantQuantity(v)}u · USD {v.usd_price}
                 </div>
 
-                {v.imeis?.length > 0 && (
+                {getVariantIdentifiers(v).length > 0 && (
                   <div className="text-muted-foreground">
-                    IMEIs: {v.imeis.join(", ")}
+                    IMEIs: {getVariantIdentifiers(v).join(", ")}
                   </div>
                 )}
 

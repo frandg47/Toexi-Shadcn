@@ -78,6 +78,15 @@ const formatVariantLabel = (variant) => {
     .join(" ");
 };
 
+const normalizeIdentifier = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+const isSerialTrackedVariant = (variant) =>
+  variant?.products?.inventory_tracking_mode === "serial";
+
 const formatARS = (value) =>
   new Intl.NumberFormat("es-AR", {
     style: "currency",
@@ -162,7 +171,7 @@ export default function AftersalesPage() {
             .order("created_at", { ascending: false }),
           supabase
             .from("product_variants")
-            .select("id, variant_name, color, stock, products(name, active)")
+            .select("id, variant_name, color, stock, products(name, active, inventory_tracking_mode)")
             .gt("stock", 0)
             .order("id", { ascending: false }),
         ]);
@@ -291,6 +300,10 @@ export default function AftersalesPage() {
     () => customers.find((customer) => String(customer.id) === String(saleForm.customer_id)) || null,
     [customers, saleForm.customer_id],
   );
+  const selectedAftersalesVariant = useMemo(
+    () => variants.find((variant) => String(variant.id) === String(form.variant_id)) || null,
+    [form.variant_id, variants],
+  );
 
   const selectedSeller = useMemo(
     () => sellers.find((seller) => String(seller.id_auth) === String(saleForm.seller_id)) || null,
@@ -405,6 +418,41 @@ export default function AftersalesPage() {
   const handleRegister = async () => {
     if (!form.variant_id) return toast.error("Selecciona una variante");
 
+    const selectedVariant = variants.find(
+      (variant) => String(variant.id) === String(form.variant_id),
+    );
+
+    let inventoryUnitId = null;
+    if (isSerialTrackedVariant(selectedVariant)) {
+      if (Number(form.quantity || 0) !== 1) {
+        return toast.error("Los productos serializados deben enviarse de a una unidad");
+      }
+
+      const normalizedIdentifier = normalizeIdentifier(form.imei);
+      if (!normalizedIdentifier) {
+        return toast.error("Debes indicar el IMEI/SN del equipo serializado");
+      }
+
+      const { data: inventoryUnits, error: inventoryError } = await supabase
+        .from("inventory_units")
+        .select("id")
+        .eq("variant_id", Number(form.variant_id))
+        .eq("identifier_normalized", normalizedIdentifier)
+        .eq("status", "available")
+        .limit(1);
+
+      if (inventoryError) {
+        return toast.error("No se pudo validar la unidad serializada", {
+          description: inventoryError.message,
+        });
+      }
+
+      inventoryUnitId = inventoryUnits?.[0]?.id || null;
+      if (!inventoryUnitId) {
+        return toast.error("No se encontró una unidad disponible con ese IMEI/SN");
+      }
+    }
+
     try {
       setSubmitting(true);
       const { error } = await supabase.rpc("register_aftersales_device", {
@@ -413,6 +461,7 @@ export default function AftersalesPage() {
         p_imei: form.imei.trim() || null,
         p_notes: form.notes.trim() || null,
         p_include_in_stock_cost_balance: form.include_in_stock_cost_balance || false,
+        p_inventory_unit_id: inventoryUnitId,
       });
       if (error) throw error;
       toast.success("Equipo enviado a postventa");
@@ -722,14 +771,25 @@ export default function AftersalesPage() {
           <div className="space-y-4">
             <div className="grid gap-1">
               <Label>Variante</Label>
-              <Select value={form.variant_id} onValueChange={(value) => setForm((prev) => ({ ...prev, variant_id: value }))}>
+              <Select
+                value={form.variant_id}
+                onValueChange={(value) => {
+                  const nextVariant = variants.find((variant) => String(variant.id) === String(value));
+                  setForm((prev) => ({
+                    ...prev,
+                    variant_id: value,
+                    quantity: isSerialTrackedVariant(nextVariant) ? "1" : prev.quantity,
+                    imei: "",
+                  }));
+                }}
+              >
                 <SelectTrigger><SelectValue placeholder="Seleccionar variante" /></SelectTrigger>
                 <SelectContent>{variants.map((variant) => <SelectItem key={variant.id} value={String(variant.id)}>{formatVariantLabel(variant)} | Stock: {variant.stock}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid gap-1"><Label>Cantidad</Label><Input type="number" min="1" value={form.quantity} onChange={(e) => setForm((prev) => ({ ...prev, quantity: e.target.value }))} /></div>
-              <div className="grid gap-1"><Label>IMEI</Label><Input placeholder="IMEI del equipo" value={form.imei} onChange={(e) => setForm((prev) => ({ ...prev, imei: e.target.value }))} /></div>
+              <div className="grid gap-1"><Label>Cantidad</Label><Input type="number" min="1" value={form.quantity} disabled={isSerialTrackedVariant(selectedAftersalesVariant)} onChange={(e) => setForm((prev) => ({ ...prev, quantity: e.target.value }))} /></div>
+              <div className="grid gap-1"><Label>IMEI / SN</Label><Input placeholder="IMEI o serie del equipo" value={form.imei} onChange={(e) => setForm((prev) => ({ ...prev, imei: e.target.value }))} /></div>
             </div>
             <div className="grid gap-1"><Label>Notas</Label><Textarea placeholder="Detalle del defecto o contexto" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} /></div>
             <div className="flex items-center justify-between rounded-md border p-3">

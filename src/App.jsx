@@ -42,7 +42,7 @@ import MovementsConfig from "./pages/config/MovementsConfig";
 import InstallPromptBanner from "./components/InstallPromptBanner";
 import IOSInstallBanner from "@/components/IOSInstallBanner";
 
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = false;
 
 // ðŸ”’ COMPONENTE DE RUTA PROTEGIDA
 function ProtectedRoute({ children, allowedRoles }) {

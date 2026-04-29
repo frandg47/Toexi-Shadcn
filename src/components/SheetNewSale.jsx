@@ -41,6 +41,7 @@ import {
 
 export default function SheetNewSale({ open, onOpenChange, lead }) {
   const ARS_TOLERANCE = 10;
+  const SERIAL_AVAILABLE_STATUS = "available";
   // --- Wizard ---
   const [step, setStep] = useState(1);
 
@@ -140,6 +141,29 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       minimumFractionDigits: 2,
     }).format(n || 0);
 
+  const normalizeIdentifier = (value) =>
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+
+  const isSerialTrackedVariant = (variant) =>
+    variant?.products?.inventory_tracking_mode === "serial" ||
+    variant?.inventory_tracking_mode === "serial";
+
+  const getVariantQuantity = (variant) =>
+    isSerialTrackedVariant(variant)
+      ? variant?.inventory_unit_ids?.length ?? 0
+      : Number(variant?.quantity || 0);
+
+  const buildSelectedVariant = (variant) => ({
+    ...variant,
+    quantity: isSerialTrackedVariant(variant) ? 0 : 1,
+    imeis: [],
+    inventory_unit_ids: [],
+    serialSearch: "",
+  });
+
   const formatUSD = (n) =>
     new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -154,7 +178,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   const baseTotal = useMemo(() => {
     if (!exchangeRate) return 0;
     return selectedVariants.reduce(
-      (acc, v) => acc + getPriceUSD(v) * (v.imeis?.length ?? 0) * exchangeRate,
+      (acc, v) => acc + getPriceUSD(v) * getVariantQuantity(v) * exchangeRate,
       0
     );
 
@@ -322,7 +346,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   // Total USD original
   const subtotalUSD = useMemo(() => {
     return selectedVariants.reduce(
-      (acc, v) => acc + getPriceUSD(v) * v.imeis.length,
+      (acc, v) => acc + getPriceUSD(v) * getVariantQuantity(v),
       0
     );
   }, [selectedVariants, priceType]);
@@ -532,18 +556,12 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       const { data, error } = await supabase
         .from("product_variants")
         .select(
-          "id, variant_name, color, storage, ram, usd_price, wholesale_price, stock, products(name)"
+          "id, variant_name, color, storage, ram, usd_price, wholesale_price, stock, products(name, inventory_tracking_mode)"
         )
         .in("id", ids);
 
       if (!error && data) {
-        setSelectedVariants(
-          data.map((v) => ({
-            ...v,
-            imeis: [""] // 1 unidad por defecto, con 1 IMEI vacío
-          }))
-        );
-
+        setSelectedVariants(data.map((v) => buildSelectedVariant(v)));
       }
     };
     enrichVariants();
@@ -573,7 +591,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     const fetchProducts = async () => {
       const { data } = await supabase
         .from("products")
-        .select("id, name, active, product_variants(stock)")
+        .select("id, name, active, inventory_tracking_mode, product_variants(stock)")
         .eq("active", true)
         .ilike("name", `%${q}%`)
         .limit(30);
@@ -586,6 +604,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
         return {
           id: product.id,
           name: product.name,
+          inventory_tracking_mode: product.inventory_tracking_mode || "quantity",
           stock: stockTotal,
         };
       });
@@ -603,7 +622,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
         const { data } = await supabase
           .from("product_variants")
           .select(
-            "id, variant_name, color, storage, ram, usd_price, wholesale_price, stock, products(name)"
+            "id, variant_name, color, storage, ram, usd_price, wholesale_price, stock, products(name, inventory_tracking_mode)"
           )
           .eq("product_id", selectedProduct.id)
           .eq("active", true)
@@ -631,18 +650,21 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
   // ========== CART HANDLERS ==========
   const handleAddVariant = (variant) => {
     setSelectedVariants(prev => {
-      // Si ya existe, no agregar otro: solo agregar un nuevo IMEI vacío
       const existing = prev.find(v => v.id === variant.id);
       if (existing) {
-        return prev.map(v =>
+        if (isSerialTrackedVariant(existing)) {
+          toast.info("La variante serializada ya está en el carrito");
+          return prev;
+        }
+
+        return prev.map((v) =>
           v.id === variant.id
-            ? { ...v, imeis: [...v.imeis, ""] }
+            ? { ...v, quantity: Number(v.quantity || 0) + 1 }
             : v
         );
       }
 
-      // Si es nuevo, agregamos un item con un IMEI vacío
-      return [...prev, { ...variant, imeis: [""] }];
+      return [...prev, buildSelectedVariant(variant)];
     });
   };
 
@@ -678,7 +700,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       const { data, error } = await supabase
         .from("product_variants")
         .select(
-          "id, variant_name, color, storage, ram, usd_price, wholesale_price, stock, barcode, products(name)"
+          "id, variant_name, color, storage, ram, usd_price, wholesale_price, stock, barcode, products(name, inventory_tracking_mode)"
         )
         .eq("barcode", barcode)
         .eq("active", true)
@@ -706,34 +728,91 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     }
   };
 
-  const handleIMEIChange = (variantId, index, value) => {
-    setSelectedVariants(prev =>
-      prev.map(v =>
+  const handleQuantityChange = (variantId, value) => {
+    const nextQuantity = Math.max(Number(value || 0), 1);
+    setSelectedVariants((prev) =>
+      prev.map((v) =>
+        v.id === variantId && !isSerialTrackedVariant(v)
+          ? { ...v, quantity: nextQuantity }
+          : v
+      )
+    );
+  };
+
+  const handleSerialSearchChange = (variantId, value) => {
+    setSelectedVariants((prev) =>
+      prev.map((v) =>
+        v.id === variantId ? { ...v, serialSearch: value } : v
+      )
+    );
+  };
+
+  const handleSerialUnitSubmit = async (variantId) => {
+    const variant = selectedVariants.find((item) => item.id === variantId);
+    if (!variant || !isSerialTrackedVariant(variant)) return;
+
+    const serialSearch = variant.serialSearch?.trim();
+    if (!serialSearch) return;
+
+    const normalizedIdentifier = normalizeIdentifier(serialSearch);
+    if (!normalizedIdentifier) return;
+
+    const duplicateInCart = selectedVariants.some((item) =>
+      (item.imeis || []).some(
+        (identifier) => normalizeIdentifier(identifier) === normalizedIdentifier
+      )
+    );
+
+    if (duplicateInCart) {
+      toast.error("Esa unidad ya fue agregada al carrito");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("inventory_units")
+      .select("id, variant_id, identifier_value, status")
+      .eq("variant_id", variantId)
+      .eq("identifier_normalized", normalizedIdentifier)
+      .eq("status", SERIAL_AVAILABLE_STATUS)
+      .limit(1);
+
+    if (error) {
+      console.error("Error buscando unidad serializada:", error);
+      toast.error("No se pudo validar la unidad en inventario");
+      return;
+    }
+
+    const inventoryUnit = data?.[0];
+    if (!inventoryUnit) {
+      toast.error("No se encontró una unidad disponible con ese IMEI/SN");
+      return;
+    }
+
+    setSelectedVariants((prev) =>
+      prev.map((item) =>
+        item.id === variantId
+          ? {
+              ...item,
+              inventory_unit_ids: [...(item.inventory_unit_ids || []), inventoryUnit.id],
+              imeis: [...(item.imeis || []), inventoryUnit.identifier_value],
+              serialSearch: "",
+            }
+          : item
+      )
+    );
+
+    toast.success("Unidad agregada desde inventario");
+  };
+
+  const removeSerialUnit = (variantId, unitIndex) => {
+    setSelectedVariants((prev) =>
+      prev.map((v) =>
         v.id === variantId
           ? {
-            ...v,
-            imeis: v.imeis.map((imei, i) => (i === index ? value : imei)),
-          }
-          : v
-      )
-    );
-  };
-
-  const addIMEIField = (variantId) => {
-    setSelectedVariants(prev =>
-      prev.map(v =>
-        v.id === variantId
-          ? { ...v, imeis: [...v.imeis, ""] }
-          : v
-      )
-    );
-  };
-
-  const removeIMEIField = (variantId, index) => {
-    setSelectedVariants(prev =>
-      prev.map(v =>
-        v.id === variantId
-          ? { ...v, imeis: v.imeis.filter((_, i) => i !== index) }
+              ...v,
+              inventory_unit_ids: (v.inventory_unit_ids || []).filter((_, index) => index !== unitIndex),
+              imeis: (v.imeis || []).filter((_, index) => index !== unitIndex),
+            }
           : v
       )
     );
@@ -802,6 +881,22 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       return toast.error("No hay cotizacion activa para USDT");
     }
 
+    const emptySerialVariant = selectedVariants.find(
+      (variant) => isSerialTrackedVariant(variant) && getVariantQuantity(variant) === 0
+    );
+    if (emptySerialVariant) {
+      return toast.error(
+        `Debes seleccionar al menos una unidad para ${emptySerialVariant.products?.name || "la variante"}`
+      );
+    }
+
+    const invalidQuantityVariant = selectedVariants.find(
+      (variant) => !isSerialTrackedVariant(variant) && getVariantQuantity(variant) <= 0
+    );
+    if (invalidQuantityVariant) {
+      return toast.error("Todas las cantidades deben ser mayores a cero");
+    }
+
     // Chequeo de stock
     const recheckIds = selectedVariants.map((v) => v.id);
     const { data: fresh, error: freshErr } = await supabase
@@ -813,7 +908,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
     const stockMap = Object.fromEntries(fresh.map((f) => [f.id, f.stock]));
     const insufficient = selectedVariants.find(
-      (v) => v.imeis.length > (stockMap[v.id] ?? 0)
+      (v) => getVariantQuantity(v) > (stockMap[v.id] ?? 0)
     );
     if (insufficient) {
       return toast.error(`Sin stock para ${insufficient.products.name}`);
@@ -821,7 +916,7 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
     // ✅ Armamos los datos que irá al modal
     const items = selectedVariants.map((v) => {
-      const quantity = v.imeis.length;
+      const quantity = getVariantQuantity(v);
 
       return {
         variant_id: v.id,
@@ -831,9 +926,11 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
         storage: v.storage,
         ram: v.ram,
         usd_price: getPriceUSD(v),
+        inventory_tracking_mode: v.products?.inventory_tracking_mode || "quantity",
 
-        quantity, // ← AHORA VIENE DE IMEIs
-        imeis: v.imeis, // ← ENVIAMOS TODOS LOS IMEIs
+        quantity,
+        imeis: v.imeis || [],
+        inventory_unit_ids: v.inventory_unit_ids || [],
 
         subtotal_usd: getPriceUSD(v) * quantity,
         subtotal_ars: getPriceUSD(v) * quantity * exchangeRate,
@@ -1240,7 +1337,8 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                   <h4 className="text-sm font-semibold">Carrito de venta</h4>
 
                   {selectedVariants.map((v) => {
-                    const quantity = v.imeis?.length ?? 0;
+                    const quantity = getVariantQuantity(v);
+                    const isSerialTracked = isSerialTrackedVariant(v);
 
                     return (
                       <div
@@ -1270,42 +1368,87 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                           </button>
                         </div>
 
-                        {/* Campos IMEI dinámicos */}
+                        {/* Unidades / cantidad */}
                         <div>
                           <label className="text-xs text-muted-foreground">
                             Cantidad ({quantity})
                           </label>
 
                           <div className="space-y-2 mt-1">
-                            {(v.imeis || []).map((imei, idx) => (
-                              <div key={idx} className="flex gap-2 items-center">
+                            {isSerialTracked ? (
+                              <>
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder="Escanear o escribir IMEI/SN"
+                                    value={v.serialSearch || ""}
+                                    onChange={(e) =>
+                                      handleSerialSearchChange(v.id, e.target.value)
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        handleSerialUnitSubmit(v.id);
+                                      }
+                                    }}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => handleSerialUnitSubmit(v.id)}
+                                  >
+                                    Agregar
+                                  </Button>
+                                </div>
+
+                                {(v.imeis || []).length > 0 ? (
+                                  (v.imeis || []).map((imei, idx) => (
+                                    <div key={`${v.id}-${imei}-${idx}`} className="flex gap-2 items-center">
+                                      <Input value={imei} readOnly />
+                                      <Button
+                                        variant="destructive"
+                                        size="icon"
+                                        onClick={() => removeSerialUnit(v.id, idx)}
+                                      >
+                                        <IconTrash className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">
+                                    Agrega unidades existentes del inventario para esta variante.
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() =>
+                                    handleQuantityChange(v.id, Math.max(quantity - 1, 1))
+                                  }
+                                >
+                                  <IconChevronLeft className="h-4 w-4" />
+                                </Button>
                                 <Input
-                                  placeholder={`IMEI/código único ${idx + 1}`}
-                                  value={imei}
+                                  type="number"
+                                  min="1"
+                                  value={quantity}
                                   onChange={(e) =>
-                                    handleIMEIChange(v.id, idx, e.target.value)
+                                    handleQuantityChange(v.id, e.target.value)
                                   }
                                 />
-
-                                {v.imeis.length > 1 && (
-                                  <Button
-                                    variant="destructive"
-                                    size="icon"
-                                    onClick={() => removeIMEIField(v.id, idx)}
-                                  >
-                                    <IconTrash className="h-4 w-4" />
-                                  </Button>
-                                )}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => handleQuantityChange(v.id, quantity + 1)}
+                                >
+                                  <IconChevronRight className="h-4 w-4" />
+                                </Button>
                               </div>
-                            ))}
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => addIMEIField(v.id)}
-                            >
-                              + Agregar IMEI/cod
-                            </Button>
+                            )}
                           </div>
                         </div>
 
@@ -1346,12 +1489,23 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                     <Button
                       disabled={selectedVariants.length === 0}
                       onClick={() => {
-                        // Validar IMEI vacío
-                        const missing = selectedVariants.find((v) =>
-                          v.imeis.some((i) => !i.trim())
+                        const missingSerial = selectedVariants.find(
+                          (variant) =>
+                            isSerialTrackedVariant(variant) &&
+                            getVariantQuantity(variant) === 0
                         );
-                        if (missing) {
-                          toast.error("Todos los IMEIs deben estar completos");
+                        if (missingSerial) {
+                          toast.error("Debes seleccionar las unidades serializadas antes de continuar");
+                          return;
+                        }
+
+                        const invalidQuantity = selectedVariants.find(
+                          (variant) =>
+                            !isSerialTrackedVariant(variant) &&
+                            getVariantQuantity(variant) <= 0
+                        );
+                        if (invalidQuantity) {
+                          toast.error("Todas las cantidades deben ser mayores a cero");
                           return;
                         }
                         setStep(3);

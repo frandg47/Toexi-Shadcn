@@ -153,6 +153,15 @@ const formatWarrantyVariantForNote = (variant) =>
         .filter(Boolean)
         .join(" ") || "-";
 
+const normalizeIdentifier = (value) =>
+    String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+
+const isSerialTrackedVariant = (variant) =>
+    variant?.products?.inventory_tracking_mode === "serial";
+
 const buildWarrantyPdfLines = (warranties = []) =>
     warranties.flatMap((warranty) => {
         const lines = [
@@ -365,7 +374,11 @@ export function SalesList() {
     const [warrantiesBySale, setWarrantiesBySale] = useState({});
     const selectedWarrantyItem = useMemo(
         () =>
-            warrantyItems.find((item) => String(item.id) === String(selectedWarrantyItemId)) ||
+            warrantyItems.find(
+                (item) =>
+                    String(item.warranty_selection_id || item.id) ===
+                    String(selectedWarrantyItemId),
+            ) ||
             null,
         [warrantyItems, selectedWarrantyItemId],
     );
@@ -1000,6 +1013,7 @@ export function SalesList() {
         variant_id: variantId ? String(variantId) : "",
         quantity: String(quantity),
         imei: "",
+        inventory_unit_id: null,
     });
 
     const updateWarrantyReplacementRow = (rowId, patch) => {
@@ -1032,7 +1046,10 @@ export function SalesList() {
         }
 
         try {
-            const [{ data: itemsData, error: itemsError }, { data: variantsData, error: variantsError }] =
+            const [
+                { data: itemsData, error: itemsError },
+                { data: variantsData, error: variantsError },
+            ] =
                 await Promise.all([
                     supabase
                         .from("sale_items")
@@ -1042,7 +1059,7 @@ export function SalesList() {
                         .order("id", { ascending: true }),
                     supabase
                         .from("product_variants")
-                        .select("id, variant_name, color, stock, usd_price, products(name, active)")
+                        .select("id, variant_name, color, stock, usd_price, products(name, active, inventory_tracking_mode)")
                         .gt("stock", 0)
                         .order("id", { ascending: true }),
                 ]);
@@ -1050,9 +1067,48 @@ export function SalesList() {
             if (itemsError) throw itemsError;
             if (variantsError) throw variantsError;
 
-            const validItems = (itemsData || []).filter(
-                (item) => item.variant_id && Number(item.quantity || 0) > 0,
-            );
+            const itemIds = (itemsData || []).map((item) => item.id).filter(Boolean);
+            let itemImeisData = [];
+            if (itemIds.length > 0) {
+                const { data: fetchedImeis, error: itemImeisError } = await supabase
+                    .from("sale_item_imeis")
+                    .select("id, sale_item_id, imei, inventory_unit_id")
+                    .in("sale_item_id", itemIds);
+                if (itemImeisError) throw itemImeisError;
+                itemImeisData = fetchedImeis || [];
+            }
+
+            const imeisBySaleItem = (itemImeisData || []).reduce((acc, itemImei) => {
+                if (!acc[itemImei.sale_item_id]) acc[itemImei.sale_item_id] = [];
+                acc[itemImei.sale_item_id].push(itemImei);
+                return acc;
+            }, {});
+
+            const validItems = (itemsData || [])
+                .filter((item) => item.variant_id && Number(item.quantity || 0) > 0)
+                .flatMap((item) => {
+                    const serialUnits = (imeisBySaleItem[item.id] || []).filter(
+                        (unit) => unit.inventory_unit_id,
+                    );
+                    if (serialUnits.length === 0) {
+                        return [
+                            {
+                                ...item,
+                                sale_item_id: item.id,
+                                warranty_selection_id: `sale-item:${item.id}`,
+                            },
+                        ];
+                    }
+
+                    return serialUnits.map((unit) => ({
+                        ...item,
+                        sale_item_id: item.id,
+                        quantity: 1,
+                        imei: unit.imei,
+                        inventory_unit_id: unit.inventory_unit_id,
+                        warranty_selection_id: `sale-item:${item.id}:unit:${unit.inventory_unit_id}`,
+                    }));
+                });
             const validVariants = (variantsData || []).filter(
                 (variant) => variant.products?.active !== false,
             );
@@ -1071,7 +1127,9 @@ export function SalesList() {
             setWarrantySale(sale);
             setWarrantyItems(validItems);
             setReplacementOptions(validVariants);
-            setSelectedWarrantyItemId(String(defaultItem.id));
+            setSelectedWarrantyItemId(
+                String(defaultItem.warranty_selection_id || defaultItem.id),
+            );
             setWarrantyReplacementRows([
                 createWarrantyReplacementRow(defaultItem.variant_id || validVariants[0]?.id || "", 1),
             ]);
@@ -1102,7 +1160,9 @@ export function SalesList() {
         }
 
         const selectedItem = warrantyItems.find(
-            (item) => String(item.id) === String(selectedWarrantyItemId),
+            (item) =>
+                String(item.warranty_selection_id || item.id) ===
+                String(selectedWarrantyItemId),
         );
         const validReplacementRows = warrantyReplacementRows.filter(
             (row) => row.variant_id && Number(row.quantity || 0) > 0,
@@ -1111,6 +1171,63 @@ export function SalesList() {
         if (validReplacementRows.length === 0) {
             toast.error("Debes agregar al menos un producto de reemplazo");
             return;
+        }
+
+        const resolvedReplacementRows = [];
+        for (const row of validReplacementRows) {
+            const replacementVariant = replacementOptions.find(
+                (variant) => String(variant.id) === String(row.variant_id),
+            );
+
+            if (!replacementVariant) {
+                toast.error("Selecciona un producto de reemplazo válido");
+                return;
+            }
+
+            if (isSerialTrackedVariant(replacementVariant)) {
+                if (Number(row.quantity || 0) !== 1) {
+                    toast.error("Los reemplazos serializados deben tener cantidad 1");
+                    return;
+                }
+
+                const normalizedIdentifier = normalizeIdentifier(row.imei);
+                if (!normalizedIdentifier) {
+                    toast.error("Debes indicar el IMEI/SN de la unidad de reemplazo");
+                    return;
+                }
+
+                const { data: inventoryUnits, error: inventoryError } = await supabase
+                    .from("inventory_units")
+                    .select("id, identifier_value")
+                    .eq("variant_id", Number(row.variant_id))
+                    .eq("identifier_normalized", normalizedIdentifier)
+                    .eq("status", "available")
+                    .limit(1);
+
+                if (inventoryError) {
+                    throw inventoryError;
+                }
+
+                const inventoryUnit = inventoryUnits?.[0];
+                if (!inventoryUnit) {
+                    toast.error("No se encontró una unidad disponible para el reemplazo indicado");
+                    return;
+                }
+
+                resolvedReplacementRows.push({
+                    ...row,
+                    quantity: 1,
+                    imei: inventoryUnit.identifier_value,
+                    inventory_unit_id: inventoryUnit.id,
+                });
+                continue;
+            }
+
+            resolvedReplacementRows.push({
+                ...row,
+                inventory_unit_id: null,
+                imei: row.imei?.trim() || null,
+            });
         }
 
         if (warrantyPriceDiff.differenceUsd > 0.009) {
@@ -1142,12 +1259,14 @@ export function SalesList() {
             setWarrantyProcessing(true);
             const { error } = await supabase.rpc("process_warranty_exchange", {
                 p_sale_id: warrantySale.sale_id,
-                p_sale_item_id: Number(selectedWarrantyItemId),
+                p_sale_item_id: Number(selectedItem?.sale_item_id || selectedItem?.id),
+                p_original_inventory_unit_id: selectedItem?.inventory_unit_id || null,
                 p_return_bucket: warrantyReturnBucket,
-                p_replacements: validReplacementRows.map((row) => ({
+                p_replacements: resolvedReplacementRows.map((row) => ({
                     variant_id: Number(row.variant_id),
                     quantity: Number(row.quantity || 0),
                     imei: row.imei?.trim() || null,
+                    inventory_unit_id: row.inventory_unit_id || null,
                 })),
                 p_reason: warrantyReason.trim(),
                 p_notes: warrantyNotes.trim() || null,
@@ -2079,7 +2198,9 @@ export function SalesList() {
                                 onValueChange={(value) => {
                                     setSelectedWarrantyItemId(value);
                                     const nextItem = warrantyItems.find(
-                                        (item) => String(item.id) === String(value),
+                                        (item) =>
+                                            String(item.warranty_selection_id || item.id) ===
+                                            String(value),
                                     );
                                     const nextReplacement =
                                         replacementOptions.find(
@@ -2096,9 +2217,12 @@ export function SalesList() {
                                 <SelectTrigger>
                                     <SelectValue placeholder="Seleccionar item vendido" />
                                 </SelectTrigger>
-                                <SelectContent>
-                                    {warrantyItems.map((item) => (
-                                        <SelectItem key={item.id} value={String(item.id)}>
+                                    <SelectContent>
+                                        {warrantyItems.map((item) => (
+                                        <SelectItem
+                                            key={item.warranty_selection_id || item.id}
+                                            value={String(item.warranty_selection_id || item.id)}
+                                        >
                                             {formatVariantLabel(item)}
                                             {item.imei ? ` | IMEI: ${item.imei}` : ""}
                                         </SelectItem>
@@ -2157,11 +2281,19 @@ export function SalesList() {
                                             <Label>Producto de reemplazo</Label>
                                             <Select
                                                 value={row.variant_id}
-                                                onValueChange={(value) =>
+                                                onValueChange={(value) => {
+                                                    const selectedVariant = replacementOptions.find(
+                                                        (variant) => String(variant.id) === String(value),
+                                                    );
                                                     updateWarrantyReplacementRow(row.id, {
                                                         variant_id: value,
-                                                    })
-                                                }
+                                                        quantity: isSerialTrackedVariant(selectedVariant)
+                                                            ? "1"
+                                                            : row.quantity,
+                                                        imei: "",
+                                                        inventory_unit_id: null,
+                                                    });
+                                                }}
                                             >
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Seleccionar reemplazo" />
@@ -2191,6 +2323,7 @@ export function SalesList() {
                                                     type="number"
                                                     min="1"
                                                     value={row.quantity}
+                                                    disabled={isSerialTrackedVariant(row.variant)}
                                                     onChange={(e) =>
                                                         updateWarrantyReplacementRow(row.id, {
                                                             quantity: e.target.value,
@@ -2199,9 +2332,17 @@ export function SalesList() {
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label>IMEI nuevo</Label>
+                                                <Label>
+                                                    {isSerialTrackedVariant(row.variant)
+                                                        ? "IMEI/SN de reemplazo"
+                                                        : "IMEI nuevo"}
+                                                </Label>
                                                 <Input
-                                                    placeholder="Opcional"
+                                                    placeholder={
+                                                        isSerialTrackedVariant(row.variant)
+                                                            ? "Obligatorio para serializados"
+                                                            : "Opcional"
+                                                    }
                                                     value={row.imei}
                                                     onChange={(e) =>
                                                         updateWarrantyReplacementRow(row.id, {
