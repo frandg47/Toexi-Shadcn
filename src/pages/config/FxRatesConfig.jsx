@@ -152,10 +152,10 @@ const FxRatesConfig = () => {
   const formatDate = (dateString) =>
     dateString
       ? new Intl.DateTimeFormat("es-AR", {
-        dateStyle: "short",
-        timeStyle: "short",
-        timeZone: "America/Argentina/Buenos_Aires",
-      }).format(new Date(dateString))
+          dateStyle: "short",
+          timeStyle: "short",
+          timeZone: "America/Argentina/Buenos_Aires",
+        }).format(new Date(dateString))
       : "-";
 
   // 🆕 FUNCIÓN: Inserta la nueva cotización y desactiva las anteriores
@@ -219,7 +219,7 @@ const FxRatesConfig = () => {
     // 🚫 Chequeo previo para evitar duplicados activos
     const activeExists = rates.some(
       (r) =>
-        r.source.toLowerCase() === newRate.source.toLowerCase() && r.is_active
+        r.source.toLowerCase() === newRate.source.toLowerCase() && r.is_active,
     );
 
     if (activeExists && newRate.is_active) {
@@ -350,10 +350,11 @@ const FxRatesConfig = () => {
                   >
                     <IconCalendar className="h-4 w-4" />
                     {dateRange?.from
-                      ? `${dateRange.from.toLocaleDateString("es-AR")} → ${dateRange.to
-                        ? dateRange.to.toLocaleDateString("es-AR")
-                        : "..."
-                      }`
+                      ? `${dateRange.from.toLocaleDateString("es-AR")} → ${
+                          dateRange.to
+                            ? dateRange.to.toLocaleDateString("es-AR")
+                            : "..."
+                        }`
                       : "Seleccionar rango"}
                   </Button>
                 </PopoverTrigger>
@@ -419,7 +420,6 @@ const FxRatesConfig = () => {
           </div>
         </div>
 
-
         {/* 📈 Gráfico de variación de cotizaciones */}
         {rates.length > 0 && (
           <Card className="border shadow-sm">
@@ -445,7 +445,7 @@ const FxRatesConfig = () => {
                           if (!acc[dateKey]) acc[dateKey] = { date: dateKey };
                           acc[dateKey][rate.source] = Number(rate.rate);
                           return acc;
-                        }, {})
+                        }, {}),
                       ).sort((a, b) => new Date(a.date) - new Date(b.date))
                     }
                     margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
@@ -527,9 +527,7 @@ const FxRatesConfig = () => {
                         Activa
                       </Badge>
                     )}
-                    {isReference && (
-                      <Badge variant="outline">Referencia</Badge>
-                    )}
+                    {isReference && <Badge variant="outline">Referencia</Badge>}
                   </CardTitle>
                   <div className="flex gap-2">
                     <Button
