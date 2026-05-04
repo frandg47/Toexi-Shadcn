@@ -14,6 +14,7 @@ import {
   IconCategory2,
   IconFileDollar,
   IconCash,
+  IconBox,
 } from "@tabler/icons-react";
 
 const ConfigurationPage = () => {
@@ -44,12 +45,12 @@ const ConfigurationPage = () => {
       icon: <IconRoute2 className="h-10 w-10 text-cyan-600" />,
       path: "/dashboard/settings/sales-channels",
     },
-    // {
-    //   id: "inventory",
-    //   label: "Inventario",
-    //   icon: <IconBox className="h-10 w-10 text-amber-600" />,
-    //   path: "/dashboard/settings/inventory",
-    // },
+    {
+      id: "inventory",
+      label: "Inventario",
+      icon: <IconBox className="h-10 w-10 text-amber-600" />,
+      path: "/dashboard/settings/inventory",
+    },
     {
       id: "providers",
       label: "Proveedores",
