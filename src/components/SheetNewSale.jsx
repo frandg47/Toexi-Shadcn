@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectTrigger,
@@ -156,12 +157,13 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       ? variant?.inventory_unit_ids?.length ?? 0
       : Number(variant?.quantity || 0);
 
-  const buildSelectedVariant = (variant) => ({
+const buildSelectedVariant = (variant) => ({
     ...variant,
     quantity: isSerialTrackedVariant(variant) ? 0 : 1,
     imeis: [],
     inventory_unit_ids: [],
     serialSearch: "",
+    isFree: false,
   });
 
   const formatUSD = (n) =>
@@ -174,11 +176,11 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
 
 
 
-  // Total base en ARS (sin recargos)
+// Total base en ARS (sin recargos)
   const baseTotal = useMemo(() => {
     if (!exchangeRate) return 0;
     return selectedVariants.reduce(
-      (acc, v) => acc + getPriceUSD(v) * getVariantQuantity(v) * exchangeRate,
+      (acc, v) => acc + (v.isFree ? 0 : getPriceUSD(v) * getVariantQuantity(v) * exchangeRate),
       0
     );
 
@@ -343,10 +345,10 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     return Math.max(totalDue - paidARS, 0);
   }, [totalDue, paidARS]);
 
-  // Total USD original
+// Total USD original (excluye gratuitos)
   const subtotalUSD = useMemo(() => {
     return selectedVariants.reduce(
-      (acc, v) => acc + getPriceUSD(v) * getVariantQuantity(v),
+      (acc, v) => acc + (v.isFree ? 0 : getPriceUSD(v) * getVariantQuantity(v)),
       0
     );
   }, [selectedVariants, priceType]);
@@ -824,6 +826,14 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
     );
   };
 
+  const handleToggleFree = (variantId) => {
+    setSelectedVariants((prev) =>
+      prev.map((v) =>
+        v.id === variantId ? { ...v, isFree: !v.isFree } : v
+      )
+    );
+  };
+
 
 
 
@@ -914,9 +924,10 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
       return toast.error(`Sin stock para ${insufficient.products.name}`);
     }
 
-    // ✅ Armamos los datos que irá al modal
+// ✅ Armamos los datos que irá al modal
     const items = selectedVariants.map((v) => {
       const quantity = getVariantQuantity(v);
+      const unitPrice = v.isFree ? 0 : getPriceUSD(v);
 
       return {
         variant_id: v.id,
@@ -926,14 +937,15 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
         storage: v.storage,
         ram: v.ram,
         usd_price: getPriceUSD(v),
+        is_free: v.isFree,
         inventory_tracking_mode: v.products?.inventory_tracking_mode || "quantity",
 
         quantity,
         imeis: v.imeis || [],
         inventory_unit_ids: v.inventory_unit_ids || [],
 
-        subtotal_usd: getPriceUSD(v) * quantity,
-        subtotal_ars: getPriceUSD(v) * quantity * exchangeRate,
+        subtotal_usd: unitPrice * quantity,
+        subtotal_ars: unitPrice * quantity * exchangeRate,
       };
     });
 
@@ -1347,25 +1359,38 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                       >
                         {/* Header del item */}
                         <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium text-sm">
-                              {v.products?.name} — {v.variant_name}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {v.color} • Stock: {v.stock}
-                              {v.storage ? ` • ${v.storage}GB` : ""}
-                              {v.ram ? ` • ${v.ram} RAM` : ""}
+                          <div className="flex items-start gap-2">
+                            <div>
+                              <div className="font-medium text-sm">
+                                {v.products?.name} — {v.variant_name}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {v.color} • Stock: {v.stock}
+                                {v.storage ? ` • ${v.storage}GB` : ""}
+                                {v.ram ? ` • ${v.ram} RAM` : ""}
+                              </div>
                             </div>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveVariant(v.id)}
-                            className="p-1 rounded hover:bg-red-50 text-red-600"
-                            title="Quitar"
-                          >
-                            <IconTrash className="h-4 w-4" />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                              <Checkbox
+                                checked={v.isFree}
+                                onCheckedChange={() => handleToggleFree(v.id)}
+                              />
+                              <span className={v.isFree ? "text-green-600 font-medium" : "text-muted-foreground"}>
+                                Regalo
+                              </span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveVariant(v.id)}
+                              className="p-1 rounded hover:bg-red-50 text-red-600"
+                              title="Quitar"
+                            >
+                              <IconTrash className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
 
                         {/* Unidades / cantidad */}
@@ -1459,12 +1484,20 @@ export default function SheetNewSale({ open, onOpenChange, lead }) {
                           </div>
 
                           <div className="text-right">
-                            <div className="text-sm font-semibold">
-                              {formatARS(getPriceUSD(v) * quantity * exchangeRate)}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              USD {getPriceUSD(v)} × {quantity}
-                            </div>
+                            {v.isFree ? (
+                              <div className="text-sm font-semibold text-green-600">
+                                SIN COSTO
+                              </div>
+                            ) : (
+                              <>
+                                <div className="text-sm font-semibold">
+                                  {formatARS(getPriceUSD(v) * quantity * exchangeRate)}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  USD {getPriceUSD(v)} × {quantity}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
