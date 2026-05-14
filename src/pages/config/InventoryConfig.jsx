@@ -65,8 +65,7 @@ const STATUS_BADGE_CLASS = {
     "border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200",
   reserved:
     "border-sky-200 bg-sky-100 text-sky-800 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-200",
-  sold:
-    "border-zinc-200 bg-zinc-100 text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200",
+  sold: "border-zinc-200 bg-zinc-100 text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200",
   defective:
     "border-rose-200 bg-rose-100 text-rose-800 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-200",
   in_repair:
@@ -138,7 +137,8 @@ const normalizeText = (value) =>
 
 const getStatusLabel = (status) => STATUS_LABELS[status] || status || "-";
 
-const getEventLabel = (eventType) => EVENT_LABELS[eventType] || eventType || "-";
+const getEventLabel = (eventType) =>
+  EVENT_LABELS[eventType] || eventType || "-";
 
 const normalizeIdentifierKey = (value) =>
   String(value || "")
@@ -180,58 +180,61 @@ export default function InventoryConfig() {
   const unitsPageSize = 30;
   const [unitsTotalCount, setUnitsTotalCount] = useState(0);
 
-  const fetchInventoryData = useCallback(async (loadUnits = true) => {
-    setRefreshing(true);
+  const fetchInventoryData = useCallback(
+    async (loadUnits = true) => {
+      setRefreshing(true);
 
-    const from = (unitsPage - 1) * unitsPageSize;
-    const to = from + unitsPageSize - 1;
+      const from = (unitsPage - 1) * unitsPageSize;
+      const to = from + unitsPageSize - 1;
 
-    const [variantsResponse, unitsResponse] = await Promise.all([
-      supabase
-        .from("product_variants")
-        .select(
-          "id, variant_name, color, storage, ram, stock, stock_defective, updated_at, products(id, name, active, inventory_tracking_mode, brands(name), categories(name))"
-        ),
-      loadUnits
-        ? supabase
-            .from("inventory_units")
-            .select(
-              "id, variant_id, purchase_id, purchase_item_id, sale_id, sale_item_id, warranty_exchange_id, identifier_value, status, received_at, sold_at, returned_at, notes, created_at, updated_at, variant:product_variants!inventory_units_variant_id_fkey(id, variant_name, color, storage, ram, products(id, name, inventory_tracking_mode, brands(name), categories(name))), purchase:purchases!inventory_units_purchase_id_fkey(id, purchase_date, providers(name)), sale:sales!inventory_units_sale_id_fkey(id, sale_date, customers(name, last_name))",
-              { count: "exact" }
-            )
-            .order("identifier_value", { ascending: true, nullsFirst: false })
-            .range(from, to)
-        : Promise.resolve({ data: units, count: unitsTotalCount }),
-    ]);
+      const [variantsResponse, unitsResponse] = await Promise.all([
+        supabase
+          .from("product_variants")
+          .select(
+            "id, variant_name, color, storage, ram, stock, stock_defective, updated_at, products(id, name, active, inventory_tracking_mode, brands(name), categories(name))",
+          ),
+        loadUnits
+          ? supabase
+              .from("inventory_units")
+              .select(
+                "id, variant_id, purchase_id, purchase_item_id, sale_id, sale_item_id, warranty_exchange_id, identifier_value, status, received_at, sold_at, returned_at, notes, created_at, updated_at, variant:product_variants!inventory_units_variant_id_fkey(id, variant_name, color, storage, ram, products(id, name, inventory_tracking_mode, brands(name), categories(name))), purchase:purchases!inventory_units_purchase_id_fkey(id, purchase_date, providers(name)), sale:sales!inventory_units_sale_id_fkey(id, sale_date, customers(name, last_name))",
+                { count: "exact" },
+              )
+              .order("identifier_value", { ascending: true, nullsFirst: false })
+              .range(from, to)
+          : Promise.resolve({ data: units, count: unitsTotalCount }),
+      ]);
 
-    if (variantsResponse.error || unitsResponse.error) {
-      console.error(variantsResponse.error || unitsResponse.error);
-      toast.error("Error", {
-        description: "No se pudo cargar la nueva seccion de inventario.",
+      if (variantsResponse.error || unitsResponse.error) {
+        console.error(variantsResponse.error || unitsResponse.error);
+        toast.error("Error", {
+          description: "No se pudo cargar la nueva seccion de inventario.",
+        });
+        setRefreshing(false);
+        setLoading(false);
+        return;
+      }
+
+      const nextVariants = [...(variantsResponse.data || [])].sort((a, b) => {
+        const left = formatVariantLabel(a);
+        const right = formatVariantLabel(b);
+        return left.localeCompare(right);
       });
+
+      setUnitsTotalCount(unitsResponse.count || 0);
+      const nextUnits = [...(unitsResponse.data || [])].sort((a, b) => {
+        const left = `${a.variant?.products?.name || ""} ${a.variant?.variant_name || ""} ${a.identifier_value || ""}`;
+        const right = `${b.variant?.products?.name || ""} ${b.variant?.variant_name || ""} ${b.identifier_value || ""}`;
+        return left.localeCompare(right);
+      });
+
+      setVariants(nextVariants);
+      setUnits(nextUnits);
       setRefreshing(false);
       setLoading(false);
-      return;
-    }
-
-    const nextVariants = [...(variantsResponse.data || [])].sort((a, b) => {
-      const left = formatVariantLabel(a);
-      const right = formatVariantLabel(b);
-      return left.localeCompare(right);
-    });
-
-    setUnitsTotalCount(unitsResponse.count || 0);
-    const nextUnits = [...(unitsResponse.data || [])].sort((a, b) => {
-      const left = `${a.variant?.products?.name || ""} ${a.variant?.variant_name || ""} ${a.identifier_value || ""}`;
-      const right = `${b.variant?.products?.name || ""} ${b.variant?.variant_name || ""} ${b.identifier_value || ""}`;
-      return left.localeCompare(right);
-    });
-
-    setVariants(nextVariants);
-    setUnits(nextUnits);
-    setRefreshing(false);
-    setLoading(false);
-  }, [unitsPage, unitsPageSize]);
+    },
+    [unitsPage, unitsPageSize],
+  );
 
   useEffect(() => {
     fetchInventoryData();
@@ -257,7 +260,7 @@ export default function InventoryConfig() {
     const { data, error } = await supabase
       .from("inventory_unit_events")
       .select(
-        "id, event_type, from_status, to_status, related_table, related_id, notes, payload, created_at"
+        "id, event_type, from_status, to_status, related_table, related_id, notes, payload, created_at",
       )
       .eq("inventory_unit_id", unit.id)
       .order("created_at", { ascending: false });
@@ -279,11 +282,11 @@ export default function InventoryConfig() {
     const variantCount = variants.length;
     const availableStock = variants.reduce(
       (total, variant) => total + Number(variant.stock || 0),
-      0
+      0,
     );
     const defectiveStock = variants.reduce(
       (total, variant) => total + Number(variant.stock_defective || 0),
-      0
+      0,
     );
     const serialUnits = units.length;
 
@@ -309,18 +312,23 @@ export default function InventoryConfig() {
         acc[variantId].total += 1;
         if (unit.status === "available") acc[variantId].available += 1;
         else if (unit.status === "sold") acc[variantId].sold += 1;
-        else if (["defective", "returned_defective"].includes(unit.status)) acc[variantId].defective += 1;
+        else if (["defective", "returned_defective"].includes(unit.status))
+          acc[variantId].defective += 1;
         else if (unit.status === "in_repair") acc[variantId].inRepair += 1;
         else acc[variantId].other += 1;
         return acc;
       }, {}),
-    [units]
+    [units],
   );
 
   const serialVariantsWithoutUnits = useMemo(
     () =>
       variants
-        .filter((variant) => (variant.products?.inventory_tracking_mode || "quantity") === "serial")
+        .filter(
+          (variant) =>
+            (variant.products?.inventory_tracking_mode || "quantity") ===
+            "serial",
+        )
         .map((variant) => {
           const counts = unitCountsByVariant[variant.id] || {
             available: 0,
@@ -334,57 +342,69 @@ export default function InventoryConfig() {
           return {
             ...variant,
             unitCounts: counts,
-            missingUnits: Math.max(Number(variant.stock || 0) - counts.available, 0),
-            excessUnits: Math.max(counts.available - Number(variant.stock || 0), 0),
+            missingUnits: Math.max(
+              Number(variant.stock || 0) - counts.available,
+              0,
+            ),
+            excessUnits: Math.max(
+              counts.available - Number(variant.stock || 0),
+              0,
+            ),
           };
         })
-        .filter((variant) => variant.missingUnits > 0 || variant.excessUnits > 0),
-    [unitCountsByVariant, variants]
+        .filter(
+          (variant) => variant.missingUnits > 0 || variant.excessUnits > 0,
+        ),
+    [unitCountsByVariant, variants],
   );
 
   const summaryRows = useMemo(() => {
-
     const query = normalizeText(filters.search);
 
-    return variants.filter((variant) => {
-      const trackingMode = variant.products?.inventory_tracking_mode || "quantity";
-      const searchable = normalizeText(
-        [
-          variant.products?.name,
-          variant.variant_name,
-          variant.color,
-          variant.storage,
-          variant.ram,
-          variant.products?.brands?.name,
-          variant.products?.categories?.name,
-        ]
-          .filter(Boolean)
-          .join(" ")
-      );
+    return variants
+      .filter((variant) => {
+        const trackingMode =
+          variant.products?.inventory_tracking_mode || "quantity";
+        const searchable = normalizeText(
+          [
+            variant.products?.name,
+            variant.variant_name,
+            variant.color,
+            variant.storage,
+            variant.ram,
+            variant.products?.brands?.name,
+            variant.products?.categories?.name,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        );
 
-      const matchesSearch = !query || searchable.includes(query);
-      const matchesTracking =
-        filters.trackingMode === "all" || trackingMode === filters.trackingMode;
+        const matchesSearch = !query || searchable.includes(query);
+        const matchesTracking =
+          filters.trackingMode === "all" ||
+          trackingMode === filters.trackingMode;
 
-      return matchesSearch && matchesTracking;
-    }).map((variant) => ({
-      ...variant,
-      unitCounts: unitCountsByVariant[variant.id] || {
-        total: 0,
-        available: 0,
-        sold: 0,
-        defective: 0,
-        inRepair: 0,
-        other: 0,
-      },
-    }));
+        return matchesSearch && matchesTracking;
+      })
+      .map((variant) => ({
+        ...variant,
+        unitCounts: unitCountsByVariant[variant.id] || {
+          total: 0,
+          available: 0,
+          sold: 0,
+          defective: 0,
+          inRepair: 0,
+          other: 0,
+        },
+      }));
   }, [filters.search, filters.trackingMode, unitCountsByVariant, variants]);
 
   const filteredUnits = useMemo(() => {
     const query = normalizeText(filters.search);
 
     return units.filter((unit) => {
-      const trackingMode = unit.variant?.products?.inventory_tracking_mode || "quantity";
+      const trackingMode =
+        unit.variant?.products?.inventory_tracking_mode || "quantity";
       const searchable = normalizeText(
         [
           unit.identifier_value,
@@ -397,7 +417,7 @@ export default function InventoryConfig() {
           formatCustomerName(unit.sale?.customers),
         ]
           .filter(Boolean)
-          .join(" ")
+          .join(" "),
       );
 
       const matchesSearch = !query || searchable.includes(query);
@@ -461,7 +481,9 @@ export default function InventoryConfig() {
 
     setSerialLoadSubmitting(true);
 
-    const normalizedIdentifiers = identifiers.map((identifier) => normalizeIdentifierKey(identifier));
+    const normalizedIdentifiers = identifiers.map((identifier) =>
+      normalizeIdentifierKey(identifier),
+    );
     const { data: existingUnits, error: existingError } = await supabase
       .from("inventory_units")
       .select("id, identifier_value")
@@ -509,19 +531,21 @@ export default function InventoryConfig() {
         return;
       }
 
-      const { error: eventError } = await supabase.from("inventory_unit_events").insert({
-        inventory_unit_id: insertedUnit.id,
-        event_type: "manual_serial_stock_initialized",
-        from_status: null,
-        to_status: "available",
-        related_table: "inventory_units",
-        related_id: insertedUnit.id,
-        notes: "Carga manual para conciliar stock serializado existente",
-        payload: {
-          source: "inventory_manual_load",
-          variant_id: serialLoadVariant.id,
-        },
-      });
+      const { error: eventError } = await supabase
+        .from("inventory_unit_events")
+        .insert({
+          inventory_unit_id: insertedUnit.id,
+          event_type: "manual_serial_stock_initialized",
+          from_status: null,
+          to_status: "available",
+          related_table: "inventory_units",
+          related_id: insertedUnit.id,
+          notes: "Carga manual para conciliar stock serializado existente",
+          payload: {
+            source: "inventory_manual_load",
+            variant_id: serialLoadVariant.id,
+          },
+        });
 
       if (eventError) {
         console.error(eventError);
@@ -589,7 +613,7 @@ export default function InventoryConfig() {
             .eq("id", unit.variant_id)
             .single();
           return { ...unit, variant };
-        })
+        }),
       );
 
       setDuplicateUnits(unitsWithVariantInfo);
@@ -633,15 +657,17 @@ export default function InventoryConfig() {
       return;
     }
 
-    const { error: eventError } = await supabase.from("inventory_unit_events").insert({
-      inventory_unit_id: editingUnit.id,
-      event_type: "manual_serial_stock_initialized",
-      from_status: editingUnit.status,
-      to_status: editingUnit.status,
-      related_table: "inventory_units",
-      related_id: editingUnit.id,
-      notes: `IMEI actualizado de "${editingUnit.identifier_value || '(vacío)'}" a "${newIdentifier}"`,
-    });
+    const { error: eventError } = await supabase
+      .from("inventory_unit_events")
+      .insert({
+        inventory_unit_id: editingUnit.id,
+        event_type: "manual_serial_stock_initialized",
+        from_status: editingUnit.status,
+        to_status: editingUnit.status,
+        related_table: "inventory_units",
+        related_id: editingUnit.id,
+        notes: `IMEI actualizado de "${editingUnit.identifier_value || "(vacío)"}" a "${newIdentifier}"`,
+      });
 
     if (eventError) {
       console.error(eventError);
@@ -697,15 +723,17 @@ export default function InventoryConfig() {
         return;
       }
 
-      const { error: eventCurrentError } = await supabase.from("inventory_unit_events").insert({
-        inventory_unit_id: editingUnit.id,
-        event_type: "manual_serial_stock_initialized",
-        from_status: editingUnit.status,
-        to_status: editingUnit.status,
-        related_table: "inventory_units",
-        related_id: editingUnit.id,
-        notes: `IMEI asignado: ${pendingIdentifier} (tomado de otra unidad por duplicado)`,
-      });
+      const { error: eventCurrentError } = await supabase
+        .from("inventory_unit_events")
+        .insert({
+          inventory_unit_id: editingUnit.id,
+          event_type: "manual_serial_stock_initialized",
+          from_status: editingUnit.status,
+          to_status: editingUnit.status,
+          related_table: "inventory_units",
+          related_id: editingUnit.id,
+          notes: `IMEI asignado: ${pendingIdentifier} (tomado de otra unidad por duplicado)`,
+        });
 
       if (eventCurrentError) {
         console.error(eventCurrentError);
@@ -745,10 +773,108 @@ export default function InventoryConfig() {
     setEditingUnit(null);
     setEditIdentifierValue("");
     fetchInventoryData();
-  }, [assignToCurrent, pendingIdentifier, editingUnit, duplicateUnits, user?.id, fetchInventoryData]);
+  }, [
+    assignToCurrent,
+    pendingIdentifier,
+    editingUnit,
+    duplicateUnits,
+    user?.id,
+    fetchInventoryData,
+  ]);
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-4 py-6">
+      {serialVariantsWithoutUnits.length > 0 ? (
+        <Card className="mt-6 border-amber-200 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+              <IconAlertTriangle className="h-5 w-5" />
+              Stock serializado sin unidades cargadas
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Estas variantes ya estan marcadas como serializadas, pero el stock
+              disponible no tiene todas sus unidades creadas en
+              `inventory_units`. Mientras exista esta diferencia, no vas a poder
+              vender ese stock desde el flujo serializado.
+            </p>
+
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[320px] min-w-[320px]">
+                      Producto / Variante
+                    </TableHead>
+                    <TableHead className="text-right">Stock actual</TableHead>
+                    <TableHead className="text-right">
+                      Unidades disponibles
+                    </TableHead>
+                    <TableHead className="text-right">
+                      Faltan seriales
+                    </TableHead>
+                    <TableHead className="text-right">
+                      Sobran seriales
+                    </TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {serialVariantsWithoutUnits.map((variant) => (
+                    <TableRow key={`serial-gap-${variant.id}`}>
+                      <TableCell className="w-[320px] min-w-[320px] max-w-[320px]">
+                        <div className="space-y-1 max-w-[320px]">
+                          <div
+                            className="truncate font-medium"
+                            title={formatVariantLabel(variant)}
+                          >
+                            {formatVariantLabel(variant)}
+                          </div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {[
+                              variant.products?.brands?.name,
+                              variant.products?.categories?.name,
+                            ]
+                              .filter(Boolean)
+                              .join(" - ") || "Sin clasificacion"}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {Number(variant.stock || 0)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {variant.unitCounts.available}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {variant.missingUnits}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {variant.excessUnits}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {variant.missingUnits > 0 ? (
+                          <Button
+                            size="sm"
+                            onClick={() => openSerialLoadDialog(variant)}
+                          >
+                            Cargar seriales
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Revisar inconsistencia
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
@@ -757,7 +883,11 @@ export default function InventoryConfig() {
           </p>
         </div>
 
-        <Button variant="outline" onClick={fetchInventoryData} disabled={refreshing}>
+        <Button
+          variant="outline"
+          onClick={fetchInventoryData}
+          disabled={refreshing}
+        >
           <IconRefresh className="mr-2 h-4 w-4" />
           {refreshing ? "Actualizando..." : "Refrescar"}
         </Button>
@@ -819,7 +949,10 @@ export default function InventoryConfig() {
                 placeholder="Buscar por producto, variante, IMEI/SN, proveedor o cliente"
                 value={filters.search}
                 onChange={(event) =>
-                  setFilters((current) => ({ ...current, search: event.target.value }))
+                  setFilters((current) => ({
+                    ...current,
+                    search: event.target.value,
+                  }))
                 }
               />
             </div>
@@ -862,70 +995,6 @@ export default function InventoryConfig() {
         </CardContent>
       </Card>
 
-      {serialVariantsWithoutUnits.length > 0 ? (
-        <Card className="mt-6 border-amber-200 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
-              <IconAlertTriangle className="h-5 w-5" />
-              Stock serializado sin unidades cargadas
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Estas variantes ya estan marcadas como serializadas, pero el stock disponible no tiene todas sus unidades
-              creadas en `inventory_units`. Mientras exista esta diferencia, no vas a poder vender ese stock desde el
-              flujo serializado.
-            </p>
-
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[320px] min-w-[320px]">Producto / Variante</TableHead>
-                    <TableHead className="text-right">Stock actual</TableHead>
-                    <TableHead className="text-right">Unidades disponibles</TableHead>
-                    <TableHead className="text-right">Faltan seriales</TableHead>
-                    <TableHead className="text-right">Sobran seriales</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {serialVariantsWithoutUnits.map((variant) => (
-                    <TableRow key={`serial-gap-${variant.id}`}>
-                      <TableCell className="w-[320px] min-w-[320px] max-w-[320px]">
-                        <div className="space-y-1 max-w-[320px]">
-                          <div className="truncate font-medium" title={formatVariantLabel(variant)}>
-                            {formatVariantLabel(variant)}
-                          </div>
-                          <div className="truncate text-xs text-muted-foreground">
-                            {[variant.products?.brands?.name, variant.products?.categories?.name]
-                              .filter(Boolean)
-                              .join(" - ") || "Sin clasificacion"}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{Number(variant.stock || 0)}</TableCell>
-                      <TableCell className="text-right">{variant.unitCounts.available}</TableCell>
-                      <TableCell className="text-right">{variant.missingUnits}</TableCell>
-                      <TableCell className="text-right">{variant.excessUnits}</TableCell>
-                      <TableCell className="text-right">
-                        {variant.missingUnits > 0 ? (
-                          <Button size="sm" onClick={() => openSerialLoadDialog(variant)}>
-                            Cargar seriales
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Revisar inconsistencia</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
       <Tabs defaultValue="summary" className="mt-6 space-y-4">
         <TabsList>
           <TabsTrigger value="summary">
@@ -945,7 +1014,9 @@ export default function InventoryConfig() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="py-10 text-sm text-muted-foreground">Cargando inventario...</div>
+                <div className="py-10 text-sm text-muted-foreground">
+                  Cargando inventario...
+                </div>
               ) : summaryRows.length === 0 ? (
                 <div className="py-10 text-sm text-muted-foreground">
                   No hay variantes que coincidan con los filtros actuales.
@@ -955,48 +1026,80 @@ export default function InventoryConfig() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                          <TableHead className="w-[320px] min-w-[320px]">Producto / Variante</TableHead>
+                        <TableHead className="w-[320px] min-w-[320px]">
+                          Producto / Variante
+                        </TableHead>
                         <TableHead>Tracking</TableHead>
                         <TableHead className="text-right">Stock</TableHead>
                         <TableHead className="text-right">Defectuoso</TableHead>
-                        <TableHead className="text-right">Serial disponibles</TableHead>
-                        <TableHead className="text-right">Serial vendidas</TableHead>
-                        <TableHead className="text-right">Serial otras</TableHead>
+                        <TableHead className="text-right">
+                          Serial disponibles
+                        </TableHead>
+                        <TableHead className="text-right">
+                          Serial vendidas
+                        </TableHead>
+                        <TableHead className="text-right">
+                          Serial otras
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {summaryRows.map((variant) => (
                         <TableRow key={variant.id}>
-                            <TableCell className="w-[320px] min-w-[320px] max-w-[320px]">
-                              <div className="space-y-1 max-w-[320px]">
-                                <div className="truncate font-medium" title={formatVariantLabel(variant)}>
-                                  {formatVariantLabel(variant)}
-                                </div>
-                                <div
-                                  className="truncate text-xs text-muted-foreground"
-                                  title={
-                                    [variant.products?.brands?.name, variant.products?.categories?.name]
-                                      .filter(Boolean)
-                                      .join(" - ") || "Sin clasificacion"
-                                  }
-                                >
-                                  {[variant.products?.brands?.name, variant.products?.categories?.name]
+                          <TableCell className="w-[320px] min-w-[320px] max-w-[320px]">
+                            <div className="space-y-1 max-w-[320px]">
+                              <div
+                                className="truncate font-medium"
+                                title={formatVariantLabel(variant)}
+                              >
+                                {formatVariantLabel(variant)}
+                              </div>
+                              <div
+                                className="truncate text-xs text-muted-foreground"
+                                title={
+                                  [
+                                    variant.products?.brands?.name,
+                                    variant.products?.categories?.name,
+                                  ]
                                     .filter(Boolean)
-                                    .join(" - ") || "Sin clasificacion"}
+                                    .join(" - ") || "Sin clasificacion"
+                                }
+                              >
+                                {[
+                                  variant.products?.brands?.name,
+                                  variant.products?.categories?.name,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" - ") || "Sin clasificacion"}
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
-                              {TRACKING_LABELS[variant.products?.inventory_tracking_mode || "quantity"]}
+                              {
+                                TRACKING_LABELS[
+                                  variant.products?.inventory_tracking_mode ||
+                                    "quantity"
+                                ]
+                              }
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right">{Number(variant.stock || 0)}</TableCell>
-                          <TableCell className="text-right">{Number(variant.stock_defective || 0)}</TableCell>
-                          <TableCell className="text-right">{variant.unitCounts.available}</TableCell>
-                          <TableCell className="text-right">{variant.unitCounts.sold}</TableCell>
                           <TableCell className="text-right">
-                            {variant.unitCounts.defective + variant.unitCounts.inRepair + variant.unitCounts.other}
+                            {Number(variant.stock || 0)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {Number(variant.stock_defective || 0)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {variant.unitCounts.available}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {variant.unitCounts.sold}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {variant.unitCounts.defective +
+                              variant.unitCounts.inRepair +
+                              variant.unitCounts.other}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1015,7 +1118,9 @@ export default function InventoryConfig() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="py-10 text-sm text-muted-foreground">Cargando unidades...</div>
+                <div className="py-10 text-sm text-muted-foreground">
+                  Cargando unidades...
+                </div>
               ) : filteredUnits.length === 0 ? (
                 <div className="py-10 text-sm text-muted-foreground">
                   No hay unidades que coincidan con los filtros actuales.
@@ -1026,7 +1131,9 @@ export default function InventoryConfig() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>IMEI / SN</TableHead>
-                          <TableHead className="w-[320px] min-w-[320px]">Producto / Variante</TableHead>
+                        <TableHead className="w-[320px] min-w-[320px]">
+                          Producto / Variante
+                        </TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Compra</TableHead>
                         <TableHead>Venta</TableHead>
@@ -1039,31 +1146,47 @@ export default function InventoryConfig() {
                         <TableRow key={unit.id}>
                           <TableCell>
                             <div className="space-y-1">
-                              <div className="font-medium">{unit.identifier_value}</div>
-                              <div className="text-xs text-muted-foreground">Unidad #{unit.id}</div>
+                              <div className="font-medium">
+                                {unit.identifier_value}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Unidad #{unit.id}
+                              </div>
                             </div>
                           </TableCell>
-                            <TableCell className="w-[320px] min-w-[320px] max-w-[320px]">
-                              <div className="space-y-1 max-w-[320px]">
-                                <div className="truncate font-medium" title={formatVariantLabel(unit.variant)}>
-                                  {formatVariantLabel(unit.variant)}
-                                </div>
-                                <div
-                                  className="truncate text-xs text-muted-foreground"
-                                  title={
-                                    [unit.variant?.products?.brands?.name, unit.variant?.products?.categories?.name]
-                                      .filter(Boolean)
-                                      .join(" - ") || "Sin clasificacion"
-                                  }
-                                >
-                                  {[unit.variant?.products?.brands?.name, unit.variant?.products?.categories?.name]
+                          <TableCell className="w-[320px] min-w-[320px] max-w-[320px]">
+                            <div className="space-y-1 max-w-[320px]">
+                              <div
+                                className="truncate font-medium"
+                                title={formatVariantLabel(unit.variant)}
+                              >
+                                {formatVariantLabel(unit.variant)}
+                              </div>
+                              <div
+                                className="truncate text-xs text-muted-foreground"
+                                title={
+                                  [
+                                    unit.variant?.products?.brands?.name,
+                                    unit.variant?.products?.categories?.name,
+                                  ]
                                     .filter(Boolean)
-                                    .join(" - ") || "Sin clasificacion"}
+                                    .join(" - ") || "Sin clasificacion"
+                                }
+                              >
+                                {[
+                                  unit.variant?.products?.brands?.name,
+                                  unit.variant?.products?.categories?.name,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" - ") || "Sin clasificacion"}
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge className={STATUS_BADGE_CLASS[unit.status] || ""} variant="outline">
+                            <Badge
+                              className={STATUS_BADGE_CLASS[unit.status] || ""}
+                              variant="outline"
+                            >
                               {getStatusLabel(unit.status)}
                             </Badge>
                           </TableCell>
@@ -1072,11 +1195,14 @@ export default function InventoryConfig() {
                               <div className="space-y-1 text-sm">
                                 <div>Compra #{unit.purchase.id}</div>
                                 <div className="text-xs text-muted-foreground">
-                                  {unit.purchase.providers?.name || "Sin proveedor"}
+                                  {unit.purchase.providers?.name ||
+                                    "Sin proveedor"}
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-sm text-muted-foreground">-</span>
+                              <span className="text-sm text-muted-foreground">
+                                -
+                              </span>
                             )}
                           </TableCell>
                           <TableCell>
@@ -1088,14 +1214,20 @@ export default function InventoryConfig() {
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-sm text-muted-foreground">-</span>
+                              <span className="text-sm text-muted-foreground">
+                                -
+                              </span>
                             )}
                           </TableCell>
                           <TableCell>
                             <div className="space-y-1 text-xs text-muted-foreground">
-                              <div>Recibida: {formatDateTime(unit.received_at)}</div>
+                              <div>
+                                Recibida: {formatDateTime(unit.received_at)}
+                              </div>
                               <div>Vendida: {formatDateTime(unit.sold_at)}</div>
-                              <div>Devuelta: {formatDateTime(unit.returned_at)}</div>
+                              <div>
+                                Devuelta: {formatDateTime(unit.returned_at)}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
@@ -1106,11 +1238,15 @@ export default function InventoryConfig() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEditUnitDialog(unit)}>
+                                <DropdownMenuItem
+                                  onClick={() => openEditUnitDialog(unit)}
+                                >
                                   <IconPencil className="mr-2 h-4 w-4" />
                                   Editar
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openHistory(unit)}>
+                                <DropdownMenuItem
+                                  onClick={() => openHistory(unit)}
+                                >
                                   <IconHistory className="mr-2 h-4 w-4" />
                                   Historial
                                 </DropdownMenuItem>
@@ -1137,13 +1273,28 @@ export default function InventoryConfig() {
                         Anterior
                       </Button>
                       <div className="text-sm">
-                        {unitsPage} / {Math.max(1, Math.ceil(unitsTotalCount / unitsPageSize))}
+                        {unitsPage} /{" "}
+                        {Math.max(
+                          1,
+                          Math.ceil(unitsTotalCount / unitsPageSize),
+                        )}
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setUnitsPage((p) => Math.min(Math.ceil(unitsTotalCount / unitsPageSize), p + 1))}
-                        disabled={unitsPage >= Math.ceil(unitsTotalCount / unitsPageSize) || loading}
+                        onClick={() =>
+                          setUnitsPage((p) =>
+                            Math.min(
+                              Math.ceil(unitsTotalCount / unitsPageSize),
+                              p + 1,
+                            ),
+                          )
+                        }
+                        disabled={
+                          unitsPage >=
+                            Math.ceil(unitsTotalCount / unitsPageSize) ||
+                          loading
+                        }
                       >
                         Siguiente
                       </Button>
@@ -1178,7 +1329,9 @@ export default function InventoryConfig() {
                   </div>
                   <div>
                     <span className="font-medium">Compra:</span>{" "}
-                    {selectedUnit.purchase?.id ? `#${selectedUnit.purchase.id}` : "-"}
+                    {selectedUnit.purchase?.id
+                      ? `#${selectedUnit.purchase.id}`
+                      : "-"}
                   </div>
                   <div>
                     <span className="font-medium">Venta:</span>{" "}
@@ -1189,7 +1342,9 @@ export default function InventoryConfig() {
             ) : null}
 
             {historyLoading ? (
-              <div className="py-8 text-sm text-muted-foreground">Cargando historial...</div>
+              <div className="py-8 text-sm text-muted-foreground">
+                Cargando historial...
+              </div>
             ) : unitEvents.length === 0 ? (
               <div className="py-8 text-sm text-muted-foreground">
                 No hay eventos registrados para esta unidad.
@@ -1200,16 +1355,22 @@ export default function InventoryConfig() {
                   {unitEvents.map((event) => (
                     <div key={event.id} className="rounded-lg border p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="font-medium">{getEventLabel(event.event_type)}</div>
+                        <div className="font-medium">
+                          {getEventLabel(event.event_type)}
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           {formatDateTime(event.created_at)}
                         </div>
                       </div>
 
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline">{getStatusLabel(event.from_status)}</Badge>
+                        <Badge variant="outline">
+                          {getStatusLabel(event.from_status)}
+                        </Badge>
                         <span>{">"}</span>
-                        <Badge variant="outline">{getStatusLabel(event.to_status)}</Badge>
+                        <Badge variant="outline">
+                          {getStatusLabel(event.to_status)}
+                        </Badge>
                         {event.related_table && event.related_id ? (
                           <span>
                             {event.related_table} #{event.related_id}
@@ -1218,7 +1379,9 @@ export default function InventoryConfig() {
                       </div>
 
                       {event.notes ? (
-                        <p className="mt-2 text-sm text-muted-foreground">{event.notes}</p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {event.notes}
+                        </p>
                       ) : null}
                     </div>
                   ))}
@@ -1229,7 +1392,10 @@ export default function InventoryConfig() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={serialLoadDialogOpen} onOpenChange={setSerialLoadDialogOpen}>
+      <Dialog
+        open={serialLoadDialogOpen}
+        onOpenChange={setSerialLoadDialogOpen}
+      >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Cargar seriales faltantes</DialogTitle>
@@ -1239,7 +1405,9 @@ export default function InventoryConfig() {
             <div className="rounded-lg border bg-muted/30 p-4 text-sm">
               <div>
                 <span className="font-medium">Variante:</span>{" "}
-                {serialLoadVariant ? formatVariantLabel(serialLoadVariant) : "-"}
+                {serialLoadVariant
+                  ? formatVariantLabel(serialLoadVariant)
+                  : "-"}
               </div>
               <div className="mt-1">
                 <span className="font-medium">Stock sin serializar:</span>{" "}
@@ -1249,14 +1417,17 @@ export default function InventoryConfig() {
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Ingresá un IMEI/SN por linea. Debes cargar exactamente {serialLoadVariant?.missingUnits || 0} seriales
-                para conciliar el stock actual sin modificar la cantidad existente.
+                Ingresá un IMEI/SN por linea. Debes cargar exactamente{" "}
+                {serialLoadVariant?.missingUnits || 0} seriales para conciliar
+                el stock actual sin modificar la cantidad existente.
               </p>
               <Textarea
                 rows={10}
                 placeholder={"359881234567890\n359881234567891\nSN-ABC-123456"}
                 value={serialIdentifiersText}
-                onChange={(event) => setSerialIdentifiersText(event.target.value)}
+                onChange={(event) =>
+                  setSerialIdentifiersText(event.target.value)
+                }
               />
             </div>
           </div>
@@ -1273,7 +1444,10 @@ export default function InventoryConfig() {
             >
               Cancelar
             </Button>
-            <Button onClick={handleLoadSerialUnits} disabled={serialLoadSubmitting}>
+            <Button
+              onClick={handleLoadSerialUnits}
+              disabled={serialLoadSubmitting}
+            >
               {serialLoadSubmitting ? "Guardando..." : "Guardar seriales"}
             </Button>
           </DialogFooter>
@@ -1290,7 +1464,8 @@ export default function InventoryConfig() {
             {editingUnit && (
               <div className="rounded-lg border bg-muted/30 p-4 text-sm">
                 <div>
-                  <span className="font-medium">Unidad ID:</span> #{editingUnit.id}
+                  <span className="font-medium">Unidad ID:</span> #
+                  {editingUnit.id}
                 </div>
                 <div className="mt-1">
                   <span className="font-medium">Variante:</span>{" "}
@@ -1316,7 +1491,8 @@ export default function InventoryConfig() {
                 }}
               />
               <p className="text-xs text-muted-foreground">
-                Ingrese el nuevo IMEI o número de serie. Se verificará que no esté en uso por otra unidad.
+                Ingrese el nuevo IMEI o número de serie. Se verificará que no
+                esté en uso por otra unidad.
               </p>
             </div>
           </div>
@@ -1333,7 +1509,10 @@ export default function InventoryConfig() {
             >
               Cancelar
             </Button>
-            <Button onClick={handleSaveIdentifier} disabled={editSubmitting || !editIdentifierValue.trim()}>
+            <Button
+              onClick={handleSaveIdentifier}
+              disabled={editSubmitting || !editIdentifierValue.trim()}
+            >
               {editSubmitting ? "Guardando..." : "Guardar"}
             </Button>
           </DialogFooter>
@@ -1349,24 +1528,34 @@ export default function InventoryConfig() {
           <div className="space-y-4">
             <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 text-sm dark:border-amber-900 dark:bg-amber-950/20">
               <p className="font-medium text-amber-800 dark:text-amber-200">
-                El IMEI "{pendingIdentifier}" ya está asignado a otra(s) unidad(es).
+                El IMEI "{pendingIdentifier}" ya está asignado a otra(s)
+                unidad(es).
               </p>
               <p className="mt-2 text-muted-foreground">
-                ¿Qué deseas hacer? Podés asignar el IMEI a la unidad actual que estás editando (las otras quedarán sin IMEI), o mantener el IMEI donde está (la unidad actual quedará sin IMEI).
+                ¿Qué deseas hacer? Podés asignar el IMEI a la unidad actual que
+                estás editando (las otras quedarán sin IMEI), o mantener el IMEI
+                donde está (la unidad actual quedará sin IMEI).
               </p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Unidades con este IMEI</label>
+              <label className="text-sm font-medium">
+                Unidades con este IMEI
+              </label>
               <div className="grid gap-2">
                 <div className="flex items-center justify-between rounded-lg border border-emerald-500/50 bg-emerald-50/50 p-3 dark:bg-emerald-950/20">
                   <div>
-                    <div className="font-medium">Unidad #{editingUnit?.id} (actual)</div>
+                    <div className="font-medium">
+                      Unidad #{editingUnit?.id} (actual)
+                    </div>
                     <div className="text-xs text-muted-foreground">
-                      {editingUnit?.variant?.products?.name} - {editingUnit?.variant?.variant_name}
+                      {editingUnit?.variant?.products?.name} -{" "}
+                      {editingUnit?.variant?.variant_name}
                     </div>
                   </div>
-                  <Badge className="border-emerald-500 bg-emerald-100 text-emerald-700">A editar</Badge>
+                  <Badge className="border-emerald-500 bg-emerald-100 text-emerald-700">
+                    A editar
+                  </Badge>
                 </div>
                 {duplicateUnits.map((unit) => (
                   <div
@@ -1376,10 +1565,14 @@ export default function InventoryConfig() {
                     <div>
                       <div className="font-medium">Unidad #{unit.id}</div>
                       <div className="text-xs text-muted-foreground">
-                        {unit.variant?.products?.name} - {unit.variant?.variant_name}
+                        {unit.variant?.products?.name} -{" "}
+                        {unit.variant?.variant_name}
                       </div>
                     </div>
-                    <Badge className={STATUS_BADGE_CLASS[unit.status] || ""} variant="outline">
+                    <Badge
+                      className={STATUS_BADGE_CLASS[unit.status] || ""}
+                      variant="outline"
+                    >
                       {getStatusLabel(unit.status)}
                     </Badge>
                   </div>
@@ -1401,7 +1594,9 @@ export default function InventoryConfig() {
               Cancelar
             </Button>
             <Button onClick={handleAssignDuplicateToExisting}>
-              {assignToCurrent ? "Asignar a unidad actual" : "Mantener IMEI donde está"}
+              {assignToCurrent
+                ? "Asignar a unidad actual"
+                : "Mantener IMEI donde está"}
             </Button>
           </DialogFooter>
         </DialogContent>
