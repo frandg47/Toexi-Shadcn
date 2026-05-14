@@ -21,6 +21,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Table,
   TableBody,
   TableCell,
@@ -34,7 +40,9 @@ import { useAuth } from "@/context/AuthContextProvider";
 import {
   IconAlertTriangle,
   IconBox,
+  IconDotsVertical,
   IconHistory,
+  IconPencil,
   IconRefresh,
   IconSearch,
   IconStack2,
@@ -157,6 +165,20 @@ export default function InventoryConfig() {
   const [serialLoadVariant, setSerialLoadVariant] = useState(null);
   const [serialIdentifiersText, setSerialIdentifiersText] = useState("");
   const [serialLoadSubmitting, setSerialLoadSubmitting] = useState(false);
+
+  const [editUnitDialogOpen, setEditUnitDialogOpen] = useState(false);
+  const [editingUnit, setEditingUnit] = useState(null);
+  const [editIdentifierValue, setEditIdentifierValue] = useState("");
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+  const [duplicateUnits, setDuplicateUnits] = useState([]);
+  const [pendingIdentifier, setPendingIdentifier] = useState("");
+  const [assignToCurrent, setAssignToCurrent] = useState(false);
+
+  const [unitsPage, setUnitsPage] = useState(1);
+  const unitsPageSize = 30;
+  const [unitsTotalCount, setUnitsTotalCount] = useState(0);
 
   const fetchInventoryData = useCallback(async () => {
     setRefreshing(true);
@@ -502,6 +524,209 @@ export default function InventoryConfig() {
     setSerialIdentifiersText("");
     fetchInventoryData();
   }, [fetchInventoryData, serialIdentifiersText, serialLoadVariant, user?.id]);
+
+  const openEditUnitDialog = useCallback((unit) => {
+    setEditingUnit(unit);
+    setEditIdentifierValue(unit.identifier_value || "");
+    setEditUnitDialogOpen(true);
+  }, []);
+
+  const handleSaveIdentifier = useCallback(async () => {
+    if (!editingUnit || !editIdentifierValue.trim()) return;
+
+    const newIdentifier = editIdentifierValue.trim();
+    const newNormalized = normalizeIdentifierKey(newIdentifier);
+
+    if (!newNormalized) {
+      toast.warning("IMEI inválido", {
+        description: "El IMEI/SN debe tener contenido válido.",
+      });
+      return;
+    }
+
+    setEditSubmitting(true);
+
+    const { data: existingUnits, error: searchError } = await supabase
+      .from("inventory_units")
+      .select("id, identifier_value, variant_id, status")
+      .eq("identifier_normalized", newNormalized)
+      .neq("id", editingUnit.id);
+
+    if (searchError) {
+      console.error(searchError);
+      toast.error("Error", {
+        description: "No se pudo verificar si el IMEI ya existe.",
+      });
+      setEditSubmitting(false);
+      return;
+    }
+
+    if ((existingUnits || []).length > 0) {
+      const unitsWithVariantInfo = await Promise.all(
+        (existingUnits || []).map(async (unit) => {
+          const { data: variant } = await supabase
+            .from("product_variants")
+            .select("variant_name, products(name)")
+            .eq("id", unit.variant_id)
+            .single();
+          return { ...unit, variant };
+        })
+      );
+
+      setDuplicateUnits(unitsWithVariantInfo);
+      setPendingIdentifier(newIdentifier);
+      setAssignToCurrent(true);
+      setDuplicateDialogOpen(true);
+      setEditSubmitting(false);
+      return;
+    }
+
+    for (const unit of duplicateUnits) {
+      const { error: deleteError } = await supabase
+        .from("inventory_units")
+        .delete()
+        .eq("id", unit.id);
+
+      if (deleteError) {
+        console.error(deleteError);
+        toast.error("Error", {
+          description: `No se pudo eliminar la unidad #${unit.id}.`,
+        });
+        setEditSubmitting(false);
+        return;
+      }
+    }
+
+    const { error: updateError } = await supabase
+      .from("inventory_units")
+      .update({
+        identifier_value: newIdentifier,
+        updated_by: user?.id || null,
+      })
+      .eq("id", editingUnit.id);
+
+    if (updateError) {
+      console.error(updateError);
+      toast.error("Error", {
+        description: "No se pudo actualizar el IMEI.",
+      });
+      setEditSubmitting(false);
+      return;
+    }
+
+    const { error: eventError } = await supabase.from("inventory_unit_events").insert({
+      inventory_unit_id: editingUnit.id,
+      event_type: "manual_serial_stock_initialized",
+      from_status: editingUnit.status,
+      to_status: editingUnit.status,
+      related_table: "inventory_units",
+      related_id: editingUnit.id,
+      notes: `IMEI actualizado de "${editingUnit.identifier_value || '(vacío)'}" a "${newIdentifier}"`,
+    });
+
+    if (eventError) {
+      console.error(eventError);
+    }
+
+    toast.success("IMEI actualizado", {
+      description: `La unidad ahora tiene el IMEI: ${newIdentifier}`,
+    });
+
+    setEditSubmitting(false);
+    setEditUnitDialogOpen(false);
+    setEditingUnit(null);
+    setEditIdentifierValue("");
+    fetchInventoryData();
+  }, [editingUnit, editIdentifierValue, user?.id, fetchInventoryData]);
+
+  const handleAssignDuplicateToExisting = useCallback(async () => {
+    if (!pendingIdentifier) return;
+
+    if (assignToCurrent && editingUnit) {
+      setEditSubmitting(true);
+
+      for (const duplicateUnit of duplicateUnits) {
+        const { error: deleteError } = await supabase
+          .from("inventory_units")
+          .delete()
+          .eq("id", duplicateUnit.id);
+
+        if (deleteError) {
+          console.error(deleteError);
+          toast.error("Error", {
+            description: `No se pudo eliminar la unidad #${duplicateUnit.id}.`,
+          });
+          setEditSubmitting(false);
+          return;
+        }
+      }
+
+      const { error: updateCurrentError } = await supabase
+        .from("inventory_units")
+        .update({
+          identifier_value: pendingIdentifier,
+          updated_by: user?.id || null,
+        })
+        .eq("id", editingUnit.id);
+
+      if (updateCurrentError) {
+        console.error(updateCurrentError);
+        toast.error("Error", {
+          description: "No se pudo actualizar el IMEI de la unidad actual.",
+        });
+        setEditSubmitting(false);
+        return;
+      }
+
+      const { error: eventCurrentError } = await supabase.from("inventory_unit_events").insert({
+        inventory_unit_id: editingUnit.id,
+        event_type: "manual_serial_stock_initialized",
+        from_status: editingUnit.status,
+        to_status: editingUnit.status,
+        related_table: "inventory_units",
+        related_id: editingUnit.id,
+        notes: `IMEI asignado: ${pendingIdentifier} (tomado de otra unidad por duplicado)`,
+      });
+
+      if (eventCurrentError) {
+        console.error(eventCurrentError);
+      }
+
+      toast.success("IMEI asignado a unidad actual", {
+        description: `La unidad actual #{${editingUnit.id}} ahora tiene el IMEI ${pendingIdentifier}. Las unidades duplicadas fueron eliminadas.`,
+      });
+
+      setEditSubmitting(false);
+    } else {
+      if (editingUnit) {
+        const { error: deleteError } = await supabase
+          .from("inventory_units")
+          .delete()
+          .eq("id", editingUnit.id);
+
+        if (deleteError) {
+          console.error(deleteError);
+          toast.error("Error", {
+            description: `No se pudo eliminar la unidad actual.`,
+          });
+          return;
+        }
+      }
+
+      toast.success("IMEI mantenido", {
+        description: `La unidad actual fue eliminada. El IMEI ${pendingIdentifier} permanece en la unidad existente.`,
+      });
+    }
+
+    setDuplicateDialogOpen(false);
+    setDuplicateUnits([]);
+    setPendingIdentifier("");
+    setAssignToCurrent(false);
+    setEditUnitDialogOpen(false);
+    setEditingUnit(null);
+    setEditIdentifierValue("");
+    fetchInventoryData();
+  }, [assignToCurrent, pendingIdentifier, editingUnit, duplicateUnits, user?.id, fetchInventoryData]);
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-4 py-6">
@@ -855,10 +1080,23 @@ export default function InventoryConfig() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button variant="outline" size="sm" onClick={() => openHistory(unit)}>
-                              <IconHistory className="mr-2 h-4 w-4" />
-                              Historial
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <IconDotsVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEditUnitDialog(unit)}>
+                                  <IconPencil className="mr-2 h-4 w-4" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openHistory(unit)}>
+                                  <IconHistory className="mr-2 h-4 w-4" />
+                                  Historial
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -990,6 +1228,133 @@ export default function InventoryConfig() {
             </Button>
             <Button onClick={handleLoadSerialUnits} disabled={serialLoadSubmitting}>
               {serialLoadSubmitting ? "Guardando..." : "Guardar seriales"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editUnitDialogOpen} onOpenChange={setEditUnitDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar IMEI de unidad</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {editingUnit && (
+              <div className="rounded-lg border bg-muted/30 p-4 text-sm">
+                <div>
+                  <span className="font-medium">Unidad ID:</span> #{editingUnit.id}
+                </div>
+                <div className="mt-1">
+                  <span className="font-medium">Variante:</span>{" "}
+                  {formatVariantLabel(editingUnit.variant)}
+                </div>
+                <div className="mt-1">
+                  <span className="font-medium">IMEI actual:</span>{" "}
+                  {editingUnit.identifier_value || "(sin IMEI)"}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nuevo IMEI / SN</label>
+              <Input
+                value={editIdentifierValue}
+                onChange={(e) => setEditIdentifierValue(e.target.value)}
+                placeholder="Ingrese el nuevo IMEI o número de serie"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && editIdentifierValue.trim()) {
+                    handleSaveIdentifier();
+                  }
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Ingrese el nuevo IMEI o número de serie. Se verificará que no esté en uso por otra unidad.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditUnitDialogOpen(false);
+                setEditingUnit(null);
+                setEditIdentifierValue("");
+              }}
+              disabled={editSubmitting}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveIdentifier} disabled={editSubmitting || !editIdentifierValue.trim()}>
+              {editSubmitting ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={duplicateDialogOpen} onOpenChange={setDuplicateDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>IMEI ya existe</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 text-sm dark:border-amber-900 dark:bg-amber-950/20">
+              <p className="font-medium text-amber-800 dark:text-amber-200">
+                El IMEI "{pendingIdentifier}" ya está asignado a otra(s) unidad(es).
+              </p>
+              <p className="mt-2 text-muted-foreground">
+                ¿Qué deseas hacer? Podés asignar el IMEI a la unidad actual que estás editando (las otras quedarán sin IMEI), o mantener el IMEI donde está (la unidad actual quedará sin IMEI).
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Unidades con este IMEI</label>
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between rounded-lg border border-emerald-500/50 bg-emerald-50/50 p-3 dark:bg-emerald-950/20">
+                  <div>
+                    <div className="font-medium">Unidad #{editingUnit?.id} (actual)</div>
+                    <div className="text-xs text-muted-foreground">
+                      {editingUnit?.variant?.products?.name} - {editingUnit?.variant?.variant_name}
+                    </div>
+                  </div>
+                  <Badge className="border-emerald-500 bg-emerald-100 text-emerald-700">A editar</Badge>
+                </div>
+                {duplicateUnits.map((unit) => (
+                  <div
+                    key={unit.id}
+                    className="flex items-center justify-between rounded-lg border p-3"
+                  >
+                    <div>
+                      <div className="font-medium">Unidad #{unit.id}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {unit.variant?.products?.name} - {unit.variant?.variant_name}
+                      </div>
+                    </div>
+                    <Badge className={STATUS_BADGE_CLASS[unit.status] || ""} variant="outline">
+                      {getStatusLabel(unit.status)}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDuplicateDialogOpen(false);
+                setDuplicateUnits([]);
+                setPendingIdentifier("");
+                setAssignToCurrent(false);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleAssignDuplicateToExisting}>
+              {assignToCurrent ? "Asignar a unidad actual" : "Mantener IMEI donde está"}
             </Button>
           </DialogFooter>
         </DialogContent>
