@@ -180,8 +180,11 @@ export default function InventoryConfig() {
   const unitsPageSize = 30;
   const [unitsTotalCount, setUnitsTotalCount] = useState(0);
 
-  const fetchInventoryData = useCallback(async () => {
+  const fetchInventoryData = useCallback(async (loadUnits = true) => {
     setRefreshing(true);
+
+    const from = (unitsPage - 1) * unitsPageSize;
+    const to = from + unitsPageSize - 1;
 
     const [variantsResponse, unitsResponse] = await Promise.all([
       supabase
@@ -189,11 +192,16 @@ export default function InventoryConfig() {
         .select(
           "id, variant_name, color, storage, ram, stock, stock_defective, updated_at, products(id, name, active, inventory_tracking_mode, brands(name), categories(name))"
         ),
-      supabase
-        .from("inventory_units")
-        .select(
-          "id, variant_id, purchase_id, purchase_item_id, sale_id, sale_item_id, warranty_exchange_id, identifier_value, status, received_at, sold_at, returned_at, notes, created_at, updated_at, variant:product_variants!inventory_units_variant_id_fkey(id, variant_name, color, storage, ram, products(id, name, inventory_tracking_mode, brands(name), categories(name))), purchase:purchases!inventory_units_purchase_id_fkey(id, purchase_date, providers(name)), sale:sales!inventory_units_sale_id_fkey(id, sale_date, customers(name, last_name))"
-        ),
+      loadUnits
+        ? supabase
+            .from("inventory_units")
+            .select(
+              "id, variant_id, purchase_id, purchase_item_id, sale_id, sale_item_id, warranty_exchange_id, identifier_value, status, received_at, sold_at, returned_at, notes, created_at, updated_at, variant:product_variants!inventory_units_variant_id_fkey(id, variant_name, color, storage, ram, products(id, name, inventory_tracking_mode, brands(name), categories(name))), purchase:purchases!inventory_units_purchase_id_fkey(id, purchase_date, providers(name)), sale:sales!inventory_units_sale_id_fkey(id, sale_date, customers(name, last_name))",
+              { count: "exact" }
+            )
+            .order("identifier_value", { ascending: true, nullsFirst: false })
+            .range(from, to)
+        : Promise.resolve({ data: units, count: unitsTotalCount }),
     ]);
 
     if (variantsResponse.error || unitsResponse.error) {
@@ -212,6 +220,7 @@ export default function InventoryConfig() {
       return left.localeCompare(right);
     });
 
+    setUnitsTotalCount(unitsResponse.count || 0);
     const nextUnits = [...(unitsResponse.data || [])].sort((a, b) => {
       const left = `${a.variant?.products?.name || ""} ${a.variant?.variant_name || ""} ${a.identifier_value || ""}`;
       const right = `${b.variant?.products?.name || ""} ${b.variant?.variant_name || ""} ${b.identifier_value || ""}`;
@@ -222,11 +231,21 @@ export default function InventoryConfig() {
     setUnits(nextUnits);
     setRefreshing(false);
     setLoading(false);
-  }, []);
+  }, [unitsPage, unitsPageSize]);
 
   useEffect(() => {
     fetchInventoryData();
   }, [fetchInventoryData]);
+
+  useEffect(() => {
+    setUnitsPage(1);
+  }, [filters.search, filters.trackingMode, filters.unitStatus]);
+
+  useEffect(() => {
+    if (filters.search) {
+      fetchInventoryData(true);
+    }
+  }, [unitsPage]);
 
   const openHistory = useCallback(async (unit) => {
     if (!unit?.id) return;
@@ -1102,6 +1121,34 @@ export default function InventoryConfig() {
                       ))}
                     </TableBody>
                   </Table>
+                  <div className="flex flex-col items-center justify-between gap-3 py-3 sm:flex-row">
+                    <div className="text-sm text-muted-foreground">
+                      {filteredUnits.length > 0 && unitsTotalCount > 0
+                        ? `Mostrando ${units.length} de ${unitsTotalCount} unidades`
+                        : `${unitsTotalCount} unidades en total`}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUnitsPage((p) => Math.max(1, p - 1))}
+                        disabled={unitsPage <= 1 || loading}
+                      >
+                        Anterior
+                      </Button>
+                      <div className="text-sm">
+                        {unitsPage} / {Math.max(1, Math.ceil(unitsTotalCount / unitsPageSize))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUnitsPage((p) => Math.min(Math.ceil(unitsTotalCount / unitsPageSize), p + 1))}
+                        disabled={unitsPage >= Math.ceil(unitsTotalCount / unitsPageSize) || loading}
+                      >
+                        Siguiente
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>
