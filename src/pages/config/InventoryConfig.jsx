@@ -179,6 +179,15 @@ export default function InventoryConfig() {
   const [unitsPage, setUnitsPage] = useState(1);
   const unitsPageSize = 30;
   const [unitsTotalCount, setUnitsTotalCount] = useState(0);
+  const [allUnitsForCount, setAllUnitsForCount] = useState([]);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const fetchInventoryData = useCallback(
     async (loadUnits = true) => {
@@ -187,23 +196,50 @@ export default function InventoryConfig() {
       const from = (unitsPage - 1) * unitsPageSize;
       const to = from + unitsPageSize - 1;
 
-      const [variantsResponse, unitsResponse] = await Promise.all([
-        supabase
-          .from("product_variants")
-          .select(
-            "id, variant_name, color, storage, ram, stock, stock_defective, updated_at, products(id, name, active, inventory_tracking_mode, brands(name), categories(name))",
-          ),
-        loadUnits
-          ? supabase
-              .from("inventory_units")
-              .select(
-                "id, variant_id, purchase_id, purchase_item_id, sale_id, sale_item_id, warranty_exchange_id, identifier_value, status, received_at, sold_at, returned_at, notes, created_at, updated_at, variant:product_variants!inventory_units_variant_id_fkey(id, variant_name, color, storage, ram, products(id, name, inventory_tracking_mode, brands(name), categories(name))), purchase:purchases!inventory_units_purchase_id_fkey(id, purchase_date, providers(name)), sale:sales!inventory_units_sale_id_fkey(id, sale_date, customers(name, last_name))",
-                { count: "exact" },
-              )
-              .order("identifier_value", { ascending: true, nullsFirst: false })
-              .range(from, to)
-          : Promise.resolve({ data: units, count: unitsTotalCount }),
-      ]);
+      const [variantsResponse, unitsResponse, allUnitsResponse] =
+        await Promise.all([
+          supabase
+            .from("product_variants")
+            .select(
+              "id, variant_name, color, storage, ram, stock, stock_defective, updated_at, products(id, name, active, inventory_tracking_mode, brands(name), categories(name))",
+            ),
+          loadUnits
+            ? (() => {
+                let query = supabase
+                  .from("inventory_units")
+                  .select(
+                    "id, variant_id, purchase_id, purchase_item_id, sale_id, sale_item_id, warranty_exchange_id, identifier_value, status, received_at, sold_at, returned_at, notes, created_at, updated_at, variant:product_variants!inventory_units_variant_id_fkey(id, variant_name, color, storage, ram, products(id, name, inventory_tracking_mode, brands(name), categories(name))), purchase:purchases!inventory_units_purchase_id_fkey(id, purchase_date, providers(name)), sale:sales!inventory_units_sale_id_fkey(id, sale_date, customers(name, last_name))",
+                    { count: "exact" },
+                  )
+                  .order("identifier_value", {
+                    ascending: true,
+                    nullsFirst: false,
+                  })
+                  .range(from, to);
+
+                if (debouncedSearch) {
+                  const term = `%${debouncedSearch}%`;
+                  query = query.or(`identifier_value.ilike.${term}`);
+                }
+
+                if (filters.trackingMode !== "all") {
+                  query = query.eq(
+                    "variant.products.inventory_tracking_mode",
+                    filters.trackingMode,
+                  );
+                }
+
+                if (filters.unitStatus !== "all") {
+                  query = query.eq("status", filters.unitStatus);
+                }
+
+                return query;
+              })()
+            : Promise.resolve({ data: units, count: unitsTotalCount }),
+          supabase
+            .from("inventory_units")
+            .select("id, variant_id, status", { count: "exact" }),
+        ]);
 
       if (variantsResponse.error || unitsResponse.error) {
         console.error(variantsResponse.error || unitsResponse.error);
@@ -222,6 +258,8 @@ export default function InventoryConfig() {
       });
 
       setUnitsTotalCount(unitsResponse.count || 0);
+      setAllUnitsForCount(allUnitsResponse.data || []);
+
       const nextUnits = [...(unitsResponse.data || [])].sort((a, b) => {
         const left = `${a.variant?.products?.name || ""} ${a.variant?.variant_name || ""} ${a.identifier_value || ""}`;
         const right = `${b.variant?.products?.name || ""} ${b.variant?.variant_name || ""} ${b.identifier_value || ""}`;
@@ -233,7 +271,7 @@ export default function InventoryConfig() {
       setRefreshing(false);
       setLoading(false);
     },
-    [unitsPage, unitsPageSize],
+    [unitsPage, unitsPageSize, filters.trackingMode, filters.unitStatus, debouncedSearch],
   );
 
   useEffect(() => {
@@ -242,13 +280,11 @@ export default function InventoryConfig() {
 
   useEffect(() => {
     setUnitsPage(1);
-  }, [filters.search, filters.trackingMode, filters.unitStatus]);
+  }, [debouncedSearch, filters.trackingMode, filters.unitStatus]);
 
   useEffect(() => {
-    if (filters.search) {
-      fetchInventoryData(true);
-    }
-  }, [unitsPage]);
+    fetchInventoryData(true);
+  }, [unitsPage, debouncedSearch]);
 
   const openHistory = useCallback(async (unit) => {
     if (!unit?.id) return;
@@ -288,14 +324,14 @@ export default function InventoryConfig() {
       (total, variant) => total + Number(variant.stock_defective || 0),
       0,
     );
-    const serialUnits = units.length;
+    const serialUnits = allUnitsForCount.length;
 
     return { variantCount, availableStock, defectiveStock, serialUnits };
   }, [variants, units]);
 
   const unitCountsByVariant = useMemo(
     () =>
-      units.reduce((acc, unit) => {
+      allUnitsForCount.reduce((acc, unit) => {
         const variantId = unit.variant_id;
         if (!variantId) return acc;
         if (!acc[variantId]) {
@@ -318,7 +354,7 @@ export default function InventoryConfig() {
         else acc[variantId].other += 1;
         return acc;
       }, {}),
-    [units],
+    [allUnitsForCount],
   );
 
   const serialVariantsWithoutUnits = useMemo(
@@ -359,7 +395,7 @@ export default function InventoryConfig() {
   );
 
   const summaryRows = useMemo(() => {
-    const query = normalizeText(filters.search);
+    const query = normalizeText(debouncedSearch);
 
     return variants
       .filter((variant) => {
@@ -397,38 +433,9 @@ export default function InventoryConfig() {
           other: 0,
         },
       }));
-  }, [filters.search, filters.trackingMode, unitCountsByVariant, variants]);
+  }, [debouncedSearch, filters.trackingMode, unitCountsByVariant, variants]);
 
-  const filteredUnits = useMemo(() => {
-    const query = normalizeText(filters.search);
-
-    return units.filter((unit) => {
-      const trackingMode =
-        unit.variant?.products?.inventory_tracking_mode || "quantity";
-      const searchable = normalizeText(
-        [
-          unit.identifier_value,
-          unit.variant?.products?.name,
-          unit.variant?.variant_name,
-          unit.variant?.color,
-          unit.variant?.storage,
-          unit.variant?.ram,
-          unit.purchase?.providers?.name,
-          formatCustomerName(unit.sale?.customers),
-        ]
-          .filter(Boolean)
-          .join(" "),
-      );
-
-      const matchesSearch = !query || searchable.includes(query);
-      const matchesTracking =
-        filters.trackingMode === "all" || trackingMode === filters.trackingMode;
-      const matchesStatus =
-        filters.unitStatus === "all" || unit.status === filters.unitStatus;
-
-      return matchesSearch && matchesTracking && matchesStatus;
-    });
-  }, [filters.search, filters.trackingMode, filters.unitStatus, units]);
+  const filteredUnits = units;
 
   const openSerialLoadDialog = useCallback((variant) => {
     setSerialLoadVariant(variant);
@@ -784,6 +791,24 @@ export default function InventoryConfig() {
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-4 py-6">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
+          <p className="text-sm text-muted-foreground">
+            Resumen por variante y trazabilidad por unidad serializada.
+          </p>
+        </div>
+
+        <Button
+          variant="outline"
+          onClick={fetchInventoryData}
+          disabled={refreshing}
+        >
+          <IconRefresh className="mr-2 h-4 w-4" />
+          {refreshing ? "Actualizando..." : "Refrescar"}
+        </Button>
+      </div>
+
       {serialVariantsWithoutUnits.length > 0 ? (
         <Card className="mt-6 border-amber-200 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/20">
           <CardHeader>
@@ -875,23 +900,6 @@ export default function InventoryConfig() {
           </CardContent>
         </Card>
       ) : null}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
-          <p className="text-sm text-muted-foreground">
-            Resumen por variante y trazabilidad por unidad serializada.
-          </p>
-        </div>
-
-        <Button
-          variant="outline"
-          onClick={fetchInventoryData}
-          disabled={refreshing}
-        >
-          <IconRefresh className="mr-2 h-4 w-4" />
-          {refreshing ? "Actualizando..." : "Refrescar"}
-        </Button>
-      </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
@@ -947,13 +955,8 @@ export default function InventoryConfig() {
               <Input
                 className="pl-9"
                 placeholder="Buscar por producto, variante, IMEI/SN, proveedor o cliente"
-                value={filters.search}
-                onChange={(event) =>
-                  setFilters((current) => ({
-                    ...current,
-                    search: event.target.value,
-                  }))
-                }
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
               />
             </div>
 
