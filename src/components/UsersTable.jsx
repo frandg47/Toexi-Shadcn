@@ -489,7 +489,7 @@ const UsersTable = ({ refreshToken = 0 }) => {
                       ) : (
                         <Badge variant="outline">
                           <IconBriefcase className="h-4 w-4" />
-                          Integrante
+                          Free
                         </Badge>
                       )}
                     </TableCell>

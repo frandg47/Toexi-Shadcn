@@ -81,7 +81,10 @@ const getPeriodRange = (monthFilter) => {
 // ------------------------------
 // COMPONENTE GENERAL
 // ------------------------------
-export default function SellersTop({ role }) {
+export default function SellersTop({ viewRole, currentUserRole }) {
+  const showCommission = viewRole === "seller";
+  const isOwner = currentUserRole === "owner";
+  const isSuperadmin = currentUserRole === "superadmin";
   const [topSales, setTopSales] = useState([]);
   const [topCommission, setTopCommission] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -154,25 +157,29 @@ export default function SellersTop({ role }) {
       .eq("status", "vendido");
 
     if (salesError) return console.error(salesError);
-    
 
-    // Obtener datos de usuarios
+// Obtener usuarios filtrados por rol (de la vista, no del usuario actual)
+    const roleFilter = viewRole === "superadmin" ? "superadmin" : "seller";
     const { data: users, error: usersError } = await supabase
       .from("users")
-      .select("id_auth, name, last_name, avatar_url");
+      .select("id_auth, name, last_name, avatar_url")
+      .eq("role", roleFilter);
 
     if (usersError) return console.error(usersError);
 
     // Crear mapa de usuarios
     const usersMap = {};
+    const sellerUserIds = new Set();
     users?.forEach(u => {
       usersMap[u.id_auth] = u;
+      sellerUserIds.add(u.id_auth);
     });
 
-    // Agrupar por vendedor
+    // Agrupar por vendedor (solo los del rol correspondiente)
     const sellerData = {};
     sales?.forEach(sale => {
       if (!sale.seller_id) return;
+      if (!sellerUserIds.has(sale.seller_id)) return;
 
       const seller = usersMap[sale.seller_id];
       if (!seller) return;
@@ -318,17 +325,20 @@ export default function SellersTop({ role }) {
 
     if (itemsError) return console.error(itemsError);
 
-    // Obtener datos de usuarios
+    // Obtener usuarios filtrados por rol (solo sellers para comisiones)
     const { data: users, error: usersError } = await supabase
       .from("users")
-      .select("id_auth, name, last_name, avatar_url");
+      .select("id_auth, name, last_name, avatar_url")
+      .eq("role", "seller");
 
     if (usersError) return console.error(usersError);
 
-    // Crear mapa de usuarios
+    // Crear mapa de usuarios (filtrados por rol)
     const usersMap = {};
+    const sellerUserIds = new Set();
     users?.forEach(u => {
       usersMap[u.id_auth] = u;
+      sellerUserIds.add(u.id_auth);
     });
 
     const saleSellerMap = {};
@@ -336,11 +346,12 @@ export default function SellersTop({ role }) {
       if (sale?.id) saleSellerMap[sale.id] = sale.seller_id;
     });
 
-    // Agrupar comisiones por vendedor
+    // Agrupar comisiones por vendedor (solo los del rol correspondiente)
     const commissionsByVendor = {};
     (items || []).forEach((item) => {
       const sellerId = saleSellerMap[item.sale_id];
       if (!sellerId) return;
+      if (!sellerUserIds.has(sellerId)) return;
       const seller = usersMap[sellerId];
       if (!seller) return;
 
@@ -499,14 +510,14 @@ export default function SellersTop({ role }) {
       <Card>
         <CardHeader>
           <CardTitle>
-            {role === "superadmin" || role === "owner"
+            {showCommission
               ? "Ranking: Cantidad de ventas"
-              : "Mis Ventas"}
+              : "Ranking: Ventas"}
           </CardTitle>
           <CardDescription>
-            {role === "superadmin" || role === "owner"
+            {showCommission
               ? "Vendedores con más ventas completadas"
-              : "Ventas completadas en el mes actual"}
+              : "Ventas de vendedores presenciales"}
           </CardDescription>
         </CardHeader>
 
@@ -553,29 +564,30 @@ export default function SellersTop({ role }) {
 
         <CardFooter className="flex-col items-start gap-2 text-sm">
           <div className="flex gap-2 leading-none font-medium">
-            {role === "superadmin" || role === "owner"
+            {showCommission
               ? "Cantidad de ventas completadas por vendedor en el mes filtrado"
-              : "Ventas completadas en el mes filtrado"}
+              : "Cantidad de ventas por vendedor presencial"}
             <IconTrendingUp className="h-4 w-4" />
           </div>
           <div className="text-muted-foreground leading-none">
-            Mostrando la cantidad total de ventas para el último mes
+            Mostrando la cantidad total de ventas para el período filtrado
           </div>
         </CardFooter>
       </Card>
 
-      {/* -------------------------------------------------- */}
+{/* -------------------------------------------------- */}
       {/* 2) RANKING POR COMISIONES */}
       {/* -------------------------------------------------- */}
+      {showCommission ? (
       <Card>
         <CardHeader>
           <CardTitle>
-            {role === "superadmin" || role === "owner"
+            {isOwner || isSuperadmin
               ? "Ranking: Comisiones Ganadas"
               : "Mis Comisiones"}
           </CardTitle>
           <CardDescription>
-            {role === "superadmin" || role === "owner"
+            {isOwner || isSuperadmin
               ? "Vendedores que más dinero generaron"
               : "Comisiones generadas en el mes actual"}
           </CardDescription>
@@ -624,16 +636,17 @@ export default function SellersTop({ role }) {
 
         <CardFooter className="flex-col items-start gap-2 text-sm">
           <div className="flex gap-2 leading-none font-medium">
-            {role === "superadmin" || role === "owner"
-              ? "Cantidad de comisiones generadas por vendedor en el mes filtrado"
+            {isOwner || isSuperadmin
+              ? "Comisiones generadas por vendedor en el mes filtrado"
               : "Comisiones generadas en el mes filtrado"}
             <IconTrendingUp className="h-4 w-4" />
           </div>
           <div className="text-muted-foreground leading-none">
-            Mostrando las comisiones ganadas totales para el último período
+            Mostrando las comisiones ganadas totales para el período filtrado
           </div>
         </CardFooter>
       </Card>
+      ) : null}
 
       <Dialog open={salesDialogOpen} onOpenChange={setSalesDialogOpen}>
         <DialogContent className="w-[90vw] sm:max-w-3xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">

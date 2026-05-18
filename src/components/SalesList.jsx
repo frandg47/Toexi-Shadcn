@@ -586,7 +586,7 @@ export function SalesList() {
             const { data, error } = await supabase
                 .from("users")
                 .select("id_auth, name, last_name, email")
-                .eq("role", "seller")
+                .in("role", ["seller", "superadmin"])
                 .eq("is_active", true)
                 .order("name", { ascending: true });
 

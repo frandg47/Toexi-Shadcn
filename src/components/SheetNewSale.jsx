@@ -408,7 +408,7 @@ const buildSelectedVariant = (variant) => ({
       const { data, error } = await supabase
         .from("users")
         .select("id, id_auth, name, last_name, phone, email, role, is_active")
-        .eq("role", "seller")
+        .in("role", ["seller", "superadmin"])
         .eq("is_active", true)
         .order("name", { ascending: true });
 
