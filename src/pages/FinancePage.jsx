@@ -30,6 +30,13 @@ import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { IconCalendar, IconRefresh } from "@tabler/icons-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const formatCurrency = (value, currency) => {
   const safe = Number(value || 0);
@@ -95,6 +102,10 @@ export default function FinancePage() {
   const [salesYears, setSalesYears] = useState([]);
   const [salesChannels, setSalesChannels] = useState([]);
   const [selectedSalesChannels, setSelectedSalesChannels] = useState([]);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [detailMonth, setDetailMonth] = useState(null);
+  const [detailSales, setDetailSales] = useState([]);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const loadStaticData = useCallback(async () => {
     setLoading(true);
@@ -111,7 +122,7 @@ export default function FinancePage() {
       supabase
         .from("accounts")
         .select(
-          "id, name, currency, initial_balance, include_in_balance, is_reference_capital"
+          "id, name, currency, initial_balance, include_in_balance, is_reference_capital",
         )
         .order("name", { ascending: true }),
       supabase
@@ -130,11 +141,13 @@ export default function FinancePage() {
       supabase
         .from("aftersales_devices")
         .select(
-          "quantity, status, sold_sale_id, include_in_stock_cost_balance, variant:product_variants!aftersales_devices_variant_id_fkey(cost_price_usd)"
+          "quantity, status, sold_sale_id, include_in_stock_cost_balance, variant:product_variants!aftersales_devices_variant_id_fkey(cost_price_usd)",
         ),
       supabase
         .from("account_movements")
-        .select("account_id, type, amount, currency, accreditation_status, available_on"),
+        .select(
+          "account_id, type, amount, currency, accreditation_status, available_on",
+        ),
       supabase
         .from("sales_channels")
         .select("id, name")
@@ -181,7 +194,7 @@ export default function FinancePage() {
           const stock = Number(variant.stock || 0);
           const cost = Number(variant.cost_price_usd || 0);
           return total + stock * cost;
-        }, 0)
+        }, 0),
       );
     }
 
@@ -198,7 +211,7 @@ export default function FinancePage() {
           const quantity = Number(device.quantity || 0);
           const cost = Number(device.variant?.cost_price_usd || 0);
           return total + quantity * cost;
-        }, 0)
+        }, 0),
       );
     }
 
@@ -227,15 +240,15 @@ export default function FinancePage() {
         new Set(
           (salesYearsData || [])
             .map((sale) => new Date(sale.sale_date).getFullYear())
-            .filter((year) => Number.isFinite(year))
-        )
+            .filter((year) => Number.isFinite(year)),
+        ),
       ).sort((a, b) => b - a);
 
       setSalesYears(years);
       setSelectedYear((currentYear) =>
         years.length > 0 && !years.includes(currentYear)
           ? years[0]
-          : currentYear
+          : currentYear,
       );
     }
 
@@ -245,8 +258,12 @@ export default function FinancePage() {
   const loadMonthlyNetIncome = useCallback(async () => {
     setMonthlyNetIncomeLoading(true);
     // Obtener todas las ventas con sus items del año seleccionado
-    const yearStart = new Date(`${selectedYear}-01-01`).toISOString().split("T")[0];
-    const yearEnd = new Date(`${selectedYear}-12-31`).toISOString().split("T")[0];
+    const yearStart = new Date(`${selectedYear}-01-01`)
+      .toISOString()
+      .split("T")[0];
+    const yearEnd = new Date(`${selectedYear}-12-31`)
+      .toISOString()
+      .split("T")[0];
 
     let salesQuery = supabase
       .from("sales")
@@ -261,16 +278,20 @@ export default function FinancePage() {
           id,
           quantity,
           usd_price,
+          cost_price_usd,
           variant_id
         )
-      `
+      `,
       )
       .eq("status", "vendido")
       .is("voided_at", null)
       .gte("sale_date", yearStart)
       .lte("sale_date", yearEnd);
 
-    if (selectedSalesChannels.length === 1 && selectedSalesChannels[0] === "none") {
+    if (
+      selectedSalesChannels.length === 1 &&
+      selectedSalesChannels[0] === "none"
+    ) {
       salesQuery = salesQuery.is("sales_channel_id", null);
     } else if (selectedSalesChannels.length > 0) {
       const channelIds = selectedSalesChannels
@@ -279,7 +300,7 @@ export default function FinancePage() {
 
       if (channelIds.length > 0 && selectedSalesChannels.includes("none")) {
         salesQuery = salesQuery.or(
-          `sales_channel_id.in.(${channelIds.join(",")}),sales_channel_id.is.null`
+          `sales_channel_id.in.(${channelIds.join(",")}),sales_channel_id.is.null`,
         );
       } else if (channelIds.length > 0) {
         salesQuery = salesQuery.in("sales_channel_id", channelIds);
@@ -297,39 +318,8 @@ export default function FinancePage() {
       return;
     }
 
-    // Obtener todos los variant_ids únicos
-    const variantIds = new Set();
-    (salesData || []).forEach((sale) => {
-      sale.sale_items?.forEach((item) => {
-        if (item.variant_id) variantIds.add(item.variant_id);
-      });
-    });
-
-    // Obtener los costos de los productos
-    let variantCosts = {};
-    if (variantIds.size > 0) {
-      const { data: variantsData, error: variantsError } = await supabase
-        .from("product_variants")
-        .select("id, cost_price_usd")
-        .in("id", Array.from(variantIds));
-
-      if (variantsError) {
-        console.error("Error loading variant costs:", variantsError);
-        toast.error("No se pudieron cargar los costos de productos", {
-          description: variantsError.message,
-        });
-        setMonthlyNetIncomeLoading(false);
-        return;
-      }
-
-      if (variantsData) {
-        variantsData.forEach((variant) => {
-          variantCosts[variant.id] = variant.cost_price_usd || 0;
-        });
-      }
-    }
-
     // Calcular ingresos netos por mes
+    // El costo se toma de sale_items.cost_price_usd (guardado al momento de la venta)
     const monthlyData = {};
 
     (salesData || []).forEach((sale) => {
@@ -337,7 +327,7 @@ export default function FinancePage() {
       const monthKey = saleDate.toLocaleString("es-AR", {
         year: "numeric",
         month: "2-digit",
-      }); // Formato: "2026-04"
+      });
 
       if (!monthlyData[monthKey]) {
         monthlyData[monthKey] = {
@@ -352,7 +342,7 @@ export default function FinancePage() {
       sale.sale_items?.forEach((item) => {
         const quantity = Number(item.quantity || 0);
         const salePrice = Number(item.usd_price || 0);
-        const costPrice = Number(variantCosts[item.variant_id] || 0);
+        const costPrice = Number(item.cost_price_usd ?? 0);
 
         const itemSaleValue = quantity * salePrice;
         const itemCost = quantity * costPrice;
@@ -379,11 +369,45 @@ export default function FinancePage() {
     setMonthlyNetIncomeLoading(false);
   }, [selectedSalesChannels, selectedYear]);
 
+  const loadMonthDetail = useCallback(async (monthKey) => {
+    setDetailLoading(true);
+    setDetailMonth(monthKey);
+    const [month, year] = monthKey.split("/");
+    const paddedMonth = month.padStart(2, "0");
+    const monthStart = `${year}-${paddedMonth}-01`;
+    const lastDay = new Date(Number(year), Number(month), 0).getDate();
+    const monthEnd = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
+
+    const { data, error } = await supabase
+      .from("sales")
+      .select(
+        "id, sale_date, fx_rate_used, sales_channels(name), sale_items(product_name, variant_name, quantity, usd_price, cost_price_usd, subtotal_usd)",
+      )
+      .eq("status", "vendido")
+      .is("voided_at", null)
+      .gte("sale_date", monthStart)
+      .lte("sale_date", monthEnd)
+      .order("sale_date", { ascending: false });
+
+    if (error) {
+      console.error("Error loading month detail:", error);
+      toast.error("No se pudieron cargar las ventas del mes", {
+        description: error.message,
+      });
+      setDetailLoading(false);
+      return;
+    }
+
+    setDetailSales(data || []);
+    setDetailLoading(false);
+    setDetailDialogOpen(true);
+  }, []);
+
   const toggleSalesChannelFilter = (channelId) => {
     setSelectedSalesChannels((current) =>
       current.includes(channelId)
         ? current.filter((id) => id !== channelId)
-        : [...current, channelId]
+        : [...current, channelId],
     );
   };
 
@@ -391,8 +415,8 @@ export default function FinancePage() {
     return selectedSalesChannels.map((channelId) => {
       if (channelId === "none") return "Sin canal";
       return (
-        salesChannels.find((channel) => String(channel.id) === channelId)?.name ||
-        `Canal ${channelId}`
+        salesChannels.find((channel) => String(channel.id) === channelId)
+          ?.name || `Canal ${channelId}`
       );
     });
   }, [selectedSalesChannels, salesChannels]);
@@ -400,7 +424,9 @@ export default function FinancePage() {
   const loadFilteredBalances = useCallback(async () => {
     let query = supabase
       .from("account_movements")
-      .select("account_id, type, amount, currency, accreditation_status, available_on");
+      .select(
+        "account_id, type, amount, currency, accreditation_status, available_on",
+      );
 
     if (filters.accountId !== "all") {
       query = query.eq("account_id", filters.accountId);
@@ -411,13 +437,13 @@ export default function FinancePage() {
     if (dateRange?.from) {
       query = query.gte(
         "movement_date",
-        dateRange.from.toISOString().slice(0, 10)
+        dateRange.from.toISOString().slice(0, 10),
       );
     }
     if (dateRange?.to) {
       query = query.lte(
         "movement_date",
-        dateRange.to.toISOString().slice(0, 10)
+        dateRange.to.toISOString().slice(0, 10),
       );
     }
 
@@ -449,41 +475,52 @@ export default function FinancePage() {
     });
   };
 
-  const buildAccountBalances = useCallback((movementsSource) => {
-    const totals = new Map();
+  const buildAccountBalances = useCallback(
+    (movementsSource) => {
+      const totals = new Map();
 
-    movementsSource.forEach((movement) => {
-      if (isMovementPendingAccreditation(movement)) return;
-      const entry = totals.get(movement.account_id) || { income: 0, expense: 0 };
-      if (movement.type === "income") entry.income += Number(movement.amount || 0);
-      if (movement.type === "expense") entry.expense += Number(movement.amount || 0);
-      totals.set(movement.account_id, entry);
-    });
+      movementsSource.forEach((movement) => {
+        if (isMovementPendingAccreditation(movement)) return;
+        const entry = totals.get(movement.account_id) || {
+          income: 0,
+          expense: 0,
+        };
+        if (movement.type === "income")
+          entry.income += Number(movement.amount || 0);
+        if (movement.type === "expense")
+          entry.expense += Number(movement.amount || 0);
+        totals.set(movement.account_id, entry);
+      });
 
-    return accounts.map((account) => {
-      const totalsForAccount = totals.get(account.id) || { income: 0, expense: 0 };
-      const currentBalance =
-        Number(account.initial_balance || 0) +
-        totalsForAccount.income -
-        totalsForAccount.expense;
+      return accounts.map((account) => {
+        const totalsForAccount = totals.get(account.id) || {
+          income: 0,
+          expense: 0,
+        };
+        const currentBalance =
+          Number(account.initial_balance || 0) +
+          totalsForAccount.income -
+          totalsForAccount.expense;
 
-      return {
-        ...account,
-        income: totalsForAccount.income,
-        expense: totalsForAccount.expense,
-        current_balance: currentBalance,
-      };
-    });
-  }, [accounts]);
+        return {
+          ...account,
+          income: totalsForAccount.income,
+          expense: totalsForAccount.expense,
+          current_balance: currentBalance,
+        };
+      });
+    },
+    [accounts],
+  );
 
   const accountBalancesAll = useMemo(
     () => buildAccountBalances(balanceMovementsAll),
-    [buildAccountBalances, balanceMovementsAll]
+    [buildAccountBalances, balanceMovementsAll],
   );
 
   const accountBalancesFiltered = useMemo(
     () => buildAccountBalances(balanceMovementsFiltered),
-    [buildAccountBalances, balanceMovementsFiltered]
+    [buildAccountBalances, balanceMovementsFiltered],
   );
 
   const totalBalances = useMemo(() => {
@@ -495,7 +532,7 @@ export default function FinancePage() {
         else acc.ars += item.current_balance;
         return acc;
       },
-      { ars: 0, usd: 0, usdt: 0 }
+      { ars: 0, usd: 0, usdt: 0 },
     );
   }, [accountBalancesAll]);
 
@@ -512,7 +549,7 @@ export default function FinancePage() {
         else totals.ars += amount;
         return totals;
       },
-      { ars: 0, usd: 0, usdt: 0 }
+      { ars: 0, usd: 0, usdt: 0 },
     );
   }, [balanceMovementsAll]);
 
@@ -531,18 +568,22 @@ export default function FinancePage() {
       }
       return 0;
     },
-    [fxRate, usdtRate]
+    [fxRate, usdtRate],
   );
 
   const businessMetrics = useMemo(() => {
     const operatingCashUsd = accountBalancesAll.reduce((total, account) => {
       if (!account.include_in_balance) return total;
-      return total + convertAmountToUsd(account.current_balance, account.currency);
+      return (
+        total + convertAmountToUsd(account.current_balance, account.currency)
+      );
     }, 0);
 
     const referenceCapitalUsd = accountBalancesAll.reduce((total, account) => {
       if (!account.is_reference_capital) return total;
-      return total + convertAmountToUsd(account.current_balance, account.currency);
+      return (
+        total + convertAmountToUsd(account.current_balance, account.currency)
+      );
     }, 0);
 
     return {
@@ -550,9 +591,17 @@ export default function FinancePage() {
       referenceCapitalUsd,
       stockCostUsd: stockCostUsd + aftersalesStockCostUsd,
       realResultUsd:
-        operatingCashUsd + stockCostUsd + aftersalesStockCostUsd - referenceCapitalUsd,
+        operatingCashUsd +
+        stockCostUsd +
+        aftersalesStockCostUsd -
+        referenceCapitalUsd,
     };
-  }, [accountBalancesAll, aftersalesStockCostUsd, convertAmountToUsd, stockCostUsd]);
+  }, [
+    accountBalancesAll,
+    aftersalesStockCostUsd,
+    convertAmountToUsd,
+    stockCostUsd,
+  ]);
 
   if (!isOwner) {
     return <Navigate to="/unauthorized" replace />;
@@ -587,7 +636,9 @@ export default function FinancePage() {
         </Card>
         <Card className="bg-amber-500">
           <CardHeader>
-            <CardTitle className="text-white">Pendiente acreditacion ARS</CardTitle>
+            <CardTitle className="text-white">
+              Pendiente acreditacion ARS
+            </CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold text-white">
             {formatCurrency(pendingAccreditations.ars, "ARS")}
@@ -622,7 +673,9 @@ export default function FinancePage() {
         </Card>
         <Card
           className={
-            businessMetrics.realResultUsd >= 0 ? "bg-emerald-700" : "bg-rose-700"
+            businessMetrics.realResultUsd >= 0
+              ? "bg-emerald-700"
+              : "bg-rose-700"
           }
         >
           <CardHeader>
@@ -662,11 +715,15 @@ export default function FinancePage() {
               </Select>
             </div>
             <div className="grid gap-1 min-w-[260px]">
-              <span className="text-xs text-muted-foreground">Canal de venta</span>
+              <span className="text-xs text-muted-foreground">
+                Canal de venta
+              </span>
               <div className="flex max-w-[360px] flex-wrap gap-2">
                 <Button
                   type="button"
-                  variant={selectedSalesChannels.length === 0 ? "default" : "outline"}
+                  variant={
+                    selectedSalesChannels.length === 0 ? "default" : "outline"
+                  }
                   size="sm"
                   onClick={() => setSelectedSalesChannels([])}
                 >
@@ -675,7 +732,9 @@ export default function FinancePage() {
                 <Button
                   type="button"
                   variant={
-                    selectedSalesChannels.includes("none") ? "default" : "outline"
+                    selectedSalesChannels.includes("none")
+                      ? "default"
+                      : "outline"
                   }
                   size="sm"
                   onClick={() => toggleSalesChannelFilter("none")}
@@ -728,19 +787,31 @@ export default function FinancePage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Mes</TableHead>
-                  <TableHead className="text-right">Total de ventas (USD)</TableHead>
-                  <TableHead className="text-right">Costo total (USD)</TableHead>
+                  <TableHead className="text-right">
+                    Total de ventas (USD)
+                  </TableHead>
+                  <TableHead className="text-right">
+                    Costo total (USD)
+                  </TableHead>
                   <TableHead className="text-right bg-emerald-50/70 text-emerald-800">
                     Ingreso neto (USD)
                   </TableHead>
-                  <TableHead className="text-right">Cantidad de ventas</TableHead>
+                  <TableHead className="text-right">
+                    Cantidad de ventas
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {monthlyNetIncome.length > 0 ? (
                   monthlyNetIncome.map((monthData) => (
-                    <TableRow key={monthData.month}>
-                      <TableCell className="font-medium">{monthData.month}</TableCell>
+                    <TableRow
+                      key={monthData.month}
+                      onClick={() => loadMonthDetail(monthData.month)}
+                      className="cursor-pointer"
+                    >
+                      <TableCell className="font-medium">
+                        {monthData.month}
+                      </TableCell>
                       <TableCell className="text-right">
                         {formatCurrency(monthData.totalSales, "USD")}
                       </TableCell>
@@ -763,7 +834,10 @@ export default function FinancePage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={5}
+                      className="text-center text-muted-foreground"
+                    >
                       No hay datos de ingresos netos disponibles.
                     </TableCell>
                   </TableRow>
@@ -868,9 +942,15 @@ export default function FinancePage() {
                 <TableRow>
                   <TableHead>Cuenta</TableHead>
                   <TableHead>Moneda</TableHead>
-                  <TableHead className="bg-sky-50/70 text-sky-800">Saldo inicial</TableHead>
-                  <TableHead className="bg-emerald-50/70 text-emerald-800">Ingresos</TableHead>
-                  <TableHead className="bg-rose-50/70 text-rose-800">Egresos</TableHead>
+                  <TableHead className="bg-sky-50/70 text-sky-800">
+                    Saldo inicial
+                  </TableHead>
+                  <TableHead className="bg-emerald-50/70 text-emerald-800">
+                    Ingresos
+                  </TableHead>
+                  <TableHead className="bg-rose-50/70 text-rose-800">
+                    Egresos
+                  </TableHead>
                   <TableHead>Balance actual</TableHead>
                 </TableRow>
               </TableHeader>
@@ -887,7 +967,10 @@ export default function FinancePage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="bg-sky-50/50 font-medium text-sky-900">
-                      {formatCurrency(account.initial_balance, account.currency)}
+                      {formatCurrency(
+                        account.initial_balance,
+                        account.currency,
+                      )}
                     </TableCell>
                     <TableCell className="bg-emerald-50/50 font-medium text-emerald-900">
                       {formatCurrency(account.income, account.currency)}
@@ -896,7 +979,10 @@ export default function FinancePage() {
                       {formatCurrency(account.expense, account.currency)}
                     </TableCell>
                     <TableCell>
-                      {formatCurrency(account.current_balance, account.currency)}
+                      {formatCurrency(
+                        account.current_balance,
+                        account.currency,
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -915,6 +1001,106 @@ export default function FinancePage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="w-[90vw] sm:max-w-3xl max-h-[85svh] overflow-y-auto rounded-2xl p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Ventas del período {detailMonth}</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-full max-h-[65vh]">
+            {detailLoading ? (
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                Cargando...
+              </div>
+            ) : detailSales.length === 0 ? (
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                No hay ventas en este mes.
+              </div>
+            ) : (
+              <div className="rounded-md border overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Canal</TableHead>
+                      <TableHead className="text-right">Cant.</TableHead>
+                      <TableHead className="text-right">Cotización</TableHead>
+                      <TableHead className="text-right">Precio Vta</TableHead>
+                      <TableHead className="text-right">Costo</TableHead>
+                      <TableHead className="text-right">Total Vta</TableHead>
+                      <TableHead className="text-right">Costo Total</TableHead>
+                      <TableHead className="text-right bg-emerald-50/70 text-emerald-800">
+                        Ganancia Neta
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detailSales.map((sale) =>
+                      sale.sale_items?.map((item, idx) => {
+                        const qty = Number(item.quantity || 0);
+                        const salePrice = Number(item.usd_price || 0);
+                        const costPrice = Number(item.cost_price_usd ?? 0);
+                        const totalSale = qty * salePrice;
+                        const totalCost = qty * costPrice;
+                        const net = totalSale - totalCost;
+
+                        return (
+                          <TableRow key={`${sale.id}-${idx}`}>
+                            <TableCell className="whitespace-nowrap">
+                              {new Date(sale.sale_date).toLocaleDateString(
+                                "es-AR",
+                              )}
+                            </TableCell>
+                            <TableCell
+                              className="max-w-[200px] truncate"
+                              title={`${item.product_name}${item.variant_name ? ` - ${item.variant_name}` : ""}`}
+                            >
+                              {item.product_name}
+                              {item.variant_name
+                                ? ` - ${item.variant_name}`
+                                : ""}
+                            </TableCell>
+                            <TableCell>
+                              {sale.sales_channels?.name || "-"}
+                            </TableCell>
+                            <TableCell className="text-right">{qty}</TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(
+                                Number(sale.fx_rate_used ?? 0),
+                                "ARS",
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(salePrice, "USD")}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(costPrice, "USD")}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(totalSale, "USD")}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(totalCost, "USD")}
+                            </TableCell>
+                            <TableCell
+                              className={`text-right font-semibold ${
+                                net >= 0 ? "text-emerald-700" : "text-rose-700"
+                              }`}
+                            >
+                              {formatCurrency(net, "USD")}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }),
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
