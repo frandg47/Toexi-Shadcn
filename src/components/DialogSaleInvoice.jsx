@@ -91,6 +91,7 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
           imeis: v.imeis,
           inventory_unit_ids: v.inventory_unit_ids || [],
           usd_price: v.usd_price,
+          is_gift: v.is_free ?? false,
         })),
 
         p_payments: safeSale.payments.map(p => ({

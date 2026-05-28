@@ -1718,14 +1718,18 @@ export function SalesList() {
                             <strong>Productos:</strong>
                             {s.items?.map((i, idx) => (
                                 <div key={idx} className="border-b py-1 last:border-0">
-                                    <div className="flex justify-between">
-                                        <span>
+                                    <div className="flex justify-between items-center">
+                                        <span className="flex items-center gap-2">
                                             {i.product_name} {i.variant_name} {i.color ? `(${i.color})` : ""} — {i.quantity}u
+                                            {i.is_gift && (
+                                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
+                                                    REGALO
+                                                </Badge>
+                                            )}
                                         </span>
                                         <span>
-                                            ${Number(i.subtotal_ars ?? 0).toLocaleString("es-AR")}
+                                            {i.is_gift ? "$0" : `$${Number(i.subtotal_ars ?? 0).toLocaleString("es-AR")}`}
                                         </span>
-
                                     </div>
                                     {i.imei && i.imei.toString().trim() !== "" && <div className="text-xs text-muted-foreground">IMEI: {i.imei}</div>}
                                 </div>
