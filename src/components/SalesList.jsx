@@ -1379,13 +1379,13 @@ export function SalesList() {
                 },
                 head: [["Producto", "Variante", "Color", "Cant", "IMEI/s", "Subtotal USD", "Subtotal ARS"]],
                 body: sale.items?.map((i) => [
-                    i.product_name,
+                    i.is_gift ? `${i.product_name} (REGALO)` : i.product_name,
                     i.variant_name || "Modelo Base",
                     i.color || "-",
                     i.quantity,
                     (i.imeis || []).join("\n"),
-                    `USD ${(i.subtotal_usd || i.usd_price * i.quantity).toFixed(2)}`,
-                    `$ ${Number(i.subtotal_ars).toLocaleString("es-AR")}`,
+                    i.is_gift ? "USD 0.00" : `USD ${(i.subtotal_usd || i.usd_price * i.quantity).toFixed(2)}`,
+                    i.is_gift ? "$0" : `$ ${Number(i.subtotal_ars).toLocaleString("es-AR")}`,
                 ]) || [],
                 columnStyles: {
                     0: { cellWidth: 32 },

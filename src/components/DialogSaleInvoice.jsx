@@ -228,14 +228,13 @@ export default function DialogSaleInvoice({ open, onClose, sale, subtotalWithSur
       },
       head: [["Producto", "Variante", "Color", "Cant", "IMEI/s", "Subtotal USD", "Subtotal ARS"]],
       body: safeSale.variants.map((v) => [
-        v.product_name,
+        v.is_free ? `${v.product_name} (REGALO)` : v.product_name,
         v.variant_name ? v.variant_name : "Modelo Base",
         v.color || "-",
         getVariantQuantity(v),
         getVariantIdentifiers(v).join("\n"),
-        `USD ${v.usd_price.toFixed(2)}`,
-        `$ ${(v.usd_price * getVariantQuantity(v) * safeSale.fx_rate_used)
-          .toLocaleString("es-AR")}`,
+        v.is_free ? "USD 0.00" : `USD ${v.usd_price.toFixed(2)}`,
+        v.is_free ? "$0" : `$ ${(v.usd_price * getVariantQuantity(v) * safeSale.fx_rate_used).toLocaleString("es-AR")}`,
       ]),
 
       columnStyles: {
