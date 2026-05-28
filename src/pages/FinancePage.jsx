@@ -339,16 +339,12 @@ export default function FinancePage() {
         };
       }
 
+      monthlyData[monthKey].totalSales += Number(sale.total_usd || 0);
+
       sale.sale_items?.forEach((item) => {
         const quantity = Number(item.quantity || 0);
-        const salePrice = Number(item.usd_price || 0);
         const costPrice = Number(item.cost_price_usd ?? 0);
-
-        const itemSaleValue = quantity * salePrice;
-        const itemCost = quantity * costPrice;
-
-        monthlyData[monthKey].totalSales += itemSaleValue;
-        monthlyData[monthKey].totalCost += itemCost;
+        monthlyData[monthKey].totalCost += quantity * costPrice;
       });
 
       monthlyData[monthKey].salesCount += 1;
@@ -380,9 +376,7 @@ export default function FinancePage() {
 
     const { data, error } = await supabase
       .from("sales")
-      .select(
-        "id, sale_date, fx_rate_used, sales_channels(name), sale_items(product_name, variant_name, quantity, usd_price, cost_price_usd, subtotal_usd)",
-      )
+      .select(`id,sale_date,total_usd,fx_rate_used,sales_channels(name),sale_items(product_name,variant_name,quantity,usd_price,cost_price_usd,subtotal_usd)`)
       .eq("status", "vendido")
       .is("voided_at", null)
       .gte("sale_date", monthStart)
@@ -1022,12 +1016,11 @@ export default function FinancePage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Fecha</TableHead>
+                      <TableHead className="text-right">Venta ID</TableHead>
                       <TableHead>Producto</TableHead>
                       <TableHead>Canal</TableHead>
                       <TableHead className="text-right">Cant.</TableHead>
                       <TableHead className="text-right">Cotización</TableHead>
-                      <TableHead className="text-right">Precio Vta</TableHead>
-                      <TableHead className="text-right">Costo</TableHead>
                       <TableHead className="text-right">Total Vta</TableHead>
                       <TableHead className="text-right">Costo Total</TableHead>
                       <TableHead className="text-right bg-emerald-50/70 text-emerald-800">
@@ -1036,64 +1029,72 @@ export default function FinancePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {detailSales.map((sale) =>
-                      sale.sale_items?.map((item, idx) => {
-                        const qty = Number(item.quantity || 0);
-                        const salePrice = Number(item.usd_price || 0);
-                        const costPrice = Number(item.cost_price_usd ?? 0);
-                        const totalSale = qty * salePrice;
-                        const totalCost = qty * costPrice;
-                        const net = totalSale - totalCost;
+                    {detailSales.map((sale) => {
+                      const items = sale.sale_items || [];
+                      const labels = items
+                        .map(
+                          (it) =>
+                            `${it.product_name}${it.variant_name ? ` - ${it.variant_name}` : ""}`,
+                        )
+                        .join(", ");
+                      const totalQty = items.reduce(
+                        (sum, it) => sum + Number(it.quantity || 0),
+                        0,
+                      );
+                      const totalSale = Number(sale.total_usd || 0);
+                      const totalCost = items.reduce(
+                        (sum, it) =>
+                          sum +
+                          Number(it.quantity || 0) *
+                            Number(it.cost_price_usd ?? 0),
+                        0,
+                      );
+                      const net = totalSale - totalCost;
 
-                        return (
-                          <TableRow key={`${sale.id}-${idx}`}>
-                            <TableCell className="whitespace-nowrap">
-                              {new Date(sale.sale_date).toLocaleDateString(
-                                "es-AR",
-                              )}
-                            </TableCell>
-                            <TableCell
-                              className="max-w-[200px] truncate"
-                              title={`${item.product_name}${item.variant_name ? ` - ${item.variant_name}` : ""}`}
-                            >
-                              {item.product_name}
-                              {item.variant_name
-                                ? ` - ${item.variant_name}`
-                                : ""}
-                            </TableCell>
-                            <TableCell>
-                              {sale.sales_channels?.name || "-"}
-                            </TableCell>
-                            <TableCell className="text-right">{qty}</TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(
-                                Number(sale.fx_rate_used ?? 0),
-                                "ARS",
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(salePrice, "USD")}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(costPrice, "USD")}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(totalSale, "USD")}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(totalCost, "USD")}
-                            </TableCell>
-                            <TableCell
-                              className={`text-right font-semibold ${
-                                net >= 0 ? "text-emerald-700" : "text-rose-700"
-                              }`}
-                            >
-                              {formatCurrency(net, "USD")}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      }),
-                    )}
+                      return (
+                        <TableRow key={sale.id}>
+                          <TableCell className="whitespace-nowrap">
+                            {new Date(sale.sale_date).toLocaleDateString(
+                              "es-AR",
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs">
+                            #{sale.id}
+                          </TableCell>
+                          <TableCell
+                            className="max-w-[240px] truncate"
+                            title={labels}
+                          >
+                            {labels || "-"}
+                          </TableCell>
+                          <TableCell>
+                            {sale.sales_channels?.name || "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {totalQty}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(
+                              Number(sale.fx_rate_used ?? 0),
+                              "ARS",
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(totalSale, "USD")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(totalCost, "USD")}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right font-semibold ${
+                              net >= 0 ? "text-emerald-700" : "text-rose-700"
+                            }`}
+                          >
+                            {formatCurrency(net, "USD")}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
